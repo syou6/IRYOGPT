@@ -15,6 +15,8 @@ interface TrainRequest {
   urlList?: string;
 }
 
+const MAX_TRAINING_PAGES = 20;
+
 // SitemapからURLリストを取得（サイトマップインデックス対応）
 async function getUrlsFromSitemap(sitemapUrl: string): Promise<string[]> {
   try {
@@ -371,6 +373,7 @@ export default async function handler(
       job_id: jobId,
       status: 'running',
       message: `Training started for site_id ${site_id}`,
+      page_limit_max: MAX_TRAINING_PAGES,
     });
 
     // 5. バックグラウンド処理を開始（非同期）
@@ -412,11 +415,21 @@ export default async function handler(
           detectionMethod = result.detectionMethod;
         }
 
+        const originalUrlCount = urls.length;
+        let wasTruncated = false;
+        if (urls.length > MAX_TRAINING_PAGES) {
+          urls = urls.slice(0, MAX_TRAINING_PAGES);
+          wasTruncated = true;
+          console.log(`[Training] Page limit applied: keeping first ${MAX_TRAINING_PAGES} URLs out of ${originalUrlCount}`);
+        }
+
         // ジョブのtotal_pagesとmetadataを更新
         console.log(`[Training] Detection result:`, {
           detectionMethod,
           detectedSitemapUrl,
           urlCount: urls.length,
+          originalUrlCount,
+          wasTruncated,
         });
         
         await supabaseClient
@@ -427,6 +440,11 @@ export default async function handler(
               detected_sitemap_url: detectedSitemapUrl || sitemapUrl || null,
               detection_method: detectionMethod || '不明',
               url_count: urls.length,
+              original_url_count: originalUrlCount,
+              page_limit: {
+                max_pages: MAX_TRAINING_PAGES,
+                truncated: wasTruncated,
+              },
               urls: urls, // 実際に学習されたURLのリストを保存
             },
           })
@@ -506,4 +524,3 @@ export default async function handler(
     });
   }
 }
-

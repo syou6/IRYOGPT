@@ -15,6 +15,29 @@ interface Site {
   created_at: string;
 }
 
+interface TrainingJob {
+  id: string;
+  site_id: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  started_at: string | null;
+  finished_at: string | null;
+  total_pages: number | null;
+  processed_pages: number | null;
+  error_message: string | null;
+  metadata?: {
+    detected_sitemap_url?: string | null;
+    detection_method?: string;
+    url_count?: number;
+    urls?: string[];
+    original_url_count?: number;
+    page_limit?: {
+      max_pages: number;
+      truncated: boolean;
+    };
+  };
+  created_at: string;
+}
+
 export default function Dashboard() {
   const router = useRouter();
   const [sites, setSites] = useState<Site[]>([]);
@@ -29,8 +52,9 @@ export default function Dashboard() {
   });
   const [urlInputs, setUrlInputs] = useState(['']);
   const [trainingSites, setTrainingSites] = useState<Set<string>>(new Set());
-  const [showOnboarding, setShowOnboarding] = useState(false);
   const [trainingJobs, setTrainingJobs] = useState<Map<string, TrainingJob>>(new Map());
+  const trainingJobsIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const supabase = createSupabaseClient();
   const channelRef = useRef<any>(null);
 
@@ -110,7 +134,7 @@ export default function Dashboard() {
           throw new Error('Failed to fetch sites');
         }
 
-        const data = await response.json();
+        const data: Site[] = await response.json();
         setSites(data);
 
         // Training中のサイトを追跡
@@ -118,6 +142,8 @@ export default function Dashboard() {
           data.filter((s: Site) => s.status === 'training').map((s: Site) => s.id)
         );
         setTrainingSites(training);
+
+        await loadTrainingJobs(training);
       } catch (error) {
         console.error('Error fetching sites:', error);
       } finally {
@@ -182,7 +208,7 @@ export default function Dashboard() {
         },
       });
       if (!response.ok) throw new Error('Failed to fetch sites');
-      const data = await response.json();
+      const data: Site[] = await response.json();
       setSites(data);
       
       // Training中のサイトを追跡
@@ -190,47 +216,90 @@ export default function Dashboard() {
         data.filter((s: Site) => s.status === 'training').map((s: Site) => s.id)
       );
       setTrainingSites(training);
-
-      // Training中のサイトの最新ジョブを取得
-      if (training.size > 0) {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-        if (session) {
-          const jobPromises = Array.from(training).map(async (siteId) => {
-            try {
-              const jobResponse = await fetch(`/api/training-jobs/${siteId}`, {
-                headers: {
-                  Authorization: `Bearer ${session.access_token}`,
-                },
-              });
-              if (jobResponse.ok) {
-                const jobs: TrainingJob[] = await jobResponse.json();
-                const runningJob = jobs.find((j) => j.status === 'running' || j.status === 'pending');
-                if (runningJob) {
-                  return { siteId, job: runningJob };
-                }
-              }
-            } catch (error) {
-              console.error(`Error fetching job for site ${siteId}:`, error);
-            }
-            return null;
-          });
-
-          const jobResults = await Promise.all(jobPromises);
-          const jobsMap = new Map<string, TrainingJob>();
-          jobResults.forEach((result) => {
-            if (result) {
-              jobsMap.set(result.siteId, result.job);
-            }
-          });
-          setTrainingJobs(jobsMap);
-        }
-      }
+      await loadTrainingJobs(training);
     } catch (error) {
       console.error('Error fetching sites:', error);
     }
   };
+
+  async function loadTrainingJobs(trainingSet: Set<string>) {
+    const siteIds = Array.from(trainingSet);
+
+    if (siteIds.length === 0) {
+      setTrainingJobs(new Map());
+      return;
+    }
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      return;
+    }
+
+    try {
+      const token = session.access_token;
+      const jobEntries = await Promise.all(
+        siteIds.map(async (siteId) => {
+          try {
+            const resp = await fetch(`/api/training-jobs/${siteId}`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            });
+            if (!resp.ok) {
+              return null;
+            }
+            const jobs: TrainingJob[] = await resp.json();
+            if (!jobs || jobs.length === 0) {
+              return null;
+            }
+            return [siteId, jobs[0]] as const;
+          } catch (error) {
+            console.error('Error fetching training job:', error);
+            return null;
+          }
+        }),
+      );
+
+      const jobMap = new Map<string, TrainingJob>();
+      for (const entry of jobEntries) {
+        if (entry) {
+          jobMap.set(entry[0], entry[1]);
+        }
+      }
+      setTrainingJobs(jobMap);
+    } catch (error) {
+      console.error('Error loading training jobs:', error);
+    }
+  }
+
+  useEffect(() => {
+    if (trainingJobsIntervalRef.current) {
+      clearInterval(trainingJobsIntervalRef.current);
+      trainingJobsIntervalRef.current = null;
+    }
+
+    if (trainingSites.size === 0) {
+      setTrainingJobs(new Map());
+      return;
+    }
+
+    const interval = setInterval(() => {
+      loadTrainingJobs(trainingSites);
+    }, 5000);
+    trainingJobsIntervalRef.current = interval;
+
+    // 初期ロード
+    loadTrainingJobs(trainingSites);
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [Array.from(trainingSites).sort().join(',')]);
 
   // 新規サイト作成
   const handleCreateSite = async (e: React.FormEvent) => {
@@ -458,28 +527,6 @@ export default function Dashboard() {
                     <div>
                       <span className="font-medium">最終学習:</span>{' '}
                       <span className="break-words">{formatDate(site.last_trained_at)}</span>
-                    </div>
-                  )}
-                  {site.status === 'training' && trainingJobs.has(site.id) && (
-                    <div className="mt-3">
-                      <div className="flex justify-between text-xs text-gray-600 mb-1">
-                        <span className="font-medium">学習進捗</span>
-                        <span>
-                          {trainingJobs.get(site.id)?.processed_pages || 0} / {trainingJobs.get(site.id)?.total_pages || 0}
-                        </span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2">
-                        <div
-                          className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                          style={{
-                            width: `${
-                              trainingJobs.get(site.id)?.total_pages
-                                ? ((trainingJobs.get(site.id)?.processed_pages || 0) / trainingJobs.get(site.id)!.total_pages) * 100
-                                : 0
-                            }%`,
-                          }}
-                        />
-                      </div>
                     </div>
                   )}
                 </div>
@@ -746,4 +793,3 @@ export default function Dashboard() {
     </Layout>
   );
 }
-

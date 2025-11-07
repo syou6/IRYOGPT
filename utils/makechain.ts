@@ -51,9 +51,9 @@ export const makeChain = (
 
   // 回答生成用のLLM（ストリーミング対応）
   const answerLLM = new ChatOpenAI({
-    temperature: 0,
+      temperature: 0,
     model: 'gpt-4o-mini',
-    streaming: Boolean(onTokenStream),
+      streaming: Boolean(onTokenStream),
   });
 
   // 質問を独立した質問に変換するチェーン

@@ -1,8 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
-import { Document } from '@langchain/core/dist/documents/index.js';
+import { Document } from '@langchain/core/documents';
 import { CustomWebLoader } from '@/utils/custom_web_loader';
 import { OpenAIEmbeddings } from '@langchain/openai';
-import { SupabaseVectorStore } from '@langchain/community/dist/vectorstores/supabase';
+// @ts-ignore - LangChain 1.x module resolution issue
+import { SupabaseVectorStore } from '@langchain/community/vectorstores/supabase';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { supabaseClient } from '@/utils/supabase-client';
 import { requireAuth } from '@/utils/supabase-auth';

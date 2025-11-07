@@ -1,9 +1,10 @@
 import { ChatOpenAI } from '@langchain/openai';
-import { SupabaseVectorStore } from '@langchain/community/dist/vectorstores/supabase';
-import { PromptTemplate } from '@langchain/core/dist/prompts/index.js';
-import { RunnableSequence, RunnablePassthrough } from '@langchain/core/dist/runnables/index.js';
-import { StringOutputParser } from '@langchain/core/dist/output_parsers/index.js';
-import { Document } from '@langchain/core/dist/documents/index.js';
+// @ts-ignore - LangChain 1.x module resolution issue
+import { SupabaseVectorStore } from '@langchain/community/vectorstores/supabase';
+import { PromptTemplate } from '@langchain/core/prompts';
+import { RunnableSequence, RunnablePassthrough } from '@langchain/core/runnables';
+import { StringOutputParser } from '@langchain/core/output_parsers';
+import { Document } from '@langchain/core/documents';
 
 // Document配列を文字列に変換する関数
 const formatDocumentsAsString = (documents: Document[]): string => {
@@ -56,26 +57,22 @@ export const makeChain = (
   });
 
   // 質問を独立した質問に変換するチェーン
-  const condenseQuestionChain = RunnableSequence.from([
-    CONDENSE_PROMPT,
-    questionGenerator,
-    new StringOutputParser(),
-  ]);
+  const condenseQuestionChain = CONDENSE_PROMPT.pipe(questionGenerator as any).pipe(new StringOutputParser());
 
   // 回答生成チェーン
   const answerChain = RunnableSequence.from([
     {
       context: RunnableSequence.from([
         (input: { question: string }) => input.question,
-        retriever || vectorstore.asRetriever(),
+        retriever || (vectorstore as any).asRetriever(),
         formatDocumentsAsString,
       ]),
       question: (input: { question: string }) => input.question,
     },
     QA_PROMPT,
-    answerLLM,
+    answerLLM as any,
     new StringOutputParser(),
-  ]);
+  ] as any);
 
   // メインチェーン：会話履歴がある場合は質問を変換、ない場合はそのまま使用
   return RunnableSequence.from([
@@ -93,5 +90,5 @@ export const makeChain = (
       },
     },
     answerChain,
-  ]);
+  ] as any);
 };

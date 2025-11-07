@@ -25,20 +25,28 @@ SupabaseのSQLエディタで `supabase_rls_policies.sql` を実行してくだ�
 
 ### 3. 確認方法
 
-以下のSQLで設定を確認できます：
+`check_rls_policies.sql` ファイルをSupabaseのSQLエディタで実行してください。
+
+または、以下のSQLで設定を確認できます：
 
 ```sql
--- RLSが有効になっているか確認
-SELECT tablename, rowsecurity 
+-- テーブルの存在確認とRLS有効化状態
+SELECT tablename, rowsecurity as rls_enabled
 FROM pg_tables 
 WHERE schemaname = 'public' 
 AND tablename IN ('sites', 'training_jobs', 'documents');
 
 -- ポリシーを確認
-SELECT schemaname, tablename, policyname, permissive, roles, cmd, qual 
+SELECT tablename, policyname, cmd as command
 FROM pg_policies 
-WHERE tablename IN ('sites', 'training_jobs', 'documents');
+WHERE tablename IN ('sites', 'training_jobs', 'documents')
+ORDER BY tablename, policyname;
 ```
+
+**結果の見方：**
+- `rls_enabled` が `true` ならRLSが有効
+- ポリシーが表示されれば設定済み
+- 「No rows returned」の場合は、テーブルが存在しないか、ポリシーが未設定
 
 ## 注意事項
 

@@ -35,6 +35,7 @@ Answer in Markdown:`
 export const makeChain = (
   vectorstore: SupabaseVectorStore,
   onTokenStream?: (token: string) => void,
+  retriever?: any,
 ) => {
   // 質問生成用のLLM
   const questionGenerator = new ChatOpenAI({
@@ -70,7 +71,7 @@ export const makeChain = (
     {
       context: RunnableSequence.from([
         (input: { question: string }) => input.question,
-        vectorstore.asRetriever(),
+        retriever || vectorstore.asRetriever(),
         formatDocumentsAsString,
       ]),
       question: (input: { question: string }) => input.question,

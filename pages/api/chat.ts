@@ -9,7 +9,7 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
-  const { question, history } = req.body;
+  const { question, history, site_id } = req.body;
 
   if (!question) {
     return res.status(400).json({ message: 'No question in the request' });
@@ -31,6 +31,44 @@ export default async function handler(
     }
   );
 
+  // site_idが指定されている場合、カスタムRetrieverを作成
+  let retriever;
+  if (site_id) {
+    // カスタムRetrieverでsite_idフィルタを適用
+    const { BaseRetriever } = await import('@langchain/core/retrievers');
+    const { Document } = await import('@langchain/core/documents');
+    
+    retriever = new (class extends BaseRetriever {
+      async _getRelevantDocuments(query: string) {
+        // クエリの埋め込みを生成
+        const queryEmbedding = await embeddings.embedQuery(query);
+        
+        // match_documents関数を直接呼び出し（site_idフィルタ付き）
+        // ベクトルは配列形式で渡す（Supabaseが自動的にvector型に変換）
+        const { data, error } = await supabaseClient.rpc('match_documents', {
+          query_embedding: queryEmbedding,
+          match_count: 5,
+          filter: {},
+          match_site_id: site_id,
+        });
+
+        if (error) {
+          throw error;
+        }
+
+        // Document形式に変換
+        return (data || []).map((row: any) => 
+          new Document({
+            pageContent: row.content,
+            metadata: row.metadata || {},
+          })
+        );
+      }
+    })();
+  } else {
+    retriever = vectorStore.asRetriever();
+  }
+
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache, no-transform',
@@ -47,7 +85,7 @@ export default async function handler(
   // create the chain with streaming callback
   const chain = makeChain(vectorStore, (token: string) => {
     sendData(JSON.stringify({ data: token }));
-  });
+  }, retriever);
 
   try {
     //Ask a question with streaming (onTokenStream callback will handle streaming)

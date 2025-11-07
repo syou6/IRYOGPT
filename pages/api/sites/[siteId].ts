@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseClient } from '@/utils/supabase-client';
+import { requireAuth } from '@/utils/supabase-auth';
 
 // PUT: サイト情報更新
 // DELETE: サイト削除
@@ -7,14 +8,31 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
-  const { siteId } = req.query;
+  try {
+    // 認証チェック
+    const userId = await requireAuth(req);
+    const { siteId } = req.query;
 
-  if (!siteId || typeof siteId !== 'string') {
-    return res.status(400).json({ message: 'siteId is required' });
-  }
+    if (!siteId || typeof siteId !== 'string') {
+      return res.status(400).json({ message: 'siteId is required' });
+    }
 
-  if (req.method === 'PUT') {
-    try {
+    // サイトの所有者を確認
+    const { data: site, error: siteError } = await supabaseClient
+      .from('sites')
+      .select('user_id')
+      .eq('id', siteId)
+      .single();
+
+    if (siteError || !site) {
+      return res.status(404).json({ message: 'Site not found' });
+    }
+
+    if (site.user_id !== userId) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+
+    if (req.method === 'PUT') {
       const { name, baseUrl, sitemapUrl } = req.body;
 
       const updateData: any = {};
@@ -34,17 +52,9 @@ export default async function handler(
       }
 
       return res.status(200).json(data);
-    } catch (error) {
-      console.error('Error updating site:', error);
-      return res.status(500).json({
-        message: 'Failed to update site',
-        error: error instanceof Error ? error.message : String(error),
-      });
     }
-  }
 
-  if (req.method === 'DELETE') {
-    try {
+    if (req.method === 'DELETE') {
       // CASCADEでdocumentsとtraining_jobsも自動削除される
       const { error } = await supabaseClient
         .from('sites')
@@ -56,15 +66,22 @@ export default async function handler(
       }
 
       return res.status(200).json({ message: 'Site deleted successfully' });
-    } catch (error) {
-      console.error('Error deleting site:', error);
-      return res.status(500).json({
-        message: 'Failed to delete site',
-        error: error instanceof Error ? error.message : String(error),
+    }
+
+    return res.status(405).json({ message: 'Method not allowed' });
+  } catch (error: any) {
+    if (error.message === 'Unauthorized') {
+      return res.status(401).json({
+        message: 'Unauthorized',
+        error: '認証が必要です',
       });
     }
-  }
 
-  return res.status(405).json({ message: 'Method not allowed' });
+    console.error('Error:', error);
+    return res.status(500).json({
+      message: 'Failed to process request',
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 

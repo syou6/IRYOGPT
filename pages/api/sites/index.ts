@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseClient } from '@/utils/supabase-client';
+import { requireAuth } from '@/utils/supabase-auth';
 
 // GET: ユーザーのサイト一覧取得
 // POST: 新規サイト登録
@@ -7,16 +8,15 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
-  // 認証チェック（簡易版：後でSupabase Authと連携）
-  // 今は一旦スキップして実装
+  try {
+    // 認証チェック
+    const userId = await requireAuth(req);
 
-  if (req.method === 'GET') {
-    try {
-      // TODO: auth.uid()からuser_idを取得
-      // 今は一旦全件取得（テスト用）
+    if (req.method === 'GET') {
       const { data, error } = await supabaseClient
         .from('sites')
         .select('*')
+        .eq('user_id', userId)
         .order('created_at', { ascending: false });
 
       if (error) {
@@ -24,17 +24,9 @@ export default async function handler(
       }
 
       return res.status(200).json(data);
-    } catch (error) {
-      console.error('Error fetching sites:', error);
-      return res.status(500).json({
-        message: 'Failed to fetch sites',
-        error: error instanceof Error ? error.message : String(error),
-      });
     }
-  }
 
-  if (req.method === 'POST') {
-    try {
+    if (req.method === 'POST') {
       const { name, baseUrl, sitemapUrl } = req.body;
 
       if (!name || !baseUrl) {
@@ -43,14 +35,10 @@ export default async function handler(
         });
       }
 
-      // TODO: auth.uid()からuser_idを取得
-      // 今はテスト用に固定値を使用
-      const testUserId = '00000000-0000-0000-0000-000000000000'; // テスト用
-
       const { data, error } = await supabaseClient
         .from('sites')
         .insert({
-          user_id: testUserId,
+          user_id: userId,
           name,
           base_url: baseUrl,
           sitemap_url: sitemapUrl || null,
@@ -64,15 +52,22 @@ export default async function handler(
       }
 
       return res.status(201).json(data);
-    } catch (error) {
-      console.error('Error creating site:', error);
-      return res.status(500).json({
-        message: 'Failed to create site',
-        error: error instanceof Error ? error.message : String(error),
+    }
+
+    return res.status(405).json({ message: 'Method not allowed' });
+  } catch (error: any) {
+    if (error.message === 'Unauthorized') {
+      return res.status(401).json({
+        message: 'Unauthorized',
+        error: '認証が必要です',
       });
     }
-  }
 
-  return res.status(405).json({ message: 'Method not allowed' });
+    console.error('Error:', error);
+    return res.status(500).json({
+      message: 'Failed to process request',
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }
 

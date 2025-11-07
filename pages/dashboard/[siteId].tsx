@@ -284,6 +284,23 @@ export default function SiteChat() {
             if (process.env.NODE_ENV === 'development') {
               console.log('[Chat] Connection opened');
             }
+          } else if (response.status === 403) {
+            // クォータ超過エラー
+            const errorData = await response.json().catch(() => ({ error: 'クォータ超過' }));
+            console.error('[Chat] Quota exceeded:', errorData);
+            setMessageState((state) => ({
+              ...state,
+              messages: [
+                ...state.messages,
+                {
+                  type: 'apiMessage',
+                  message: errorData.error || '月間チャット上限に達しました。プランのアップグレードをご検討ください。',
+                },
+              ],
+              pending: undefined,
+            }));
+            setLoading(false);
+            ctrl.abort();
           } else if (response.status >= 400 && response.status < 500 && response.status !== 429) {
             const errorText = await response.text();
             console.error('[Chat] Client error:', response.status, errorText);

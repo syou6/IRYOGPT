@@ -222,13 +222,19 @@ async function splitDocsIntoChunks(docs: Document[]): Promise<Document[]> {
   return await textSplitter.splitDocuments(docs);
 }
 
+// トークン数の概算計算（文字数から概算、1トークン ≈ 4文字）
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
+
 // 埋め込みを生成してSupabaseに保存（site_id付き）
+// 戻り値: 使用したembeddingトークン数
 async function embedDocumentsWithSiteId(
   siteId: string,
   docs: Document[],
   embeddings: OpenAIEmbeddings,
   onProgress?: (processed: number, total: number) => void,
-): Promise<void> {
+): Promise<number> {
   console.log(`[Training] Creating embeddings for ${docs.length} documents...`);
   
   // 保存前のタイムスタンプを記録（この時点以降に保存されたドキュメントを特定するため）
@@ -290,6 +296,10 @@ async function embedDocumentsWithSiteId(
   }
 
   console.log('[Training] Embeddings successfully stored in supabase');
+  
+  // 使用したembeddingトークン数を計算（各ドキュメントのテキスト長から概算）
+  const totalTokens = docs.reduce((sum, doc) => sum + estimateTokens(doc.pageContent), 0);
+  return totalTokens;
 }
 
 export default async function handler(
@@ -476,13 +486,16 @@ export default async function handler(
           dimensions: 512,
         });
 
-        await embedDocumentsWithSiteId(site_id, docs, embeddings, (processed, total) => {
+        const embeddingTokens = await embedDocumentsWithSiteId(site_id, docs, embeddings, (processed, total) => {
           // 進捗更新（オプション）
           supabaseClient
             .from('training_jobs')
             .update({ processed_pages: processed })
             .eq('id', jobId);
         });
+
+        // コスト計算（text-embedding-3-small: $0.02 per 1M tokens）
+        const estimatedCostUsd = (embeddingTokens / 1_000_000) * 0.02;
 
         // 6. 完了処理
         await supabaseClient
@@ -493,14 +506,36 @@ export default async function handler(
           })
           .eq('id', site_id);
 
+        // training_jobsにestimated_cost_usdを記録
         await supabaseClient
           .from('training_jobs')
           .update({
             status: 'completed',
             finished_at: new Date().toISOString(),
             processed_pages: urls.length,
+            estimated_cost_usd: estimatedCostUsd,
           })
           .eq('id', jobId);
+
+        // usage_logsに訓練の記録を追加
+        try {
+          await supabaseClient.from('usage_logs').insert({
+            user_id: userId,
+            site_id: site_id,
+            action: 'training',
+            model_name: 'text-embedding-3-small',
+            tokens_consumed: embeddingTokens,
+            cost_usd: estimatedCostUsd,
+            metadata: {
+              document_count: docs.length,
+              url_count: urls.length,
+              job_id: jobId,
+            },
+          });
+        } catch (logError) {
+          console.error('[Training] Failed to log usage:', logError);
+          // ログ記録の失敗は警告のみ（訓練自体は成功）
+        }
 
         console.log(`Training completed for site_id ${site_id}`);
       } catch (error) {

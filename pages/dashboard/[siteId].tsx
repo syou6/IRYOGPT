@@ -456,7 +456,7 @@ export default function SiteChat() {
                 {loading && (
                   <div className="flex justify-start">
                     <div className="bg-gray-100 rounded-lg px-4 py-2">
-                      <LoadingDots />
+                      <LoadingDots color="#000000" />
                     </div>
                   </div>
                 )}

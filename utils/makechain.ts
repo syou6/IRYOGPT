@@ -1,9 +1,9 @@
 import { ChatOpenAI } from '@langchain/openai';
-import { SupabaseVectorStore } from '@langchain/community/vectorstores/supabase';
-import { PromptTemplate } from '@langchain/core/prompts';
-import { RunnableSequence, RunnablePassthrough } from '@langchain/core/runnables';
-import { StringOutputParser } from '@langchain/core/output_parsers';
-import { Document } from '@langchain/core/documents';
+import { SupabaseVectorStore } from '@langchain/community/dist/vectorstores/supabase';
+import { PromptTemplate } from '@langchain/core/dist/prompts/index.js';
+import { RunnableSequence, RunnablePassthrough } from '@langchain/core/dist/runnables/index.js';
+import { StringOutputParser } from '@langchain/core/dist/output_parsers/index.js';
+import { Document } from '@langchain/core/dist/documents/index.js';
 
 // Document配列を文字列に変換する関数
 const formatDocumentsAsString = (documents: Document[]): string => {
@@ -53,15 +53,6 @@ export const makeChain = (
     temperature: 0,
     model: 'gpt-4o-mini',
     streaming: Boolean(onTokenStream),
-    callbacks: onTokenStream
-      ? [
-          {
-            handleLLMNewToken(token: string) {
-              onTokenStream(token);
-            },
-          },
-        ]
-      : undefined,
   });
 
   // 質問を独立した質問に変換するチェーン

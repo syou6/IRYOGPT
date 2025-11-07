@@ -44,7 +44,7 @@
     "prettier": "^2.8.4",
     "tailwindcss": "^3.2.7",
     "tsx": "^3.12.3",
-    "typescript": "^4.9.5"
+    "typescript": "^5.3.3"
   },
   "keywords": [
     "starter",

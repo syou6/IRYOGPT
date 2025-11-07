@@ -1,6 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { OpenAIEmbeddings } from '@langchain/openai';
-import { SupabaseVectorStore } from '@langchain/community/vectorstores/supabase';
+import { SupabaseVectorStore } from '@langchain/community/dist/vectorstores/supabase';
 import { openai } from '@/utils/openai-client';
 import { supabaseClient } from '@/utils/supabase-client';
 import { makeChain } from '@/utils/makechain';
@@ -35,10 +35,12 @@ export default async function handler(
   let retriever;
   if (site_id) {
     // カスタムRetrieverでsite_idフィルタを適用
-    const { BaseRetriever } = await import('@langchain/core/retrievers');
-    const { Document } = await import('@langchain/core/documents');
+    const { BaseRetriever } = await import('@langchain/core/dist/retrievers/index.js');
+    const { Document } = await import('@langchain/core/dist/documents/index.js');
     
     retriever = new (class extends BaseRetriever {
+      lc_namespace = ['langchain', 'retrievers', 'supabase'];
+      
       async _getRelevantDocuments(query: string) {
         // クエリの埋め込みを生成
         const queryEmbedding = await embeddings.embedQuery(query);
@@ -76,7 +78,7 @@ export default async function handler(
       }
     })();
   } else {
-    retriever = vectorStore.asRetriever();
+    retriever = (vectorStore as any).asRetriever();
   }
 
   res.writeHead(200, {

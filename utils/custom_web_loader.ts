@@ -1,7 +1,7 @@
 import type { CheerioAPI, load as LoadT } from 'cheerio';
-import { Document } from '@langchain/core/documents';
-import { BaseDocumentLoader } from '@langchain/core/document_loaders/base';
-import type { DocumentLoader } from '@langchain/core/document_loaders/base';
+import { Document } from '@langchain/core/dist/documents/index.js';
+import { BaseDocumentLoader } from '@langchain/core/dist/document_loaders/base.js';
+import type { DocumentLoader } from '@langchain/core/dist/document_loaders/base.js';
 
 export class CustomWebLoader
   extends BaseDocumentLoader
@@ -35,7 +35,7 @@ export class CustomWebLoader
                   undefined;
 
     // mainタグがあればmain、なければbodyから取得
-    let contentElement = $('main').length > 0 ? $('main') : $('body');
+    let contentElement: any = $('main').length > 0 ? $('main') : $('body');
     
     // 不要な要素を削除
     contentElement = contentElement

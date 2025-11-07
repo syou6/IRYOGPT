@@ -1,7 +1,7 @@
 import { supabaseClient } from '@/utils/supabase-client';
-import { SupabaseVectorStore } from 'langchain/vectorstores';
-import { OpenAIEmbeddings } from 'langchain/embeddings';
-import { VectorDBQAChain } from 'langchain/chains';
+import { SupabaseVectorStore } from '@langchain/community/dist/vectorstores/supabase';
+import { OpenAIEmbeddings } from '@langchain/openai';
+// VectorDBQAChain is deprecated in LangChain 1.x, using makeChain instead
 import { openai } from '@/utils/openai-client';
 
 const query = 'How do i create a notion database?';

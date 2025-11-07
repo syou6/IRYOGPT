@@ -1,9 +1,9 @@
-import { Document } from '@langchain/core/documents';
+import { Document } from '@langchain/core/dist/documents/index.js';
 import * as fs from 'fs/promises';
 import { CustomWebLoader } from '@/utils/custom_web_loader';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { OpenAIEmbeddings } from '@langchain/openai';
-import { SupabaseVectorStore } from '@langchain/community/vectorstores/supabase';
+import { SupabaseVectorStore } from '@langchain/community/dist/vectorstores/supabase';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { supabaseClient } from '@/utils/supabase-client';
 import { urls } from '@/config/notionurls';

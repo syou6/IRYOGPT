@@ -113,7 +113,7 @@ export default function Dashboard() {
         setSites(data);
 
         // Training中のサイトを追跡
-        const training = new Set(
+        const training = new Set<string>(
           data.filter((s: Site) => s.status === 'training').map((s: Site) => s.id)
         );
         setTrainingSites(training);
@@ -185,7 +185,7 @@ export default function Dashboard() {
       setSites(data);
       
       // Training中のサイトを追跡
-      const training = new Set(
+      const training = new Set<string>(
         data.filter((s: Site) => s.status === 'training').map((s: Site) => s.id)
       );
       setTrainingSites(training);
@@ -224,7 +224,8 @@ export default function Dashboard() {
       const newSite = await response.json();
       setSites([newSite, ...sites]);
       setShowModal(false);
-      setFormData({ name: '', baseUrl: '', sitemapUrl: '' });
+      setFormData({ name: '', baseUrl: '', sitemapUrl: '', urlList: [] });
+      setUrlInputs(['']);
     } catch (error) {
       console.error('Error creating site:', error);
       alert('サイトの作成に失敗しました');

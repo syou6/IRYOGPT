@@ -222,8 +222,10 @@ export default function PlansPage() {
   if (authLoading || loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-gray-500">読み込み中...</div>
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="rounded-full border border-white/10 bg-white/5 px-6 py-3 text-xs uppercase tracking-[0.25em] text-slate-200">
+            読み込み中...
+          </div>
         </div>
       </Layout>
     );
@@ -231,188 +233,135 @@ export default function PlansPage() {
 
   return (
     <Layout>
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* ヘッダー */}
-        <div className="mb-8">
-          <Link
-            href="/dashboard"
-            className="text-blue-600 hover:text-blue-800 text-sm mb-2 inline-block"
-          >
-            ← ダッシュボードに戻る
-          </Link>
-          <h1 className="text-3xl font-bold text-gray-900">プラン比較</h1>
-          <p className="text-gray-600 mt-2">
-            あなたのニーズに合ったプランを選択してください
-          </p>
+      <div className="relative mx-auto max-w-6xl px-4 py-6 text-slate-100 sm:py-8">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-emerald-500/20 to-transparent blur-3xl" />
+          <div className="absolute bottom-[-20%] left-[-10%] h-72 w-72 rounded-full bg-teal-400/15 blur-[140px]" />
         </div>
 
-        {/* 現在のプラン表示 */}
-        {user && (
-          <div className="mb-8 bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <p className="text-sm text-blue-800">
-              現在のプラン:{' '}
-              <strong>
-                {plans.find((p) => p.id === user.plan)?.name || user.plan}
-              </strong>
+        <div className="relative space-y-8">
+          {/* ヘッダー */}
+          <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_35px_120px_rgba(1,6,3,0.55)] backdrop-blur-2xl">
+            <Link
+              href="/dashboard"
+              className="text-[11px] uppercase tracking-[0.35em] text-emerald-200/80"
+            >
+              ← ダッシュボード
+            </Link>
+            <h1 className="mt-2 text-3xl font-semibold text-white">プラン比較</h1>
+            <p className="text-sm text-slate-300">
+              あなたのニーズに合ったプランを選択してください
             </p>
           </div>
-        )}
 
-        {/* プラン一覧 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {plans.map((plan) => {
-            const isCurrentPlan = user?.plan === plan.id;
-            const isUpgrading = upgrading === plan.id;
+          {/* 現在のプラン表示 */}
+          {user && (
+            <div className="rounded-[28px] border border-white/10 bg-gradient-to-r from-emerald-500/10 via-green-400/5 to-cyan-300/10 p-4 text-sm text-emerald-50">
+              現在のプラン: <strong>{plans.find((p) => p.id === user.plan)?.name || user.plan}</strong>
+            </div>
+          )}
 
-            return (
-              <div
-                key={plan.id}
-                className={`relative bg-white border-2 rounded-lg p-6 ${
-                  plan.popular
-                    ? 'border-blue-500 shadow-lg'
-                    : 'border-gray-200'
-                }`}
-              >
-                {plan.popular && (
-                  <div className="absolute top-0 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
-                    <span className="bg-blue-500 text-white text-xs font-semibold px-3 py-1 rounded-full">
-                      人気
-                    </span>
-                  </div>
-                )}
-
-                {isCurrentPlan && (
-                  <div className="absolute top-4 right-4">
-                    <span className="bg-green-500 text-white text-xs font-semibold px-2 py-1 rounded">
-                      現在のプラン
-                    </span>
-                  </div>
-                )}
-
-                <div className="mb-4">
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    {plan.name}
-                  </h2>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {plan.description}
-                  </p>
-                </div>
-
-                <div className="mb-6">
-                  <div className="text-3xl font-bold text-gray-900">
-                    {plan.price}
-                  </div>
-                  {plan.price !== '無料' && plan.price !== 'カスタム' && (
-                    <div className="text-sm text-gray-500">税込</div>
-                  )}
-                </div>
-
-                <div className="mb-6 space-y-3">
-                  <div className="flex items-start">
-                    <svg
-                      className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                    <span className="text-sm text-gray-700">
-                      {plan.chat_quota === -1
-                        ? '無制限のチャット'
-                        : `月${plan.chat_quota.toLocaleString()}回のチャット`}
-                    </span>
-                  </div>
-                  <div className="flex items-start">
-                    <svg
-                      className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M5 13l4 4L19 7"
-                      />
-                    </svg>
-                    <span className="text-sm text-gray-700">
-                      {plan.embedding_quota === -1
-                        ? '無制限の埋め込み'
-                        : `月${plan.embedding_quota.toLocaleString()}トークンの埋め込み`}
-                    </span>
-                  </div>
-                  {plan.features.map((feature, index) => (
-                    <div key={index} className="flex items-start">
-                      <svg
-                        className="h-5 w-5 text-green-500 mr-2 flex-shrink-0 mt-0.5"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                      <span className="text-sm text-gray-700">{feature}</span>
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  onClick={() => handleUpgrade(plan.id)}
-                  disabled={isCurrentPlan || isUpgrading}
-                  className={`w-full py-2 px-4 rounded-lg font-semibold transition-colors ${
-                    isCurrentPlan
-                      ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                      : plan.popular
-                      ? 'bg-blue-600 text-white hover:bg-blue-700'
-                      : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+          {/* プラン一覧 */}
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
+            {plans.map((plan) => {
+              const isCurrentPlan = user?.plan === plan.id;
+              const isUpgrading = upgrading === plan.id;
+              return (
+                <div
+                  key={plan.id}
+                  className={`relative overflow-hidden rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_35px_120px_rgba(1,3,6,0.55)] backdrop-blur-2xl ${
+                    plan.popular ? 'ring-1 ring-emerald-400/40' : ''
                   }`}
                 >
-                  {isCurrentPlan
-                    ? '現在のプラン'
-                    : isUpgrading
-                    ? '処理中...'
-                    : plan.id === 'enterprise'
-                    ? 'お問い合わせ'
-                    : plan.id === 'starter'
-                    ? 'このプランに変更'
-                    : 'このプランに変更'}
-                </button>
-              </div>
-            );
-          })}
-        </div>
+                  <div className="pointer-events-none absolute inset-0 opacity-50">
+                    {plan.popular && (
+                      <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-emerald-500/30 blur-[90px]" />
+                    )}
+                  </div>
+                  <div className="relative">
+                    {plan.popular && (
+                      <span className="inline-flex items-center rounded-full bg-emerald-400/20 px-3 py-1 text-xs font-semibold text-emerald-100">
+                        人気
+                      </span>
+                    )}
+                    {isCurrentPlan && (
+                      <span className="ml-2 inline-flex items-center rounded-full border border-emerald-400/40 px-3 py-1 text-xs font-semibold text-emerald-100">
+                        現在のプラン
+                      </span>
+                    )}
 
-        {/* 注意事項 */}
-        <div className="mt-8 bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-          <h3 className="text-sm font-semibold text-yellow-800 mb-2">
-            ⚠️ 注意事項
-          </h3>
-          <ul className="text-sm text-yellow-700 list-disc list-inside space-y-1">
-            <li>
-              プラン変更は即座に反映されますが、決済処理が必要な場合は別途お手続きが必要です。
-            </li>
-            <li>
-              エンタープライズプランへの変更は、担当者からの連絡が必要です。
-            </li>
-            <li>
-              プランをダウングレードした場合、現在の使用量が新しいクォータを超えている場合は制限が適用されます。
-            </li>
-          </ul>
+                    <div className="mt-4">
+                      <h2 className="text-2xl font-semibold text-white">{plan.name}</h2>
+                      <p className="mt-1 text-sm text-slate-300">{plan.description}</p>
+                    </div>
+
+                    <div className="mt-6">
+                      <div className="text-3xl font-semibold text-white">{plan.price}</div>
+                      {plan.price !== '無料' && plan.price !== 'カスタム' && (
+                        <div className="text-xs uppercase tracking-[0.3em] text-slate-400">税込</div>
+                      )}
+                    </div>
+
+                    <div className="mt-6 space-y-3">
+                      {[{
+                        label:
+                          plan.chat_quota === -1
+                            ? '無制限のチャット'
+                            : `月${plan.chat_quota.toLocaleString()}回のチャット`,
+                      }, {
+                        label:
+                          plan.embedding_quota === -1
+                            ? '無制限の埋め込み'
+                            : `月${plan.embedding_quota.toLocaleString()}トークンの埋め込み`,
+                      }, ...plan.features.map((label) => ({ label }))].map((item, index) => (
+                        <div key={index} className="flex items-start text-sm text-slate-200">
+                          <svg
+                            className="mr-2 h-5 w-5 flex-shrink-0 text-emerald-300"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span>{item.label}</span>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button
+                      onClick={() => handleUpgrade(plan.id)}
+                      disabled={isCurrentPlan || isUpgrading}
+                      className={`mt-6 w-full rounded-full px-4 py-2.5 text-sm font-semibold transition ${
+                        isCurrentPlan
+                          ? 'cursor-not-allowed border border-white/10 bg-white/5 text-slate-400'
+                          : 'bg-gradient-to-r from-emerald-400 via-green-300 to-cyan-300 text-slate-900 shadow-[0_20px_45px_rgba(16,185,129,0.35)] hover:-translate-y-0.5'
+                      }`}
+                    >
+                      {isCurrentPlan
+                        ? '現在のプラン'
+                        : isUpgrading
+                        ? '処理中...'
+                        : plan.id === 'enterprise'
+                        ? 'お問い合わせ'
+                        : 'このプランに変更'}
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* 注意事項 */}
+          <div className="rounded-[28px] border border-amber-300/30 bg-amber-500/10 p-4 text-sm text-amber-50">
+            <h3 className="mb-2 font-semibold">⚠️ 注意事項</h3>
+            <ul className="list-disc space-y-1 pl-5 text-amber-100">
+              <li>プラン変更は即座に反映されますが、決済処理が必要な場合は別途お手続きが必要です。</li>
+              <li>エンタープライズプランへの変更は、担当者からの連絡が必要です。</li>
+              <li>プランをダウングレードした場合、現在の使用量が新しいクォータを超えている場合は制限が適用されます。</li>
+            </ul>
+          </div>
         </div>
       </div>
     </Layout>
   );
 }
-

@@ -446,8 +446,10 @@ export default function SiteChat() {
   if (authLoading || !site) {
     return (
       <Layout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-lg">読み込み中...</div>
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="rounded-full border border-white/10 bg-white/5 px-6 py-3 text-xs uppercase tracking-[0.25em] text-slate-200">
+            読み込み中...
+          </div>
         </div>
       </Layout>
     );
@@ -473,8 +475,10 @@ export default function SiteChat() {
   if (!site) {
     return (
       <Layout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-gray-500">読み込み中...</div>
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="rounded-full border border-white/10 bg-white/5 px-6 py-3 text-xs uppercase tracking-[0.25em] text-slate-200">
+            読み込み中...
+          </div>
         </div>
       </Layout>
     );
@@ -488,269 +492,256 @@ export default function SiteChat() {
 
   return (
     <Layout>
-      <div className="flex h-screen">
-        {/* メインコンテンツ（チャット） */}
-        <div className="flex-1 flex flex-col min-w-0">
-          {/* ヘッダー */}
-          <div className="border-b border-gray-200 bg-white px-3 md:px-4 py-2 md:py-3">
-            <div className="flex items-center justify-between gap-2">
-              <div className="flex-1 min-w-0">
+      {showSidebar && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm lg:hidden"
+          onClick={() => setShowSidebar(false)}
+        />
+      )}
+      <div className="relative mx-auto max-w-6xl px-4 py-6 text-slate-100 lg:py-8">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-emerald-500/20 to-transparent blur-3xl" />
+          <div className="absolute bottom-[-20%] left-0 h-72 w-72 rounded-full bg-teal-400/15 blur-[140px]" />
+        </div>
+
+        <div className="relative flex flex-col gap-6 lg:flex-row">
+          {/* メインコンテンツ（チャット） */}
+          <div className="flex min-h-[70vh] flex-1 flex-col overflow-hidden rounded-[32px] border border-white/10 bg-white/5 shadow-[0_35px_120px_rgba(1,6,3,0.6)] backdrop-blur-2xl">
+            {/* ヘッダー */}
+            <div className="flex flex-col gap-3 border-b border-white/10 px-6 py-5 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
                 <Link
                   href="/dashboard"
-                  className="text-blue-600 hover:text-blue-800 text-xs md:text-sm mb-1 inline-block"
+                  className="mb-1 inline-flex items-center text-[11px] uppercase tracking-[0.35em] text-emerald-200/80"
                 >
-                  ← ダッシュボードに戻る
+                  ← ダッシュボード
                 </Link>
-                <h1 className="text-base md:text-xl font-semibold truncate">{site.name}</h1>
+                <h1 className="truncate text-2xl font-semibold text-white">{site.name}</h1>
+                <p className="mt-1 break-all text-xs text-slate-400">{site.base_url}</p>
               </div>
-              <div className="flex items-center gap-2">
-                <div className="text-xs md:text-sm text-gray-500 hidden sm:block">
-                  {site.status === 'ready' ? '準備完了' : site.status}
+              <div className="flex flex-col gap-2 sm:items-end">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className={`rounded-full border px-3 py-1 text-xs font-medium ${
+                    site.status === 'ready'
+                      ? 'border-emerald-400/40 bg-emerald-400/15 text-emerald-50'
+                      : 'border-white/15 bg-white/10 text-slate-200'
+                  }`}>
+                    {site.status === 'ready' ? '準備完了' : site.status}
+                  </span>
+                  {embedHref && (
+                    <Link
+                      href={embedHref}
+                      className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-slate-100 transition hover:bg-white/15"
+                    >
+                      埋め込み設定
+                    </Link>
+                  )}
+                  <button
+                    onClick={() => setShowSidebar(true)}
+                    className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-slate-100 transition hover:bg-white/15 lg:hidden"
+                    aria-label="学習履歴を表示"
+                  >
+                    学習履歴
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                  </button>
                 </div>
-                {embedHref && (
-                  <Link
-                    href={embedHref}
-                    className="px-2 py-1 bg-blue-600 text-white rounded text-xs md:text-sm hover:bg-blue-700 transition-colors"
-                  >
-                    埋め込み設定
-                  </Link>
+              </div>
+            </div>
+
+            {/* チャットエリア */}
+            <div className="flex-1 overflow-y-auto px-4 py-6 sm:px-6">
+              <div className="mx-auto max-w-3xl">
+                {chatMessages.length === 0 ? (
+                  <div className="mt-8 text-center text-slate-400">メッセージがありません</div>
+                ) : (
+                  <div className="space-y-4">
+                    {chatMessages.map((message, index) => (
+                      <div
+                        key={index}
+                        className={`flex ${
+                          message.type === 'userMessage' ? 'justify-end' : 'justify-start'
+                        }`}
+                      >
+                        <div
+                          className={`max-w-[85%] rounded-3xl px-4 py-3 text-sm leading-relaxed shadow-lg sm:max-w-[80%] ${
+                            message.type === 'userMessage'
+                              ? 'bg-gradient-to-r from-emerald-400 via-green-300 to-cyan-300 text-slate-900 shadow-[0_15px_30px_rgba(16,185,129,0.35)]'
+                              : 'border border-white/10 bg-white/10 text-slate-100'
+                          }`}
+                        >
+                          {message.type === 'apiMessage' ? (
+                            <ReactMarkdown className="prose prose-sm prose-invert max-w-none break-words">
+                              {message.message}
+                            </ReactMarkdown>
+                          ) : (
+                            <p className="whitespace-pre-wrap break-words">{message.message}</p>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {loading && (
+                      <div className="flex justify-start">
+                        <div className="rounded-3xl border border-white/10 bg-white/10 px-4 py-2">
+                          <LoadingDots color="#33F699" />
+                        </div>
+                      </div>
+                    )}
+                    <div ref={messageListRef} />
+                  </div>
                 )}
-                <button
-                  onClick={() => setShowSidebar(!showSidebar)}
-                  className="lg:hidden bg-gray-100 hover:bg-gray-200 p-2 rounded-lg"
-                  aria-label="学習履歴を表示"
-                >
-                  <svg
-                    className="w-5 h-5"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
+              </div>
+            </div>
+
+            {/* 入力フォーム */}
+            <div className="border-t border-white/10 px-4 py-5 sm:px-6">
+              <div className="mx-auto max-w-3xl">
+                <form onSubmit={handleSubmit} className="flex flex-col gap-3 sm:flex-row">
+                  <textarea
+                    ref={textAreaRef}
+                    disabled={loading || site.status !== 'ready'}
+                    onKeyDown={handleEnter}
+                    rows={2}
+                    className="flex-1 resize-none rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-400 shadow-[0_15px_35px_rgba(1,5,3,0.35)] backdrop-blur-sm focus:outline-none focus:ring-2 focus:ring-emerald-400/70"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    placeholder={
+                      site.status === 'ready'
+                        ? '質問を入力してください...'
+                        : 'サイトの学習が完了していません'
+                    }
+                  />
+                  <button
+                    type="submit"
+                    disabled={loading || !query || site.status !== 'ready'}
+                    className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-400 via-green-300 to-cyan-300 px-6 py-3 text-sm font-semibold text-slate-900 shadow-[0_20px_45px_rgba(16,185,129,0.35)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:bg-white/10 disabled:text-slate-400"
                   >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                    />
+                    送信
+                  </button>
+                </form>
+              </div>
+            </div>
+          </div>
+
+          {/* サイドバー（学習履歴） */}
+          <div
+            className={`${
+              showSidebar ? 'fixed inset-x-6 inset-y-10 z-50 lg:static lg:w-80' : 'hidden lg:block lg:w-80'
+            }`}
+          >
+            <div className="flex h-full flex-col rounded-[28px] border border-white/10 bg-white/5 p-5 shadow-[0_35px_120px_rgba(1,3,6,0.55)] backdrop-blur-2xl">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-semibold text-white">学習履歴</h2>
+                <button
+                  onClick={() => setShowSidebar(false)}
+                  className="rounded-full border border-white/10 p-1 text-slate-300 hover:text-white lg:hidden"
+                  aria-label="閉じる"
+                >
+                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
-            </div>
-          </div>
-
-          {/* チャットエリア */}
-          <div className="flex-1 overflow-y-auto px-3 md:px-4 py-4 md:py-6">
-            <div className="max-w-3xl mx-auto">
-            {chatMessages.length === 0 ? (
-              <div className="text-center text-gray-500 mt-8">
-                メッセージがありません
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {chatMessages.map((message, index) => (
-                  <div
-                    key={index}
-                    className={`flex ${
-                      message.type === 'userMessage'
-                        ? 'justify-end'
-                        : 'justify-start'
-                    }`}
-                  >
-                    <div
-                      className={`max-w-[85%] sm:max-w-[80%] rounded-lg px-3 md:px-4 py-2 text-sm md:text-base ${
-                        message.type === 'userMessage'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-900'
-                      }`}
-                    >
-                      {message.type === 'apiMessage' ? (
-                        <ReactMarkdown className="prose prose-sm max-w-none break-words">
-                          {message.message}
-                        </ReactMarkdown>
-                      ) : (
-                        <p className="whitespace-pre-wrap break-words">{message.message}</p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-                {loading && (
-                  <div className="flex justify-start">
-                    <div className="bg-gray-100 rounded-lg px-4 py-2">
-                      <LoadingDots color="#000000" />
-                    </div>
+              <div className="flex-1 overflow-y-auto">
+                {trainingJobs.length === 0 ? (
+                  <p className="text-sm text-slate-400">学習履歴がありません</p>
+                ) : (
+                  <div className="space-y-3">
+                    {trainingJobs.map((job) => (
+                      <div
+                        key={job.id}
+                        className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm text-slate-200"
+                      >
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <span
+                            className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
+                              job.status === 'completed'
+                                ? 'border-emerald-400/40 bg-emerald-500/15 text-emerald-100'
+                                : job.status === 'failed'
+                                ? 'border-rose-400/40 bg-rose-500/15 text-rose-100'
+                                : job.status === 'running'
+                                ? 'border-cyan-400/40 bg-cyan-500/15 text-cyan-100'
+                                : 'border-white/15 bg-white/10 text-slate-200'
+                            }`}
+                          >
+                            {getStatusLabel(job.status)}
+                          </span>
+                          <span className="truncate text-xs text-slate-400">{formatDate(job.created_at)}</span>
+                        </div>
+                        {job.status === 'running' && job.total_pages > 0 && (
+                          <div className="mb-2">
+                            <div className="mb-1 flex justify-between text-[11px] text-slate-400">
+                              <span>進捗</span>
+                              <span>
+                                {job.processed_pages} / {job.total_pages}
+                              </span>
+                            </div>
+                            <div className="h-2 w-full rounded-full bg-white/10">
+                              <div
+                                className="h-2 rounded-full bg-gradient-to-r from-emerald-400 via-green-300 to-cyan-300"
+                                style={{ width: `${(job.processed_pages / job.total_pages) * 100}%` }}
+                              />
+                            </div>
+                          </div>
+                        )}
+                        {job.finished_at && (
+                          <div className="text-xs text-slate-400">完了: {formatDate(job.finished_at)}</div>
+                        )}
+                        {job.metadata?.detection_method && (
+                          <div className="mt-2 text-xs">
+                            <span className="font-medium text-slate-200">検出方法:</span> {job.metadata.detection_method}
+                          </div>
+                        )}
+                        {job.metadata?.url_count !== undefined && (
+                          <div className="mt-1 text-xs text-slate-300">
+                            <span className="font-medium text-slate-200">学習URL数:</span> {job.metadata.url_count}件
+                            {job.metadata.url_count === 1 && job.metadata.detection_method?.includes('ベースURLのみ') && (
+                              <span className="ml-1 text-orange-300">（ベースURLのみ）</span>
+                            )}
+                            {job.metadata.url_count > 1 && <span className="ml-1 text-emerald-300">✓</span>}
+                          </div>
+                        )}
+                        {job.metadata?.detected_sitemap_url && (
+                          <div className="mt-1 text-xs">
+                            <span className="font-medium text-slate-200">サイトマップ:</span>{' '}
+                            <a
+                              href={job.metadata.detected_sitemap_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="break-all text-emerald-200 underline-offset-4 hover:underline"
+                            >
+                              {job.metadata.detected_sitemap_url}
+                            </a>
+                          </div>
+                        )}
+                        {job.metadata?.urls && job.metadata.urls.length > 0 && (
+                          <details className="mt-2 rounded-xl border border-white/5 bg-white/5 p-2">
+                            <summary className="cursor-pointer text-xs font-medium text-emerald-200">
+                              学習URL ({job.metadata.urls.length}件)
+                            </summary>
+                            <div className="mt-2 max-h-40 overflow-y-auto text-[11px]">
+                              <ul className="space-y-1 font-mono">
+                                {job.metadata.urls.map((url, idx) => (
+                                  <li key={idx} className="break-all text-slate-200">
+                                    {idx + 1}. {url}
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </details>
+                        )}
+                        {job.error_message && (
+                          <div className="mt-2 text-xs text-rose-300">
+                            <span className="font-medium text-rose-200">エラー:</span> {job.error_message}
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 )}
-                <div ref={messageListRef} />
               </div>
-            )}
-          </div>
-        </div>
-
-          {/* 入力フォーム */}
-          <div className="border-t border-gray-200 bg-white px-3 md:px-4 py-3 md:py-4">
-            <div className="max-w-3xl mx-auto">
-              <form onSubmit={handleSubmit} className="flex gap-2">
-                <textarea
-                  ref={textAreaRef}
-                  disabled={loading || site.status !== 'ready'}
-                  onKeyDown={handleEnter}
-                  rows={1}
-                  className="flex-1 px-3 md:px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none text-sm md:text-base"
-                  value={query}
-                  onChange={(e) => setQuery(e.target.value)}
-                  placeholder={
-                    site.status === 'ready'
-                      ? '質問を入力してください...'
-                      : 'サイトの学習が完了していません'
-                  }
-                />
-                <button
-                  type="submit"
-                  disabled={loading || !query || site.status !== 'ready'}
-                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white px-4 md:px-6 py-2 rounded-lg font-medium text-sm md:text-base whitespace-nowrap"
-                >
-                  送信
-                </button>
-              </form>
             </div>
-          </div>
-        </div>
-
-        {/* サイドバー（学習履歴） */}
-        <div
-          className={`${
-            showSidebar ? 'fixed' : 'hidden'
-          } lg:block lg:static inset-0 lg:inset-auto w-full lg:w-80 border-l border-gray-200 bg-gray-50 overflow-y-auto z-40 lg:z-auto`}
-        >
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-base md:text-lg font-semibold">学習履歴</h2>
-              <button
-                onClick={() => setShowSidebar(false)}
-                className="lg:hidden text-gray-500 hover:text-gray-700"
-                aria-label="閉じる"
-              >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
-              </button>
-            </div>
-            {trainingJobs.length === 0 ? (
-              <p className="text-xs md:text-sm text-gray-500">学習履歴がありません</p>
-            ) : (
-              <div className="space-y-2 md:space-y-3">
-                {trainingJobs.map((job) => (
-                  <div
-                    key={job.id}
-                    className="bg-white rounded-lg p-2 md:p-3 border border-gray-200"
-                  >
-                    <div className="flex items-center justify-between mb-2 gap-2">
-                      <span
-                        className={`text-xs font-medium px-2 py-1 rounded flex-shrink-0 ${
-                          job.status === 'completed'
-                            ? 'bg-green-100 text-green-800'
-                            : job.status === 'failed'
-                            ? 'bg-red-100 text-red-800'
-                            : job.status === 'running'
-                            ? 'bg-blue-100 text-blue-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
-                        {getStatusLabel(job.status)}
-                      </span>
-                      <span className="text-xs text-gray-500 truncate ml-2">
-                        {formatDate(job.created_at)}
-                      </span>
-                    </div>
-                    {job.status === 'running' && job.total_pages > 0 && (
-                      <div className="mb-2">
-                        <div className="flex justify-between text-xs text-gray-600 mb-1">
-                          <span>進捗</span>
-                          <span>
-                            {job.processed_pages} / {job.total_pages}
-                          </span>
-                        </div>
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-blue-600 h-2 rounded-full transition-all"
-                            style={{
-                              width: `${
-                                (job.processed_pages / job.total_pages) * 100
-                              }%`,
-                            }}
-                          />
-                        </div>
-                      </div>
-                    )}
-                    {job.finished_at && (
-                      <div className="text-xs text-gray-500 break-words">
-                        完了: {formatDate(job.finished_at)}
-                      </div>
-                    )}
-                    {job.metadata?.detection_method && (
-                      <div className="mt-2 text-xs text-gray-600 break-words">
-                        <span className="font-medium">検出方法:</span> {job.metadata.detection_method}
-                      </div>
-                    )}
-                    {job.metadata?.url_count !== undefined && (
-                      <div className="mt-1 text-xs text-gray-600 break-words">
-                        <span className="font-medium">学習URL数:</span> {job.metadata.url_count}件
-                        {job.metadata.url_count === 1 && job.metadata.detection_method?.includes('ベースURLのみ') && (
-                          <span className="text-orange-600 ml-1">（ベースURLのみ）</span>
-                        )}
-                        {job.metadata.url_count > 1 && (
-                          <span className="text-green-600 ml-1">✓</span>
-                        )}
-                      </div>
-                    )}
-                    {job.metadata?.detected_sitemap_url && (
-                      <div className="mt-1 text-xs text-gray-600 break-words">
-                        <span className="font-medium">サイトマップ:</span>{' '}
-                        <a
-                          href={job.metadata.detected_sitemap_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline break-all"
-                        >
-                          {job.metadata.detected_sitemap_url}
-                        </a>
-                      </div>
-                    )}
-                    {job.metadata?.urls && job.metadata.urls.length > 0 && (
-                      <details className="mt-2">
-                        <summary className="text-xs text-blue-600 hover:text-blue-800 cursor-pointer font-medium">
-                          学習されたURL一覧を表示 ({job.metadata.urls.length}件)
-                        </summary>
-                        <div className="mt-2 max-h-40 overflow-y-auto border border-gray-200 rounded p-2 bg-gray-50">
-                          <ul className="space-y-1 text-xs font-mono">
-                            {job.metadata.urls.map((url, idx) => (
-                              <li key={idx} className="break-all text-gray-700">
-                                {idx + 1}. {url}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      </details>
-                    )}
-                    {job.error_message && (
-                      <div className="mt-2 text-xs text-red-600 break-words">
-                        <span className="font-medium">エラー:</span> {job.error_message}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         </div>
       </div>

@@ -6,10 +6,6 @@ import { createSupabaseClient } from '@/utils/supabase-auth';
 import Onboarding from '@/components/Onboarding';
 
 const MAX_TRAINING_PAGES = 20;
-const ADMIN_IDS = (process.env.NEXT_PUBLIC_ADMIN_USER_IDS || '')
-  .split(',')
-  .map((id) => id.trim())
-  .filter(Boolean);
 
 interface Site {
   id: string;
@@ -62,7 +58,6 @@ export default function Dashboard() {
   const trainingJobsIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const trainingJobsChannelRef = useRef<any>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const supabase = createSupabaseClient();
   const channelRef = useRef<any>(null);
 
@@ -78,7 +73,6 @@ export default function Dashboard() {
         return;
       }
 
-      setIsAdmin(ADMIN_IDS.includes(session.user.id));
       setAuthLoading(false);
     };
 
@@ -556,19 +550,21 @@ export default function Dashboard() {
   // ステータスバッジのスタイル
   const getStatusBadge = (status: Site['status']) => {
     const styles = {
-      idle: 'bg-gray-100 text-gray-800',
-      training: 'bg-blue-100 text-blue-800 animate-pulse',
-      ready: 'bg-green-100 text-green-800',
-      error: 'bg-red-100 text-red-800',
-    };
+      idle: 'border-white/10 bg-white/5 text-slate-200',
+      training: 'border-emerald-400/30 bg-emerald-400/15 text-emerald-100 animate-pulse',
+      ready: 'border-emerald-400/40 bg-emerald-500/20 text-emerald-100',
+      error: 'border-rose-400/40 bg-rose-500/20 text-rose-100',
+    } as const;
     const labels = {
       idle: '未学習',
       training: '学習中',
       ready: '準備完了',
       error: 'エラー',
-    };
+    } satisfies Record<Site['status'], string>;
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${styles[status]}`}>
+      <span
+        className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium ${styles[status]}`}
+      >
         {labels[status]}
       </span>
     );
@@ -580,16 +576,27 @@ export default function Dashboard() {
     return new Date(dateString).toLocaleString('ja-JP');
   };
 
-  const lastTrainedLabel =
-    sites.length > 0 && sites[0]?.last_trained_at
-      ? formatDate(sites[0].last_trained_at)
-      : '-';
+  const recentSite = [...sites].filter((s) => s.last_trained_at).sort((a, b) => {
+    if (!a.last_trained_at || !b.last_trained_at) return 0;
+    return (new Date(b.last_trained_at).getTime() - new Date(a.last_trained_at).getTime());
+  })[0];
+  const lastTrainedLabel = recentSite?.last_trained_at
+    ? formatDate(recentSite.last_trained_at)
+    : '-';
+
+  const heroStats = [
+    { label: '総サイト数', value: sites.length },
+    { label: '学習中', value: trainingSites.size, accent: true },
+    { label: '最終学習', value: lastTrainedLabel },
+  ];
 
   if (authLoading || loading) {
     return (
       <Layout>
-        <div className="flex items-center justify-center min-h-screen">
-          <div className="text-lg">読み込み中...</div>
+        <div className="flex min-h-screen items-center justify-center">
+          <div className="rounded-full border border-white/10 bg-white/5 px-6 py-3 text-sm uppercase tracking-[0.2em] text-slate-200">
+            読み込み中...
+          </div>
         </div>
       </Layout>
     );
@@ -604,185 +611,190 @@ export default function Dashboard() {
           }}
         />
       )}
-      <div className="container mx-auto px-4 py-4 md:py-8 max-w-6xl">
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 md:mb-8">
-          <div className="flex items-center gap-4">
-            <h1 className="text-2xl md:text-3xl font-bold">ダッシュボード</h1>
-            <Link
-              href="/dashboard/usage"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm md:text-base"
-            >
-              使用状況
-            </Link>
-            <Link
-              href="/dashboard/plans"
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm md:text-base"
-            >
-              プラン
-            </Link>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
-            <button
-              onClick={async () => {
-                await supabase.auth.signOut();
-                router.push('/auth/login');
-              }}
-              className="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-lg font-medium text-sm md:text-base"
-            >
-              ログアウト
-            </button>
-            {isAdmin && (
-              <Link
-                href="/dashboard/admin/usage"
-                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium text-sm md:text-base text-center"
-              >
-                管理者: 使用状況
-              </Link>
-            )}
-            <button
-              id="onboarding-create-site-btn"
-              onClick={() => setShowModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium text-sm md:text-base"
-            >
-              + 新規サイト登録
-            </button>
-          </div>
+      <div className="relative mx-auto max-w-6xl overflow-hidden rounded-[32px] border border-white/10 bg-white/5 px-4 py-6 text-slate-100 shadow-[0_45px_120px_rgba(1,8,4,0.65)] backdrop-blur-2xl sm:px-8 sm:py-10">
+        <div className="pointer-events-none absolute inset-0">
+          <div className="absolute -top-16 right-12 h-48 w-48 rounded-full bg-emerald-500/20 blur-3xl" />
+          <div className="absolute bottom-0 left-0 h-64 w-64 rounded-full bg-teal-400/10 blur-[140px]" />
         </div>
-
-        <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-semibold text-slate-200">サイト一覧</h2>
-            <div className="text-sm text-slate-400">{sites.length}件</div>
+        <div className="relative z-10">
+          <div className="mb-8 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+            <div>
+              <p className="text-xs uppercase tracking-[0.4em] text-emerald-200/80">Control Panel</p>
+              <h1 className="text-2xl font-semibold text-white md:text-3xl">ダッシュボード</h1>
+            </div>
+            <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+              <button
+                onClick={async () => {
+                  await supabase.auth.signOut();
+                  router.push('/auth/login');
+                }}
+                className="inline-flex flex-1 items-center justify-center rounded-full border border-white/15 bg-white/5 px-5 py-2 text-sm font-medium text-slate-100 transition hover:bg-white/10"
+              >
+                ログアウト
+              </button>
+              <button
+                id="onboarding-create-site-btn"
+                onClick={() => setShowModal(true)}
+                className="inline-flex flex-1 items-center justify-center rounded-full bg-gradient-to-r from-emerald-400 via-green-300 to-cyan-300 px-5 py-2 text-sm font-semibold text-slate-900 shadow-[0_25px_45px_rgba(16,185,129,0.35)] transition hover:-translate-y-0.5"
+              >
+                + 新規サイト登録
+              </button>
+            </div>
           </div>
-        </section>
+
+          <section className="mb-8 grid grid-cols-1 gap-4 md:grid-cols-3">
+            {heroStats.map((stat) => (
+              <div
+                key={stat.label}
+                className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 px-5 py-4 backdrop-blur-xl"
+              >
+                <div className="absolute inset-0 opacity-60">
+                  {stat.accent && (
+                    <div className="absolute inset-y-0 right-0 w-1/2 bg-gradient-to-l from-emerald-400/25 to-transparent blur-3xl" />
+                  )}
+                </div>
+                <div className="relative">
+                  <p className="text-xs uppercase tracking-[0.25em] text-slate-400">{stat.label}</p>
+                  <p className={`mt-2 text-2xl font-semibold ${stat.accent ? 'text-emerald-200' : 'text-white'}`}>
+                    {stat.value}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </section>
 
         {sites.length === 0 ? (
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-12 text-center text-slate-300">
-            <p className="text-gray-500 mb-4">登録されているサイトがありません</p>
+          <div className="rounded-3xl border border-dashed border-white/20 bg-white/5 px-6 py-12 text-center text-slate-300">
+            <p className="mb-4 text-base text-slate-200">登録されているサイトがありません</p>
             <button
               onClick={() => setShowModal(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg"
+              className="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-emerald-400 via-green-300 to-cyan-300 px-6 py-2.5 text-sm font-semibold text-slate-900 shadow-[0_20px_40px_rgba(16,185,129,0.35)] transition hover:-translate-y-0.5"
             >
               最初のサイトを登録する
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3 md:gap-6">
             {sites.map((site) => (
               <div
                 key={site.id}
-                className="bg-white rounded-lg shadow-md p-4 md:p-6 border border-gray-200 hover:shadow-lg transition-shadow"
+                className="group relative overflow-hidden rounded-3xl border border-white/10 bg-white/5 p-5 shadow-[0_35px_120px_rgba(1,3,6,0.55)] transition hover:border-emerald-400/30 hover:shadow-[0_45px_140px_rgba(1,8,4,0.65)] backdrop-blur-xl"
               >
-                <div className="flex justify-between items-start mb-3 md:mb-4 gap-2">
-                  <h2 className="text-lg md:text-xl font-semibold text-gray-900 flex-1 break-words">
-                    {site.name}
-                  </h2>
-                  <div className="flex-shrink-0">{getStatusBadge(site.status)}</div>
+                <div className="pointer-events-none absolute inset-0 opacity-60">
+                  <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-emerald-500/20 blur-[80px]" />
                 </div>
-
-                <div className="space-y-2 mb-4 text-xs md:text-sm text-gray-600">
-                  <div>
-                    <span className="font-medium text-slate-200">URL:</span>{' '}
-                    <a
-                      href={site.base_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline break-all"
-                    >
-                      {site.base_url}
-                    </a>
+                <div className="relative">
+                  <div className="mb-3 flex items-start justify-between gap-2 md:mb-4">
+                    <h2 className="flex-1 break-words text-lg font-semibold text-white md:text-xl">
+                      {site.name}
+                    </h2>
+                    <div className="flex-shrink-0">{getStatusBadge(site.status)}</div>
                   </div>
-                  {site.last_trained_at && (
+
+                  <div className="mb-4 space-y-2 text-xs text-slate-300 md:text-sm">
                     <div>
-                      <span className="font-medium">最終学習:</span>{' '}
-                      <span className="break-words">{formatDate(site.last_trained_at)}</span>
+                      <span className="font-medium text-slate-200">URL:</span>{' '}
+                      <a
+                        href={site.base_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="break-all text-emerald-200 underline-offset-4 hover:underline"
+                      >
+                        {site.base_url}
+                      </a>
+                    </div>
+                    {site.last_trained_at && (
+                      <div>
+                        <span className="font-medium text-slate-200">最終学習:</span>{' '}
+                        <span className="break-words text-slate-100">{formatDate(site.last_trained_at)}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {site.status === 'training' && (
+                    <div className="mb-4 text-xs text-slate-200 md:text-sm">
+                      {(() => {
+                        const job = trainingJobs.get(site.id);
+                        const processedPages = job?.processed_pages || 0;
+                        const inferredTotal = job?.total_pages || job?.metadata?.url_count || MAX_TRAINING_PAGES;
+                        const totalPages = inferredTotal || MAX_TRAINING_PAGES;
+                        const progressPercent = totalPages
+                          ? Math.min(100, (processedPages / totalPages) * 100)
+                          : 0;
+                        const label = job
+                          ? `${processedPages} / ${totalPages}`
+                          : 'URL解析中...';
+                        return (
+                          <div>
+                            <div className="mb-1 flex justify-between text-xs text-slate-300">
+                              <span className="font-medium">学習進捗</span>
+                              <span>{label}</span>
+                            </div>
+                            <div className="h-2 w-full rounded-full bg-white/10">
+                              <div
+                                className="h-2 rounded-full bg-gradient-to-r from-emerald-400 via-green-300 to-cyan-300 transition-all duration-300"
+                                style={{ width: `${progressPercent}%` }}
+                              />
+                            </div>
+                            {!job && (
+                              <p className="mt-1 text-[11px] text-slate-400">URLリストを解析しています...</p>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   )}
-                </div>
 
-                {site.status === 'training' && (
-                  <div className="mb-4 text-xs md:text-sm text-gray-600">
-                    {(() => {
-                      const job = trainingJobs.get(site.id);
-                      const processedPages = job?.processed_pages || 0;
-                      const inferredTotal = job?.total_pages || job?.metadata?.url_count || MAX_TRAINING_PAGES;
-                      const totalPages = inferredTotal || MAX_TRAINING_PAGES;
-                      const progressPercent = totalPages
-                        ? Math.min(100, (processedPages / totalPages) * 100)
-                        : 0;
-                      const label = job
-                        ? `${processedPages} / ${totalPages}`
-                        : 'URL解析中...';
-                      return (
-                        <div>
-                          <div className="flex justify-between text-xs text-slate-300 mb-1">
-                            <span className="font-medium">学習進捗</span>
-                            <span>{label}</span>
-                          </div>
-                          <div className="w-full bg-white/10 rounded-full h-2">
-                            <div
-                              className="bg-emerald-400 h-2 rounded-full transition-all duration-300"
-                              style={{ width: `${progressPercent}%` }}
-                            />
-                          </div>
-                          {!job && (
-                            <p className="mt-1 text-[11px] text-slate-400">URLリストを解析しています...</p>
-                          )}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                )}
-
-                <div className="flex flex-col sm:flex-row gap-2 mt-4">
-                  {site.status === 'ready' && (
-                    <>
-                      <Link
-                        id="onboarding-chat-btn"
-                        href={`/dashboard/${site.id}`}
-                        className="flex-1 rounded-full border border-emerald-400/30 px-4 py-2 text-center text-sm text-emerald-200 transition hover:bg-emerald-400/10"
+                  <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+                    {site.status === 'ready' && (
+                      <>
+                        <Link
+                          id="onboarding-chat-btn"
+                          href={`/dashboard/${site.id}`}
+                          className="flex-1 rounded-full bg-gradient-to-r from-emerald-400 via-green-300 to-cyan-300 px-4 py-2.5 text-center text-sm font-semibold text-slate-900 shadow-[0_20px_40px_rgba(16,185,129,0.35)] transition hover:-translate-y-0.5"
+                        >
+                          チャット開始
+                        </Link>
+                        <button
+                          onClick={() => handleStartTraining(site.id)}
+                          className="flex-1 rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-100 transition hover:bg-white/10"
+                        >
+                          再学習
+                        </button>
+                      </>
+                    )}
+                    {site.status === 'idle' && (
+                      <button
+                        id="onboarding-start-training-btn"
+                        onClick={() => handleStartTraining(site.id)}
+                        className="flex-1 rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-100 transition hover:bg-white/15"
                       >
-                        チャット開始
-                      </Link>
+                        学習開始
+                      </button>
+                    )}
+                    {site.status === 'training' && (
+                      <button
+                        disabled
+                        className="flex-1 cursor-not-allowed rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-400"
+                      >
+                        学習中...
+                      </button>
+                    )}
+                    {site.status === 'error' && (
                       <button
                         onClick={() => handleStartTraining(site.id)}
-                        className="flex-1 rounded-full bg-emerald-400 px-4 py-2 text-center text-sm font-semibold text-slate-900 transition hover:-translate-y-0.5"
+                        className="flex-1 rounded-full bg-gradient-to-r from-rose-500/80 to-orange-400/80 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_20px_45px_rgba(248,113,113,0.35)]"
                       >
                         再学習
                       </button>
-                    </>
-                  )}
-                  {site.status === 'idle' && (
+                    )}
                     <button
-                      id="onboarding-start-training-btn"
-                      onClick={() => handleStartTraining(site.id)}
-                      className="flex-1 rounded-full bg-emerald-400 px-4 py-2 text-center text-sm font-semibold text-slate-900 transition hover:-translate-y-0.5"
+                      onClick={() => handleDeleteSite(site.id)}
+                      className="w-full rounded-full border border-rose-500/40 bg-rose-500/10 px-4 py-2.5 text-sm font-medium text-rose-100 transition hover:bg-rose-500/20 sm:w-auto"
                     >
-                      学習開始
+                      削除
                     </button>
-                  )}
-                  {site.status === 'training' && (
-                    <button
-                      disabled
-                      className="flex-1 rounded-full bg-white/15 text-slate-400 px-4 py-2 text-sm font-medium cursor-not-allowed"
-                    >
-                      学習中...
-                    </button>
-                  )}
-                  {site.status === 'error' && (
-                    <button
-                      onClick={() => handleStartTraining(site.id)}
-                      className="flex-1 rounded-full bg-red-500 px-4 py-2 text-center text-sm font-semibold text-white transition hover:-translate-y-0.5"
-                    >
-                      再学習
-                    </button>
-                  )}
-                  <button
-                    onClick={() => handleDeleteSite(site.id)}
-                    className="rounded-full border border-white/10 px-4 py-2 text-center text-sm text-slate-200 transition hover:border-red-500/50 hover:text-red-200 sm:w-auto w-full"
-                  >
-                    削除
-                  </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -791,15 +803,13 @@ export default function Dashboard() {
 
         {/* 新規サイト登録Modal */}
         {showModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg p-4 md:p-6 max-w-md w-full max-h-[90vh] overflow-y-auto">
-              <h2 className="text-xl md:text-2xl font-bold mb-4">新規サイト登録</h2>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm">
+            <div className="w-full max-h-[90vh] max-w-md overflow-y-auto rounded-3xl border border-white/10 bg-gradient-to-b from-[#07150f] via-[#030a08] to-[#010305] p-5 text-slate-100 shadow-[0_45px_120px_rgba(1,5,3,0.75)] md:p-6">
+              <h2 className="mb-4 text-xl font-semibold md:text-2xl">新規サイト登録</h2>
               <form onSubmit={handleCreateSite}>
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      サイト名 *
-                    </label>
+                    <label className="mb-1 block text-sm font-medium text-slate-200">サイト名 *</label>
                     <input
                       type="text"
                       required
@@ -807,14 +817,12 @@ export default function Dashboard() {
                       onChange={(e) =>
                         setFormData({ ...formData, name: e.target.value })
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm md:text-base"
+                      className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/60"
                       placeholder="例: STRIX 総合型選抜塾"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      ベースURL *
-                    </label>
+                    <label className="mb-1 block text-sm font-medium text-slate-200">ベースURL *</label>
                     <input
                       type="url"
                       required
@@ -822,29 +830,25 @@ export default function Dashboard() {
                       onChange={(e) =>
                         setFormData({ ...formData, baseUrl: e.target.value })
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm md:text-base"
+                      className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/60"
                       placeholder="https://example.com"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      サイトマップURL（オプション）
-                    </label>
+                    <label className="mb-1 block text-sm font-medium text-slate-200">サイトマップURL（オプション）</label>
                     <input
                       type="url"
                       value={formData.sitemapUrl}
                       onChange={(e) =>
                         setFormData({ ...formData, sitemapUrl: e.target.value })
                       }
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm md:text-base"
+                      className="w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/60"
                       placeholder="https://example.com/sitemap.xml"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      URLリスト（オプション）
-                    </label>
-                    <div className="space-y-2 mb-2">
+                    <label className="mb-1 block text-sm font-medium text-slate-200">URLリスト（オプション）</label>
+                    <div className="mb-2 space-y-2">
                       {urlInputs.map((urlInput, index) => (
                         <div key={index} className="flex gap-2">
                           <input
@@ -856,7 +860,6 @@ export default function Dashboard() {
                               setUrlInputs(newInputs);
                             }}
                             onBlur={() => {
-                              // 入力が完了したら、有効なURLをリストに追加
                               const trimmedUrl = urlInput.trim();
                               if (
                                 trimmedUrl &&
@@ -867,7 +870,6 @@ export default function Dashboard() {
                                   ...formData,
                                   urlList: [...formData.urlList, trimmedUrl],
                                 });
-                                // 入力フィールドをクリア
                                 const newInputs = [...urlInputs];
                                 newInputs[index] = '';
                                 setUrlInputs(newInputs);
@@ -886,14 +888,13 @@ export default function Dashboard() {
                                     ...formData,
                                     urlList: [...formData.urlList, trimmedUrl],
                                   });
-                                  // 入力フィールドをクリア
                                   const newInputs = [...urlInputs];
                                   newInputs[index] = '';
                                   setUrlInputs(newInputs);
                                 }
                               }
                             }}
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm md:text-base"
+                            className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/60"
                             placeholder="https://example.com/page1"
                           />
                           {index === urlInputs.length - 1 && (
@@ -902,11 +903,11 @@ export default function Dashboard() {
                               onClick={() => {
                                 setUrlInputs([...urlInputs, '']);
                               }}
-                              className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-lg font-medium text-sm whitespace-nowrap flex items-center justify-center"
+                              className="flex items-center justify-center rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-sm font-medium text-slate-100 transition hover:bg-white/15"
                               aria-label="URL入力フィールドを追加"
                             >
                               <svg
-                                className="w-5 h-5"
+                                className="h-5 w-5"
                                 fill="none"
                                 stroke="currentColor"
                                 viewBox="0 0 24 24"
@@ -924,11 +925,10 @@ export default function Dashboard() {
                             <button
                               type="button"
                               onClick={() => {
-                                // 入力フィールドを削除
                                 const newInputs = urlInputs.filter((_, i) => i !== index);
                                 setUrlInputs(newInputs.length > 0 ? newInputs : ['']);
                               }}
-                              className="bg-red-500 hover:bg-red-600 text-white px-3 py-2 rounded-lg font-medium text-sm whitespace-nowrap"
+                              className="rounded-2xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm font-medium text-rose-100 transition hover:bg-rose-500/20"
                               aria-label="この入力フィールドを削除"
                             >
                               ✕
@@ -938,12 +938,12 @@ export default function Dashboard() {
                       ))}
                     </div>
                     {formData.urlList.length > 0 && (
-                      <div className="border border-gray-300 rounded-lg p-2 max-h-40 overflow-y-auto mb-2">
+                      <div className="mb-2 max-h-40 overflow-y-auto rounded-2xl border border-white/10 bg-white/5 p-2">
                         <div className="space-y-1">
                           {formData.urlList.map((url, index) => (
                             <div
                               key={index}
-                              className="flex items-center justify-between bg-gray-50 px-2 py-1 rounded text-sm"
+                              className="flex items-center justify-between rounded-xl bg-white/10 px-2 py-1 text-sm text-white"
                             >
                               <span className="flex-1 truncate font-mono text-xs">{url}</span>
                               <button
@@ -954,7 +954,7 @@ export default function Dashboard() {
                                     urlList: formData.urlList.filter((_, i) => i !== index),
                                   });
                                 }}
-                                className="ml-2 text-red-600 hover:text-red-800 text-xs"
+                                className="ml-2 text-xs text-rose-200 hover:text-rose-100"
                                 aria-label="削除"
                               >
                                 ✕
@@ -964,26 +964,26 @@ export default function Dashboard() {
                         </div>
                       </div>
                     )}
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="mt-1 text-xs text-slate-400">
                       サイトマップURLより優先されます。「+」ボタンで入力フィールドを追加できます。
                     </p>
                   </div>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-3 mt-6">
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row">
                   <button
                     type="button"
                     onClick={() => {
                       setShowModal(false);
                       setFormData({ name: '', baseUrl: '', sitemapUrl: '', urlList: [] });
-      setUrlInputs(['']);
+                      setUrlInputs(['']);
                     }}
-                    className="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-lg font-medium text-sm md:text-base"
+                    className="flex-1 rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-100 transition hover:bg-white/15"
                   >
                     キャンセル
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium text-sm md:text-base"
+                    className="flex-1 rounded-full bg-gradient-to-r from-emerald-400 via-green-300 to-cyan-300 px-4 py-2.5 text-sm font-semibold text-slate-900 shadow-[0_20px_45px_rgba(16,185,129,0.35)]"
                   >
                     登録
                   </button>
@@ -993,6 +993,7 @@ export default function Dashboard() {
           </div>
         )}
       </div>
-    </Layout>
+    </div>
+  </Layout>
   );
 }

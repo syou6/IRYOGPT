@@ -287,8 +287,10 @@
 
 ## 📚 関連ドキュメント
 
+- [コンポーネントドキュメント](./COMPONENTS.md) - 再利用可能な UI コンポーネントの詳細
 - [ワーカー仕様書](./WORKER_SPEC_V3.md) - Redis + BullMQ によるジョブキューシステム
 - [マイグレーションガイド](./MIGRATION_V3.md) - v2 → v3 への移行手順
+- [UI デザインガイド](./UI_V3_DESIGN.md) - Luminous Minimalism デザインシステム
 - [スキーマ SQL](../schema_saas_step3_v3.sql) - v3 データベースマイグレーション
 
 ---

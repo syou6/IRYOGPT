@@ -6,6 +6,10 @@ import { createSupabaseClient } from '@/utils/supabase-auth';
 import Onboarding from '@/components/Onboarding';
 
 const MAX_TRAINING_PAGES = 20;
+const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAILS ?? '')
+  .split(',')
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
 
 interface Site {
   id: string;
@@ -15,7 +19,16 @@ interface Site {
   status: 'idle' | 'training' | 'ready' | 'error';
   last_trained_at: string | null;
   created_at: string;
+  user_id?: string;
+  owner_email?: string | null;
 }
+
+const STATUS_LABELS: Record<Site['status'], string> = {
+  idle: '未学習',
+  training: '学習中',
+  ready: '準備完了',
+  error: 'エラー',
+};
 
 interface TrainingJob {
   id: string;
@@ -53,6 +66,8 @@ export default function Dashboard() {
     urlList: [] as string[],
   });
   const [urlInputs, setUrlInputs] = useState(['']);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(ADMIN_EMAILS.length === 0);
   const [trainingSites, setTrainingSites] = useState<Set<string>>(new Set());
   const [trainingJobs, setTrainingJobs] = useState<Map<string, TrainingJob>>(new Map());
   const trainingJobsIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -72,7 +87,9 @@ export default function Dashboard() {
         router.push('/auth/login');
         return;
       }
-
+      const normalizedMail = session.user.email?.toLowerCase() ?? '';
+      setUserEmail(session.user.email ?? null);
+      setIsAdmin(ADMIN_EMAILS.length === 0 ? true : ADMIN_EMAILS.includes(normalizedMail));
       setAuthLoading(false);
     };
 
@@ -445,6 +462,10 @@ export default function Dashboard() {
 
   // 学習開始
   const handleStartTraining = async (siteId: string) => {
+    if (!isAdmin) {
+      alert('学習処理は現在、管理者が実行します。お問い合わせください。');
+      return;
+    }
     const site = sites.find((s) => s.id === siteId);
     if (!site) return;
 
@@ -518,6 +539,10 @@ export default function Dashboard() {
 
   // サイト削除
   const handleDeleteSite = async (siteId: string) => {
+    if (!isAdmin) {
+      alert('削除は管理者のみが実行できます。');
+      return;
+    }
     const site = sites.find((s) => s.id === siteId);
     if (!site) return;
 
@@ -555,17 +580,11 @@ export default function Dashboard() {
       ready: 'border-emerald-400/40 bg-emerald-500/20 text-emerald-100',
       error: 'border-rose-400/40 bg-rose-500/20 text-rose-100',
     } as const;
-    const labels = {
-      idle: '未学習',
-      training: '学習中',
-      ready: '準備完了',
-      error: 'エラー',
-    } satisfies Record<Site['status'], string>;
     return (
       <span
         className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium ${styles[status]}`}
       >
-        {labels[status]}
+        {STATUS_LABELS[status]}
       </span>
     );
   };
@@ -663,6 +682,17 @@ export default function Dashboard() {
             ))}
           </section>
 
+          {!isAdmin && (
+            <div className="mb-8 rounded-3xl border border-dashed border-white/15 bg-white/5 px-5 py-4 text-sm text-slate-200">
+              <p>
+                現在、チャットボットの学習と埋め込み設定は SiteGPT チームが代行します。必要な URL を登録しておくだけで大丈夫です。
+              </p>
+              <p className="mt-2 text-xs text-slate-400">
+                {userEmail ? `ログイン中: ${userEmail}` : 'ログインユーザー情報を取得しています…'} / 学習は順次対応します。
+              </p>
+            </div>
+          )}
+
         {sites.length === 0 ? (
           <div className="rounded-3xl border border-dashed border-white/20 bg-white/5 px-6 py-12 text-center text-slate-300">
             <p className="mb-4 text-base text-slate-200">登録されているサイトがありません</p>
@@ -690,6 +720,11 @@ export default function Dashboard() {
                     </h2>
                     <div className="flex-shrink-0">{getStatusBadge(site.status)}</div>
                   </div>
+                  {isAdmin && (
+                    <p className="mb-3 text-xs text-slate-400">
+                      所有者: {site.owner_email ?? '不明'}
+                    </p>
+                  )}
 
                   <div className="mb-4 space-y-2 text-xs text-slate-300 md:text-sm">
                     <div>
@@ -745,56 +780,74 @@ export default function Dashboard() {
                     </div>
                   )}
 
-                  <div className="mt-6 flex flex-col gap-2 sm:flex-row">
-                    {site.status === 'ready' && (
-                      <>
-                        <Link
-                          id="onboarding-chat-btn"
-                          href={`/dashboard/${site.id}`}
-                          className="flex-1 rounded-full bg-gradient-to-r from-emerald-400 via-green-300 to-cyan-300 px-4 py-2.5 text-center text-sm font-semibold text-slate-900 shadow-[0_20px_40px_rgba(16,185,129,0.35)] transition hover:-translate-y-0.5"
+                  {isAdmin ? (
+                    <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+                      {site.status === 'ready' && (
+                        <>
+                          <Link
+                            id="onboarding-chat-btn"
+                            href={`/dashboard/${site.id}`}
+                            className="flex-1 rounded-full bg-gradient-to-r from-emerald-400 via-green-300 to-cyan-300 px-4 py-2.5 text-center text-sm font-semibold text-slate-900 shadow-[0_20px_40px_rgba(16,185,129,0.35)] transition hover:-translate-y-0.5"
+                          >
+                            チャット開始
+                          </Link>
+                          <button
+                            onClick={() => handleStartTraining(site.id)}
+                            className="flex-1 rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-100 transition hover:bg-white/10"
+                          >
+                            再学習
+                          </button>
+                        </>
+                      )}
+                      {site.status === 'idle' && (
+                        <button
+                          id="onboarding-start-training-btn"
+                          onClick={() => handleStartTraining(site.id)}
+                          className="flex-1 rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-100 transition hover:bg-white/15"
                         >
-                          チャット開始
-                        </Link>
+                          学習開始
+                        </button>
+                      )}
+                      {site.status === 'training' && (
+                        <button
+                          disabled
+                          className="flex-1 cursor-not-allowed rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-400"
+                        >
+                          学習中...
+                        </button>
+                      )}
+                      {site.status === 'error' && (
                         <button
                           onClick={() => handleStartTraining(site.id)}
-                          className="flex-1 rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-100 transition hover:bg-white/10"
+                          className="flex-1 rounded-full bg-gradient-to-r from-rose-500/80 to-orange-400/80 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_20px_45px_rgba(248,113,113,0.35)]"
                         >
                           再学習
                         </button>
-                      </>
-                    )}
-                    {site.status === 'idle' && (
+                      )}
                       <button
-                        id="onboarding-start-training-btn"
-                        onClick={() => handleStartTraining(site.id)}
-                        className="flex-1 rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-100 transition hover:bg-white/15"
+                        onClick={() => handleDeleteSite(site.id)}
+                        className="w-full rounded-full border border-rose-500/40 bg-rose-500/10 px-4 py-2.5 text-sm font-medium text-rose-100 transition hover:bg-rose-500/20 sm:w-auto"
                       >
-                        学習開始
+                        削除
                       </button>
-                    )}
-                    {site.status === 'training' && (
-                      <button
-                        disabled
-                        className="flex-1 cursor-not-allowed rounded-full border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-slate-400"
-                      >
-                        学習中...
-                      </button>
-                    )}
-                    {site.status === 'error' && (
-                      <button
-                        onClick={() => handleStartTraining(site.id)}
-                        className="flex-1 rounded-full bg-gradient-to-r from-rose-500/80 to-orange-400/80 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_20px_45px_rgba(248,113,113,0.35)]"
-                      >
-                        再学習
-                      </button>
-                    )}
-                    <button
-                      onClick={() => handleDeleteSite(site.id)}
-                      className="w-full rounded-full border border-rose-500/40 bg-rose-500/10 px-4 py-2.5 text-sm font-medium text-rose-100 transition hover:bg-rose-500/20 sm:w-auto"
-                    >
-                      削除
-                    </button>
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="mt-6 space-y-3">
+                      {site.status === 'ready' && (
+                        <Link
+                          id="onboarding-chat-btn"
+                          href={`/dashboard/${site.id}`}
+                          className="block rounded-full bg-gradient-to-r from-emerald-400 via-green-300 to-cyan-300 px-4 py-2.5 text-center text-sm font-semibold text-slate-900 shadow-[0_20px_40px_rgba(16,185,129,0.35)]"
+                        >
+                          チャット開始
+                        </Link>
+                      )}
+                      <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-200">
+                        <p>学習作業は運営が対応します。完了次第ご連絡します。</p>
+                        <p className="mt-1 text-xs text-slate-400">現在のステータス：{STATUS_LABELS[site.status]}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}

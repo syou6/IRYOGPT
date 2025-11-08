@@ -12,28 +12,28 @@ interface OnboardingStep {
 const ONBOARDING_STEPS: OnboardingStep[] = [
   {
     id: 'welcome',
-    title: 'ようこそ！',
-    description: 'SiteGPT.jpへようこそ！このガイドで基本的な使い方を説明します。',
+    title: 'ようこそ SiteGPT へ',
+    description: 'ここでは、学習させたいURLを登録しておくだけでOKです。学習と埋め込み設定はチームが代行します。',
     position: 'bottom',
   },
   {
     id: 'create-site',
-    title: 'サイトを登録',
-    description: '「+ 新規サイト登録」ボタンをクリックして、学習させたいWebサイトを登録します。',
+    title: '情報を登録',
+    description: '「+ 新規サイト登録」からサイト名とベースURL・追加したいページを入力してください。',
     target: 'onboarding-create-site-btn',
     position: 'bottom',
   },
   {
     id: 'start-training',
-    title: '学習を開始',
-    description: 'サイトを登録したら、「学習開始」ボタンをクリックして、サイトの内容を学習させます。',
+    title: '依頼を送信',
+    description: '登録後はステータスが「未学習」になります。学習ボタンは運営側で操作するので、そのままで大丈夫です。',
     target: 'onboarding-start-training-btn',
     position: 'top',
   },
   {
     id: 'chat',
-    title: 'チャット開始',
-    description: '学習が完了したら、「チャット開始」ボタンから、サイトについて質問できるようになります。',
+    title: '進捗を確認',
+    description: '学習完了後はこちらで「チャット開始」がアクティブになり、埋め込みスクリプトもチームから共有されます。',
     target: 'onboarding-chat-btn',
     position: 'top',
   },
@@ -161,13 +161,13 @@ export default function Onboarding({
     <>
       {/* オーバーレイ */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 z-40"
+        className="fixed inset-0 z-40 bg-slate-950/70 backdrop-blur-sm"
         onClick={handleSkip}
       />
 
       {/* ツールチップ */}
       <div
-        className="fixed z-50 bg-white rounded-lg shadow-xl p-4 md:p-6 max-w-sm w-11/12"
+        className="fixed z-50 w-11/12 max-w-sm rounded-[28px] border border-white/10 bg-gradient-to-b from-[#08131d] via-[#050b12] to-[#030508] p-4 text-slate-100 shadow-[0_35px_120px_rgba(1,5,3,0.65)] md:p-6"
         style={{
           top: position.top,
           left: position.left,
@@ -176,24 +176,24 @@ export default function Onboarding({
         onClick={(e) => e.stopPropagation()}
       >
         {/* ステップインジケーター */}
-        <div className="flex items-center justify-between mb-3">
+        <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             {ONBOARDING_STEPS.map((_, index) => (
               <div
                 key={index}
                 className={`h-2 w-2 rounded-full ${
                   index === currentStep
-                    ? 'bg-blue-600'
+                    ? 'bg-emerald-400'
                     : index < currentStep
-                    ? 'bg-blue-300'
-                    : 'bg-gray-300'
+                    ? 'bg-emerald-200'
+                    : 'bg-slate-600'
                 }`}
               />
             ))}
           </div>
           <button
             onClick={handleSkip}
-            className="text-gray-400 hover:text-gray-600 text-xl font-bold"
+            className="text-slate-500 hover:text-slate-300 text-xl font-bold"
             aria-label="スキップ"
           >
             ×
@@ -201,20 +201,20 @@ export default function Onboarding({
         </div>
 
         {/* コンテンツ */}
-        <h3 className="text-lg md:text-xl font-bold mb-2">{step.title}</h3>
-        <p className="text-sm md:text-base text-gray-600 mb-4">{step.description}</p>
+        <h3 className="mb-2 text-lg font-semibold text-white md:text-xl">{step.title}</h3>
+        <p className="mb-4 text-sm text-slate-300 md:text-base">{step.description}</p>
 
         {/* 矢印（ターゲット要素がある場合） */}
         {step.target && step.position && (
           <div
-            className={`absolute w-0 h-0 border-8 ${
+            className={`absolute h-0 w-0 border-8 ${
               step.position === 'top'
-                ? 'border-t-blue-600 border-r-transparent border-b-transparent border-l-transparent bottom-full left-1/2 -translate-x-1/2'
+                ? 'bottom-full left-1/2 -translate-x-1/2 border-t-emerald-400 border-r-transparent border-b-transparent border-l-transparent'
                 : step.position === 'bottom'
-                ? 'border-b-blue-600 border-r-transparent border-t-transparent border-l-transparent top-full left-1/2 -translate-x-1/2'
+                ? 'top-full left-1/2 -translate-x-1/2 border-b-emerald-400 border-r-transparent border-t-transparent border-l-transparent'
                 : step.position === 'left'
-                ? 'border-l-blue-600 border-t-transparent border-r-transparent border-b-transparent right-full top-1/2 -translate-y-1/2'
-                : 'border-r-blue-600 border-t-transparent border-l-transparent border-b-transparent left-full top-1/2 -translate-y-1/2'
+                ? 'right-full top-1/2 -translate-y-1/2 border-l-emerald-400 border-t-transparent border-r-transparent border-b-transparent'
+                : 'left-full top-1/2 -translate-y-1/2 border-r-emerald-400 border-t-transparent border-l-transparent border-b-transparent'
             }`}
           />
         )}
@@ -224,14 +224,14 @@ export default function Onboarding({
           {currentStep > 0 && (
             <button
               onClick={() => setCurrentStep(currentStep - 1)}
-              className="px-4 py-2 text-gray-600 hover:text-gray-800 text-sm font-medium"
+              className="rounded-full px-4 py-2 text-sm font-medium text-slate-400 hover:text-slate-200"
             >
               戻る
             </button>
           )}
           <button
             onClick={handleNext}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium"
+            className="rounded-full bg-gradient-to-r from-emerald-400 via-green-300 to-cyan-300 px-4 py-2 text-sm font-semibold text-slate-900 shadow-[0_15px_35px_rgba(16,185,129,0.35)]"
           >
             {currentStep === ONBOARDING_STEPS.length - 1 ? '完了' : '次へ'}
           </button>
@@ -240,4 +240,3 @@ export default function Onboarding({
     </>
   );
 }
-

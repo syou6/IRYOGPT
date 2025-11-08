@@ -6,7 +6,7 @@ import { OpenAIEmbeddings } from '@langchain/openai';
 import { SupabaseVectorStore } from '@langchain/community/vectorstores/supabase';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { supabaseClient } from '@/utils/supabase-client';
-import { requireAuth } from '@/utils/supabase-auth';
+import { getAuthUser } from '@/utils/supabase-auth';
 import { trainingQueue } from '@/lib/queue';
 
 interface TrainRequest {
@@ -18,6 +18,16 @@ interface TrainRequest {
 }
 
 const MAX_TRAINING_PAGES = 20;
+const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || process.env.ADMIN_EMAILS || '')
+  .split(',')
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
+
+const isAdminEmail = (email?: string | null) => {
+  if (!email) return false;
+  if (ADMIN_EMAILS.length === 0) return true;
+  return ADMIN_EMAILS.includes(email.toLowerCase());
+};
 
 // SitemapからURLリストを取得（サイトマップインデックス対応）
 async function getUrlsFromSitemap(sitemapUrl: string): Promise<string[]> {
@@ -314,7 +324,10 @@ export default async function handler(
 
   try {
     // 認証チェック
-    const userId = await requireAuth(req);
+    const authUser = await getAuthUser(req);
+    const userId = authUser.id;
+    const normalizedEmail = authUser.email?.toLowerCase() ?? null;
+    const adminView = isAdminEmail(normalizedEmail);
 
     const { site_id, baseUrl, sitemapUrl, urlList, forceRetrain } = req.body as TrainRequest;
 
@@ -351,9 +364,13 @@ export default async function handler(
       return res.status(404).json({ message: 'Site not found' });
     }
 
-    if (site.user_id !== userId) {
+    const ownerUserId = site.user_id;
+
+    if (ownerUserId !== userId && !adminView) {
       return res.status(403).json({ message: 'Forbidden' });
     }
+
+    const targetUserId = ownerUserId;
 
     // 1. sites.status を 'training' に更新
     const { error: siteUpdateError } = await supabaseClient
@@ -392,7 +409,8 @@ export default async function handler(
           baseUrl,
           sitemapUrl,
           urlList: processedUrlList,
-          userId,
+          ownerUserId: targetUserId,
+          requestedBy: userId,
           forceRetrain: forceRetrain || false,
         },
         {
@@ -555,7 +573,7 @@ export default async function handler(
         // usage_logsに訓練の記録を追加
         try {
           await supabaseClient.from('usage_logs').insert({
-            user_id: userId,
+            user_id: targetUserId,
             site_id: site_id,
             action: 'training',
             model_name: 'text-embedding-3-small',

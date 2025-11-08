@@ -45,7 +45,8 @@ interface TrainingJobData {
   baseUrl: string;
   sitemapUrl?: string;
   urlList?: string[];
-  userId: string;
+  ownerUserId: string;
+  requestedBy?: string;
   forceRetrain?: boolean;
 }
 
@@ -290,7 +291,8 @@ const worker = new Worker<TrainingJobData>(
       baseUrl,
       sitemapUrl,
       urlList,
-      userId,
+      ownerUserId,
+      requestedBy,
       forceRetrain = false,
     } = job.data;
 
@@ -420,7 +422,7 @@ const worker = new Worker<TrainingJobData>(
       // 11. usage_logsに記録
       try {
         await supabase.from('usage_logs').insert({
-          user_id: userId,
+          user_id: ownerUserId,
           site_id: site_id,
           action: 'training',
           model_name: 'text-embedding-3-small',
@@ -430,6 +432,7 @@ const worker = new Worker<TrainingJobData>(
             document_count: docs.length,
             url_count: urls.length,
             job_id: job.id,
+            requested_by: requestedBy || ownerUserId,
           },
         });
       } catch (logError) {

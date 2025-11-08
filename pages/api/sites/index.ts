@@ -1,6 +1,17 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseClient } from '@/utils/supabase-client';
-import { requireAuth } from '@/utils/supabase-auth';
+import { getAuthUser, getSupabaseAdminClient } from '@/utils/supabase-auth';
+
+const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || process.env.ADMIN_EMAILS || '')
+  .split(',')
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
+
+const isAdminEmail = (email?: string | null) => {
+  if (!email) return false;
+  if (ADMIN_EMAILS.length === 0) return true;
+  return ADMIN_EMAILS.includes(email.toLowerCase());
+};
 
 // GET: ユーザーのサイト一覧取得
 // POST: 新規サイト登録
@@ -10,20 +21,63 @@ export default async function handler(
 ) {
   try {
     // 認証チェック
-    const userId = await requireAuth(req);
+    const authUser = await getAuthUser(req);
+    const userId = authUser.id;
+    const normalizedEmail = authUser.email?.toLowerCase() ?? null;
+    const adminView = isAdminEmail(normalizedEmail ?? undefined);
 
     if (req.method === 'GET') {
-      const { data, error } = await supabaseClient
+      const query = supabaseClient
         .from('sites')
         .select('*')
-        .eq('user_id', userId)
         .order('created_at', { ascending: false });
+
+      if (!adminView) {
+        query.eq('user_id', userId);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         throw error;
       }
 
-      return res.status(200).json(data);
+      if (!adminView) {
+        return res.status(200).json(
+          data?.map((site) => ({
+            ...site,
+            owner_email: normalizedEmail,
+          })) ?? [],
+        );
+      }
+
+      const adminClient = getSupabaseAdminClient();
+      const ownerMap = new Map<string, string | null>();
+      const uniqueUserIds = Array.from(
+        new Set(
+          (data ?? [])
+            .map((site) => site.user_id)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      );
+
+      await Promise.all(
+        uniqueUserIds.map(async (id) => {
+          try {
+            const { data: userData } = await adminClient.auth.admin.getUserById(id);
+            ownerMap.set(id, userData?.user?.email ?? null);
+          } catch (err) {
+            ownerMap.set(id, null);
+          }
+        }),
+      );
+
+      return res.status(200).json(
+        data?.map((site) => ({
+          ...site,
+          owner_email: ownerMap.get(site.user_id) ?? null,
+        })) ?? [],
+      );
     }
 
     if (req.method === 'POST') {
@@ -70,4 +124,3 @@ export default async function handler(
     });
   }
 }
-

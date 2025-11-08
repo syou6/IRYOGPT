@@ -39,35 +39,39 @@ const getSupabaseAdmin = () => {
   return supabaseAdminInstance;
 };
 
+export const getSupabaseAdminClient = () => getSupabaseAdmin();
+
+export async function getAuthUser(req: NextApiRequest) {
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    throw new Error('Unauthorized');
+  }
+
+  const token = authHeader.replace('Bearer ', '');
+  if (!token) {
+    throw new Error('Unauthorized');
+  }
+
+  const supabaseAdmin = getSupabaseAdmin();
+  const {
+    data: { user },
+    error,
+  } = await supabaseAdmin.auth.getUser(token);
+
+  if (error || !user) {
+    throw new Error('Unauthorized');
+  }
+
+  return user;
+}
+
 // API Routes用：リクエストから認証されたユーザーIDを取得
 export async function getUserIdFromRequest(
   req: NextApiRequest,
 ): Promise<string | null> {
-  const authHeader = req.headers.authorization;
-  
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const token = authHeader.replace('Bearer ', '');
-  
-  if (!token) {
-    return null;
-  }
-
-  // Service Role Keyを使ったクライアントでJWTを検証
-  const supabaseAdmin = getSupabaseAdmin();
-
   try {
-    const {
-      data: { user },
-      error,
-    } = await supabaseAdmin.auth.getUser(token);
-
-    if (error || !user) {
-      return null;
-    }
-
+    const user = await getAuthUser(req);
     return user.id;
   } catch (error) {
     return null;
@@ -78,13 +82,8 @@ export async function getUserIdFromRequest(
 export async function requireAuth(
   req: NextApiRequest,
 ): Promise<string> {
-  const userId = await getUserIdFromRequest(req);
-  
-  if (!userId) {
-    throw new Error('Unauthorized');
-  }
-  
-  return userId;
+  const user = await getAuthUser(req);
+  return user.id;
 }
 
 const adminIds = (process.env.ADMIN_USER_IDS || '')

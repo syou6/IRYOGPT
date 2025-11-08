@@ -71,90 +71,117 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
   return `(function() {
   'use strict';
   
-  // 既に読み込まれている場合はスキップ
   if (window.SiteGPTEmbed && window.SiteGPTEmbed.loaded) {
     return;
   }
-  
+
   const siteId = '${siteId}';
   const apiBaseUrl = '${apiBaseUrl}';
-  
-  // チャットボットウィジェットのHTML
-  const widgetHTML = \`
-    <div id="sitegpt-widget" style="position: fixed; bottom: 20px; right: 20px; z-index: 9999;">
-      <div id="sitegpt-chat-container" style="display: none; width: 400px; height: 600px; background: white; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); flex-direction: column;">
-        <div style="background: #4F46E5; color: white; padding: 16px; border-radius: 8px 8px 0 0; display: flex; justify-content: space-between; align-items: center;">
-          <h3 style="margin: 0; font-size: 18px;">チャットボット</h3>
-          <button id="sitegpt-close-btn" style="background: none; border: none; color: white; font-size: 24px; cursor: pointer;">&times;</button>
-        </div>
-        <div id="sitegpt-messages" style="flex: 1; padding: 16px; overflow-y: auto; height: 400px;"></div>
-        <div style="padding: 16px; border-top: 1px solid #e5e7eb;">
-          <input type="text" id="sitegpt-input" placeholder="質問を入力..." style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 4px; margin-bottom: 8px;">
-          <button id="sitegpt-send-btn" style="width: 100%; padding: 8px; background: #4F46E5; color: white; border: none; border-radius: 4px; cursor: pointer;">送信</button>
-        </div>
-      </div>
-      <button id="sitegpt-toggle-btn" style="width: 60px; height: 60px; border-radius: 50%; background: #4F46E5; color: white; border: none; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.15); font-size: 24px;">💬</button>
-    </div>
-  \`;
-  
-  // ウィジェットをDOMに追加
-  const widgetDiv = document.createElement('div');
-  widgetDiv.innerHTML = widgetHTML;
-  document.body.appendChild(widgetDiv);
-  
-  // チャットコンテナとボタンの参照を取得
+
+  const styles = [
+    '.sgpt-widget{position:fixed;right:24px;bottom:24px;z-index:9999;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;color:#e2e8f0}',
+    '.sgpt-widget *{box-sizing:border-box;font-family:inherit}',
+    '.sgpt-fab{width:60px;height:60px;border-radius:999px;background:linear-gradient(120deg,#34d399,#6ee7b7,#22d3ee);color:#0f172a;border:none;box-shadow:0 25px 45px rgba(15,23,42,.35);cursor:pointer;font-weight:600;letter-spacing:.05em;display:flex;align-items:center;justify-content:center;transition:all .3s ease}',
+    '.sgpt-fab:hover{transform:translateY(-4px)}',
+    '.sgpt-chat-panel{position:absolute;right:0;bottom:80px;width:min(360px,90vw);height:520px;border-radius:28px;border:1px solid rgba(255,255,255,.08);background:rgba(3,7,18,.92);box-shadow:0 45px 120px rgba(1,3,6,.75);backdrop-filter:blur(30px);display:flex;flex-direction:column;opacity:0;pointer-events:none;transform:translateY(20px);transition:all .35s cubic-bezier(.21,1.02,.73,1)}',
+    '.sgpt-widget.is-open .sgpt-chat-panel{opacity:1;pointer-events:auto;transform:translateY(0)}',
+    '.sgpt-chat-header{padding:20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.06)}',
+    '.sgpt-title{font-size:1.1rem;font-weight:600;margin:0;color:#f8fafc}',
+    '.sgpt-close-btn{border:none;background:none;color:#94a3b8;font-size:1.4rem;cursor:pointer}',
+    '.sgpt-messages{flex:1;padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:12px}',
+    '.sgpt-message{padding:12px 16px;border-radius:18px;font-size:.93rem;line-height:1.5;max-width:92%;box-shadow:0 15px 40px rgba(2,6,23,.35)}',
+    '.sgpt-message.user{margin-left:auto;background:linear-gradient(120deg,#34d399,#22d3ee);color:#0f172a}',
+    '.sgpt-message.bot{background:rgba(2,6,23,.7);border:1px solid rgba(148,163,184,.2);color:#e2e8f0}',
+    '.sgpt-input-bar{padding:16px 20px;border-top:1px solid rgba(255,255,255,.06);display:flex;gap:12px;align-items:center}',
+    '.sgpt-input{flex:1;border-radius:16px;border:1px solid rgba(148,163,184,.3);background:rgba(15,23,42,.8);color:#f1f5f9;padding:12px 16px;font-size:.95rem;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}',
+    '.sgpt-input::placeholder{color:#64748b}',
+    '.sgpt-send-btn{border:none;border-radius:14px;padding:12px 20px;font-weight:600;background:linear-gradient(120deg,#34d399,#6ee7b7,#22d3ee);color:#0f172a;cursor:pointer;box-shadow:0 20px 45px rgba(15,23,42,.45)}',
+    '.sgpt-send-btn:disabled{opacity:.6;cursor:not-allowed}',
+    '.sgpt-loading{font-size:.85rem;color:#94a3b8}',
+    '.sgpt-widget .sgpt-chip{display:inline-flex;padding:4px 10px;border-radius:999px;background:rgba(52,211,153,.18);color:#a7f3d0;font-size:.75rem;letter-spacing:.15em}',
+    '.sgpt-widget .sgpt-footer{padding:0 20px 16px;text-align:center;font-size:.7rem;color:#475569}'
+  ].join('');
+
+  const styleEl = document.createElement('style');
+  styleEl.textContent = styles;
+  document.head.appendChild(styleEl);
+
+  const widgetHTML = [
+    '<div class="sgpt-widget" id="sitegpt-widget">',
+    '  <div class="sgpt-chat-panel" id="sitegpt-chat-container">',
+    '    <div class="sgpt-chat-header">',
+    '      <div>',
+    '        <p class="sgpt-chip">SiteGPT</p>',
+    '        <p class="sgpt-title">Neon Assistant</p>',
+    '      </div>',
+    '      <button class="sgpt-close-btn" id="sitegpt-close-btn">×</button>',
+    '    </div>',
+    '    <div class="sgpt-messages" id="sitegpt-messages"></div>',
+    '    <div class="sgpt-input-bar">',
+    '      <input type="text" id="sitegpt-input" class="sgpt-input" placeholder="質問を入力..." />',
+    '      <button id="sitegpt-send-btn" class="sgpt-send-btn">送信</button>',
+    '    </div>',
+    '    <div class="sgpt-footer">Powered by SiteGPT</div>',
+    '  </div>',
+    '  <button class="sgpt-fab" id="sitegpt-toggle-btn">💬</button>',
+    '</div>'
+  ].join('');
+
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = widgetHTML;
+  document.body.appendChild(wrapper);
+
+  const widget = document.getElementById('sitegpt-widget');
   const chatContainer = document.getElementById('sitegpt-chat-container');
   const toggleBtn = document.getElementById('sitegpt-toggle-btn');
   const closeBtn = document.getElementById('sitegpt-close-btn');
   const messagesDiv = document.getElementById('sitegpt-messages');
-  const inputField = document.getElementById('sitegpt-input');
+  const inputField = document.getElementById('sitegpt-input') as HTMLInputElement | null;
   const sendBtn = document.getElementById('sitegpt-send-btn');
-  
-  // トグル機能
-  toggleBtn.addEventListener('click', function() {
-    if (chatContainer.style.display === 'none') {
-      chatContainer.style.display = 'flex';
-    } else {
-      chatContainer.style.display = 'none';
+
+  function toggleChat(open) {
+    if (!widget || !chatContainer) return;
+    const shouldOpen = typeof open === 'boolean' ? open : !widget.classList.contains('is-open');
+    widget.classList.toggle('is-open', shouldOpen);
+    if (shouldOpen && inputField && typeof inputField.focus === 'function') {
+      setTimeout(() => inputField.focus(), 150);
     }
-  });
-  
-  // 閉じる機能
-  closeBtn.addEventListener('click', function() {
-    chatContainer.style.display = 'none';
-  });
-  
-  // メッセージを追加する関数
+  }
+
+  toggleBtn?.addEventListener('click', () => toggleChat());
+  closeBtn?.addEventListener('click', () => toggleChat(false));
+
   function addMessage(text, isUser) {
+    if (!messagesDiv) return;
     const messageDiv = document.createElement('div');
-    messageDiv.style.marginBottom = '12px';
-    messageDiv.style.padding = '8px 12px';
-    messageDiv.style.borderRadius = '8px';
-    messageDiv.style.backgroundColor = isUser ? '#4F46E5' : '#f3f4f6';
-    messageDiv.style.color = isUser ? 'white' : 'black';
-    messageDiv.style.textAlign = isUser ? 'right' : 'left';
+    messageDiv.className = \'sgpt-message \'+ (isUser ? 'user' : 'bot');
     messageDiv.textContent = text;
     messagesDiv.appendChild(messageDiv);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
   }
-  
-  // 送信機能
+
+  function showLoading() {
+    if (!messagesDiv) return null;
+    const loading = document.createElement('div');
+    loading.id = 'sitegpt-loading';
+    loading.className = 'sgpt-message bot sgpt-loading';
+    loading.textContent = 'Neon assistant is thinking...';
+    messagesDiv.appendChild(loading);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    return loading;
+  }
+
   function sendMessage() {
+    if (!inputField) return;
+    if (!inputField || typeof inputField.value !== 'string') return;
     const question = inputField.value.trim();
     if (!question) return;
-    
-    // ユーザーメッセージを表示
+
     addMessage(question, true);
     inputField.value = '';
-    
-    // ローディング表示
-    const loadingDiv = document.createElement('div');
-    loadingDiv.id = 'sitegpt-loading';
-    loadingDiv.textContent = '考え中...';
-    loadingDiv.style.padding = '8px 12px';
-    messagesDiv.appendChild(loadingDiv);
-    
-    // API呼び出し（埋め込み用エンドポイントを使用）
+
+    const loadingDiv = showLoading();
+
     fetch(apiBaseUrl + '/api/embed/chat', {
       method: 'POST',
       headers: {
@@ -173,31 +200,22 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
       return response.text();
     })
     .then(text => {
-      // ローディングを削除
-      const loading = document.getElementById('sitegpt-loading');
-      if (loading) loading.remove();
-      
-      // SSE形式のレスポンスを処理
+      if (loadingDiv) loadingDiv.remove();
+
       const lines = text.split('\\n');
       let answer = '';
-      
       for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.substring(6);
-          if (data === '[DONE]') {
-            break;
-          }
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.data) {
-              answer += parsed.data;
-            }
-          } catch (e) {
-            // JSONパースエラーは無視
-          }
+        if (!line.startsWith('data: ')) continue;
+        const payload = line.substring(6);
+        if (payload === '[DONE]') break;
+        try {
+          const parsed = JSON.parse(payload);
+          if (parsed.data) answer += parsed.data;
+        } catch (err) {
+          console.warn('SiteGPT embed parse error', err);
         }
       }
-      
+
       if (answer) {
         addMessage(answer, false);
       } else {
@@ -205,30 +223,23 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
       }
     })
     .catch(error => {
-      // ローディングを削除
-      const loading = document.getElementById('sitegpt-loading');
-      if (loading) loading.remove();
-      
+      if (loadingDiv) loadingDiv.remove();
       console.error('Chat error:', error);
       addMessage('エラーが発生しました。しばらくしてから再度お試しください。', false);
     });
   }
   
-  // 送信ボタンクリック
-  sendBtn.addEventListener('click', sendMessage);
-  
-  // Enterキーで送信
-  inputField.addEventListener('keypress', function(e) {
+  sendBtn?.addEventListener('click', sendMessage);
+  inputField?.addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
+      e.preventDefault();
       sendMessage();
     }
   });
-  
-  // 読み込み完了フラグ
+
   window.SiteGPTEmbed = {
     loaded: true,
     siteId: siteId,
   };
 })();`;
 }
-

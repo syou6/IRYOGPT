@@ -1,6 +1,17 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseClient } from '@/utils/supabase-client';
-import { requireAuth } from '@/utils/supabase-auth';
+import { getAuthUser } from '@/utils/supabase-auth';
+
+const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || process.env.ADMIN_EMAILS || '')
+  .split(',')
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
+
+const isAdminEmail = (email?: string | null) => {
+  if (!email) return false;
+  if (ADMIN_EMAILS.length === 0) return true;
+  return ADMIN_EMAILS.includes(email.toLowerCase());
+};
 
 // GET: サイトの学習ジョブ履歴を取得
 export default async function handler(
@@ -13,7 +24,9 @@ export default async function handler(
 
   try {
     // 認証チェック
-    const userId = await requireAuth(req);
+    const authUser = await getAuthUser(req);
+    const userId = authUser.id;
+    const adminView = isAdminEmail(authUser.email?.toLowerCase());
     const { siteId } = req.query;
 
     if (!siteId || typeof siteId !== 'string') {
@@ -31,7 +44,7 @@ export default async function handler(
       return res.status(404).json({ message: 'Site not found' });
     }
 
-    if (site.user_id !== userId) {
+    if (site.user_id !== userId && !adminView) {
       return res.status(403).json({ message: 'Forbidden' });
     }
 
@@ -63,4 +76,3 @@ export default async function handler(
     });
   }
 }
-

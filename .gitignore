@@ -41,3 +41,6 @@ next-env.d.ts
 
 # Scraped data files
 franknotion.json
+
+# Test files
+public/index.html

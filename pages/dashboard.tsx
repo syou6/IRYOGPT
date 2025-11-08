@@ -580,6 +580,11 @@ export default function Dashboard() {
     return new Date(dateString).toLocaleString('ja-JP');
   };
 
+  const lastTrainedLabel =
+    sites.length > 0 && sites[0]?.last_trained_at
+      ? formatDate(sites[0].last_trained_at)
+      : '-';
+
   if (authLoading || loading) {
     return (
       <Layout>
@@ -649,6 +654,7 @@ export default function Dashboard() {
             <h2 className="text-xl font-semibold text-slate-200">サイト一覧</h2>
             <div className="text-sm text-slate-400">{sites.length}件</div>
           </div>
+        </section>
 
         {sites.length === 0 ? (
           <div className="rounded-3xl border border-white/10 bg-white/5 p-12 text-center text-slate-300">

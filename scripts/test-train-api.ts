@@ -1,3 +1,5 @@
+export {};
+
 /**
  * STEP 2 テスト用スクリプト
  * /api/train/url をテストするためのスクリプト
@@ -84,4 +86,3 @@ async function testTrainAPI() {
 
 // 実行
 testTrainAPI();
-

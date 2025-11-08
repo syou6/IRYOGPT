@@ -7,12 +7,14 @@ import { SupabaseVectorStore } from '@langchain/community/vectorstores/supabase'
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { supabaseClient } from '@/utils/supabase-client';
 import { requireAuth } from '@/utils/supabase-auth';
+import { trainingQueue } from '@/lib/queue';
 
 interface TrainRequest {
   site_id: string;
   baseUrl: string;
   sitemapUrl?: string;
   urlList?: string;
+  forceRetrain?: boolean;
 }
 
 const MAX_TRAINING_PAGES = 20;
@@ -314,9 +316,9 @@ export default async function handler(
     // 認証チェック
     const userId = await requireAuth(req);
 
-    const { site_id, baseUrl, sitemapUrl, urlList } = req.body as TrainRequest;
+    const { site_id, baseUrl, sitemapUrl, urlList, forceRetrain } = req.body as TrainRequest;
 
-    console.log(`[Training] Request body:`, { site_id, baseUrl, sitemapUrl, urlList: urlList ? `${urlList.substring(0, 100)}...` : null });
+    console.log(`[Training] Request body:`, { site_id, baseUrl, sitemapUrl, urlList: urlList ? `${urlList.substring(0, 100)}...` : null, forceRetrain });
 
     if (!site_id || !baseUrl) {
       return res.status(400).json({ 
@@ -324,12 +326,12 @@ export default async function handler(
       });
     }
 
-    // URLリストを事前に処理（非同期処理で使用するため）
+    // URLリストを事前に処理（キューに渡すため）
     const processedUrlList = urlList && urlList.trim() 
       ? urlList.split('\n')
           .map((url) => url.trim())
           .filter((url) => url.length > 0 && (url.startsWith('http://') || url.startsWith('https://')))
-      : null;
+      : undefined;
 
     console.log(`[Training] Processed URL list:`, { 
       hasUrlList: !!urlList, 
@@ -381,22 +383,55 @@ export default async function handler(
 
     const jobId = job.id;
 
-    // 3. ジョブステータスを 'running' に更新
-    await supabaseClient
-      .from('training_jobs')
-      .update({ status: 'running', started_at: new Date().toISOString() })
-      .eq('id', jobId);
+    // 3. キューにジョブを追加
+    try {
+      const queueJob = await trainingQueue.add(
+        'train-site',
+        {
+          site_id,
+          baseUrl,
+          sitemapUrl,
+          urlList: processedUrlList,
+          userId,
+          forceRetrain: forceRetrain || false,
+        },
+        {
+          jobId, // training_jobs.id を使用してジョブIDを統一
+          priority: 1,
+        }
+      );
 
-    // 4. レスポンスを即座に返す（非同期処理を開始）
-    res.status(200).json({
-      job_id: jobId,
-      status: 'running',
-      message: `Training started for site_id ${site_id}`,
-      page_limit_max: MAX_TRAINING_PAGES,
-    });
+      console.log(`[Training] Job ${jobId} added to queue`);
 
-    // 5. バックグラウンド処理を開始（非同期）
-    (async () => {
+      // 4. レスポンスを即座に返す
+      res.status(200).json({
+        job_id: jobId,
+        status: 'pending',
+        message: `Training job queued for site_id ${site_id}`,
+        page_limit_max: MAX_TRAINING_PAGES,
+      });
+    } catch (queueError) {
+      console.error('[Training] Failed to add job to queue:', queueError);
+      
+      // キュー追加に失敗した場合、既存の同期処理にフォールバック
+      console.log('[Training] Falling back to synchronous processing');
+      
+      // ジョブステータスを 'running' に更新
+      await supabaseClient
+        .from('training_jobs')
+        .update({ status: 'running', started_at: new Date().toISOString() })
+        .eq('id', jobId);
+
+      // レスポンスを返す
+      res.status(200).json({
+        job_id: jobId,
+        status: 'running',
+        message: `Training started for site_id ${site_id} (fallback mode)`,
+        page_limit_max: MAX_TRAINING_PAGES,
+      });
+
+      // バックグラウンド処理を開始（既存の同期処理）
+      (async () => {
       try {
         // 再学習の場合、既存のドキュメントを削除（重複を防ぐため）
         console.log(`[Training] Deleting existing documents for site_id: ${site_id}`);
@@ -557,6 +592,7 @@ export default async function handler(
           .eq('id', jobId);
       }
     })();
+    }
 
   } catch (error: any) {
     if (error.message === 'Unauthorized') {

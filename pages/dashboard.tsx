@@ -6,6 +6,10 @@ import { createSupabaseClient } from '@/utils/supabase-auth';
 import Onboarding from '@/components/Onboarding';
 
 const MAX_TRAINING_PAGES = 20;
+const ADMIN_IDS = (process.env.NEXT_PUBLIC_ADMIN_USER_IDS || '')
+  .split(',')
+  .map((id) => id.trim())
+  .filter(Boolean);
 
 interface Site {
   id: string;
@@ -58,6 +62,7 @@ export default function Dashboard() {
   const trainingJobsIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const trainingJobsChannelRef = useRef<any>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const supabase = createSupabaseClient();
   const channelRef = useRef<any>(null);
 
@@ -73,6 +78,7 @@ export default function Dashboard() {
         return;
       }
 
+      setIsAdmin(ADMIN_IDS.includes(session.user.id));
       setAuthLoading(false);
     };
 
@@ -179,7 +185,7 @@ export default function Dashboard() {
             table: 'sites',
             filter: `user_id=eq.${session.user.id}`,
           },
-          (payload) => {
+          (payload: any) => {
             // サイトの変更を検知したら再取得
             if (process.env.NODE_ENV === 'development') {
               console.log('[Realtime] Sites table changed, fetching sites...', payload);
@@ -187,7 +193,7 @@ export default function Dashboard() {
             fetchSitesWithAuth();
           }
         )
-        .subscribe((status) => {
+        .subscribe((status: any) => {
           // デバッグ用: チャンネルの接続状態をログ出力（開発環境のみ）
           if (process.env.NODE_ENV === 'development') {
             if (status === 'SUBSCRIBED') {
@@ -361,7 +367,7 @@ export default function Dashboard() {
             schema: 'public',
             table: 'training_jobs',
           },
-          (payload) => {
+          (payload: any) => {
             const job = payload.new as TrainingJob | null;
             if (job && trainingSites.has(job.site_id)) {
               setTrainingJobs((prev) => {
@@ -380,7 +386,7 @@ export default function Dashboard() {
             }
           },
         )
-        .subscribe((status) => {
+        .subscribe((status: any) => {
           // デバッグ用: チャンネルの接続状態をログ出力（開発環境のみ）
           if (process.env.NODE_ENV === 'development') {
             if (status === 'SUBSCRIBED') {
@@ -595,7 +601,21 @@ export default function Dashboard() {
       )}
       <div className="container mx-auto px-4 py-4 md:py-8 max-w-6xl">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 md:mb-8">
-          <h1 className="text-2xl md:text-3xl font-bold">ダッシュボード</h1>
+          <div className="flex items-center gap-4">
+            <h1 className="text-2xl md:text-3xl font-bold">ダッシュボード</h1>
+            <Link
+              href="/dashboard/usage"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm md:text-base"
+            >
+              使用状況
+            </Link>
+            <Link
+              href="/dashboard/plans"
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm md:text-base"
+            >
+              プラン
+            </Link>
+          </div>
           <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
             <button
               onClick={async () => {
@@ -606,6 +626,14 @@ export default function Dashboard() {
             >
               ログアウト
             </button>
+            {isAdmin && (
+              <Link
+                href="/dashboard/admin/usage"
+                className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg font-medium text-sm md:text-base text-center"
+              >
+                管理者: 使用状況
+              </Link>
+            )}
             <button
               id="onboarding-create-site-btn"
               onClick={() => setShowModal(true)}
@@ -616,8 +644,14 @@ export default function Dashboard() {
           </div>
         </div>
 
+        <section className="rounded-3xl border border-white/10 bg-white/5 p-6">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-semibold text-slate-200">サイト一覧</h2>
+            <div className="text-sm text-slate-400">{sites.length}件</div>
+          </div>
+
         {sites.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 rounded-lg">
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-12 text-center text-slate-300">
             <p className="text-gray-500 mb-4">登録されているサイトがありません</p>
             <button
               onClick={() => setShowModal(true)}
@@ -642,7 +676,7 @@ export default function Dashboard() {
 
                 <div className="space-y-2 mb-4 text-xs md:text-sm text-gray-600">
                   <div>
-                    <span className="font-medium">URL:</span>{' '}
+                    <span className="font-medium text-slate-200">URL:</span>{' '}
                     <a
                       href={site.base_url}
                       target="_blank"
@@ -675,18 +709,18 @@ export default function Dashboard() {
                         : 'URL解析中...';
                       return (
                         <div>
-                          <div className="flex justify-between text-xs text-gray-600 mb-1">
+                          <div className="flex justify-between text-xs text-slate-300 mb-1">
                             <span className="font-medium">学習進捗</span>
                             <span>{label}</span>
                           </div>
-                          <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div className="w-full bg-white/10 rounded-full h-2">
                             <div
-                              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                              className="bg-emerald-400 h-2 rounded-full transition-all duration-300"
                               style={{ width: `${progressPercent}%` }}
                             />
                           </div>
                           {!job && (
-                            <p className="mt-1 text-[11px] text-gray-500">URLリストを解析しています...</p>
+                            <p className="mt-1 text-[11px] text-slate-400">URLリストを解析しています...</p>
                           )}
                         </div>
                       );
@@ -700,13 +734,13 @@ export default function Dashboard() {
                       <Link
                         id="onboarding-chat-btn"
                         href={`/dashboard/${site.id}`}
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-center text-sm font-medium"
+                        className="flex-1 rounded-full border border-emerald-400/30 px-4 py-2 text-center text-sm text-emerald-200 transition hover:bg-emerald-400/10"
                       >
                         チャット開始
                       </Link>
                       <button
                         onClick={() => handleStartTraining(site.id)}
-                        className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                        className="flex-1 rounded-full bg-emerald-400 px-4 py-2 text-center text-sm font-semibold text-slate-900 transition hover:-translate-y-0.5"
                       >
                         再学習
                       </button>
@@ -716,7 +750,7 @@ export default function Dashboard() {
                     <button
                       id="onboarding-start-training-btn"
                       onClick={() => handleStartTraining(site.id)}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                      className="flex-1 rounded-full bg-emerald-400 px-4 py-2 text-center text-sm font-semibold text-slate-900 transition hover:-translate-y-0.5"
                     >
                       学習開始
                     </button>
@@ -724,7 +758,7 @@ export default function Dashboard() {
                   {site.status === 'training' && (
                     <button
                       disabled
-                      className="flex-1 bg-gray-300 text-gray-600 px-4 py-2 rounded-lg text-sm font-medium cursor-not-allowed"
+                      className="flex-1 rounded-full bg-white/15 text-slate-400 px-4 py-2 text-sm font-medium cursor-not-allowed"
                     >
                       学習中...
                     </button>
@@ -732,14 +766,14 @@ export default function Dashboard() {
                   {site.status === 'error' && (
                     <button
                       onClick={() => handleStartTraining(site.id)}
-                      className="flex-1 bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+                      className="flex-1 rounded-full bg-red-500 px-4 py-2 text-center text-sm font-semibold text-white transition hover:-translate-y-0.5"
                     >
                       再学習
                     </button>
                   )}
                   <button
                     onClick={() => handleDeleteSite(site.id)}
-                    className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-medium sm:w-auto w-full"
+                    className="rounded-full border border-white/10 px-4 py-2 text-center text-sm text-slate-200 transition hover:border-red-500/50 hover:text-red-200 sm:w-auto w-full"
                   >
                     削除
                   </button>

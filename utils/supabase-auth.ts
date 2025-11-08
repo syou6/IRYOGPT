@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import type { NextApiRequest } from 'next';
 
 // フロントエンド用のSupabaseクライアント（anon key使用）
-let supabaseClientInstance: ReturnType<typeof createClient> | null = null;
+let supabaseClientInstance: any = null;
 
 export const createSupabaseClient = () => {
   if (supabaseClientInstance) {
@@ -18,7 +18,7 @@ export const createSupabaseClient = () => {
 };
 
 // API Routes用のSupabase Adminクライアント（Service Role Key使用）
-let supabaseAdminInstance: ReturnType<typeof createClient> | null = null;
+let supabaseAdminInstance: any = null;
 
 const getSupabaseAdmin = () => {
   if (supabaseAdminInstance) {
@@ -87,3 +87,18 @@ export async function requireAuth(
   return userId;
 }
 
+const adminIds = (process.env.ADMIN_USER_IDS || '')
+  .split(',')
+  .map((id) => id.trim())
+  .filter(Boolean);
+
+export async function requireAdmin(req: NextApiRequest): Promise<string> {
+  const userId = await requireAuth(req);
+  if (adminIds.length === 0) {
+    throw new Error('AdminNotConfigured');
+  }
+  if (!adminIds.includes(userId)) {
+    throw new Error('Forbidden');
+  }
+  return userId;
+}

@@ -1,3 +1,5 @@
+export {};
+
 /**
  * 埋め込みAPIのテストスクリプト
  * /api/embed/script と /api/embed/chat をテスト
@@ -183,4 +185,3 @@ async function main() {
 }
 
 main();
-

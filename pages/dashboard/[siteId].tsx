@@ -197,7 +197,7 @@ export default function SiteChat() {
             table: 'training_jobs',
             filter: `site_id=eq.${siteId}`,
           },
-          (payload) => {
+          (payload: any) => {
             // ジョブの変更を検知したら再取得
             fetchTrainingJobs();
           }
@@ -470,6 +470,22 @@ export default function SiteChat() {
     return new Date(dateString).toLocaleString('ja-JP');
   };
 
+  if (!site) {
+    return (
+      <Layout>
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="text-gray-500">読み込み中...</div>
+        </div>
+      </Layout>
+    );
+  }
+
+  // site.idが確実に存在することを確認
+  const siteIdForLinks = site?.id;
+  const embedHref = siteIdForLinks && typeof siteIdForLinks === 'string' && siteIdForLinks.length > 0 
+    ? `/dashboard/sites/${siteIdForLinks}/embed` 
+    : null;
+
   return (
     <Layout>
       <div className="flex h-screen">
@@ -491,6 +507,14 @@ export default function SiteChat() {
                 <div className="text-xs md:text-sm text-gray-500 hidden sm:block">
                   {site.status === 'ready' ? '準備完了' : site.status}
                 </div>
+                {embedHref && (
+                  <Link
+                    href={embedHref}
+                    className="px-2 py-1 bg-blue-600 text-white rounded text-xs md:text-sm hover:bg-blue-700 transition-colors"
+                  >
+                    埋め込み設定
+                  </Link>
+                )}
                 <button
                   onClick={() => setShowSidebar(!showSidebar)}
                   className="lg:hidden bg-gray-100 hover:bg-gray-200 p-2 rounded-lg"
@@ -733,4 +757,3 @@ export default function SiteChat() {
     </Layout>
   );
 }
-

@@ -14,7 +14,11 @@
     "format": "prettier --ignore-path .gitignore \"**/*.+(ts|js|tsx)\" --write",
     "scrape-embed": "tsx -r dotenv/config scripts/scrape-embed.ts",
     "test-train-api": "tsx -r dotenv/config scripts/test-train-api.ts",
-    "test:embed": "tsx -r dotenv/config scripts/test-embed-api.ts"
+    "test:embed": "tsx -r dotenv/config scripts/test-embed-api.ts",
+    "test:redis": "tsx -r dotenv/config scripts/test-redis-connection.ts",
+    "check:queue": "tsx -r dotenv/config scripts/check-queue-status.ts",
+    "worker": "tsx -r dotenv/config scripts/start-worker.ts",
+    "check-schema": "tsx -r dotenv/config scripts/check-schema.ts"
   },
   "dependencies": {
     "@langchain/community": "^1.0.0",
@@ -23,9 +27,11 @@
     "@langchain/textsplitters": "^1.0.0",
     "@microsoft/fetch-event-source": "^2.0.1",
     "@supabase/supabase-js": "^2.10.0",
+    "bullmq": "^5.0.0",
     "cheerio": "1.0.0-rc.12",
     "clsx": "^1.2.1",
     "dotenv": "^16.0.3",
+    "ioredis": "^5.3.2",
     "langchain": "^1.0.3",
     "next": "13.2.3",
     "react": "18.2.0",

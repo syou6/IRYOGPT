@@ -9,7 +9,7 @@ const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 
 const stripe = stripeSecret
   ? new Stripe(stripeSecret, {
-      apiVersion: '2022-11-15',
+      apiVersion: '2023-10-16',
     })
   : null;
 

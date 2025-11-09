@@ -114,7 +114,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     '    <div class="sgpt-chat-header">',
     '      <div>',
     '        <p class="sgpt-chip">WEBGPT</p>',
-    '        <p class="sgpt-title">Neon Assistant</p>',
+    '        <p class="sgpt-title">WEBGPT サポート</p>',
     '      </div>',
     '      <button class="sgpt-close-btn" id="webgpt-close-btn">×</button>',
     '    </div>',
@@ -173,7 +173,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     const loading = document.createElement('div');
     loading.id = 'webgpt-loading';
     loading.className = 'sgpt-message bot sgpt-loading';
-    loading.textContent = 'Neon assistant is thinking...';
+    loading.textContent = 'WEBGPT が回答を作成しています...';
     messagesDiv.appendChild(loading);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
     return loading;

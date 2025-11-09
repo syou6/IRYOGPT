@@ -225,7 +225,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
       }
 
       if (answer) {
-        const cleaned = answer.replace(/\*\*(.*?)\*\*/g, '$1');
+        const cleaned = answer.split('**').join('');
         addMessage(cleaned, false);
       } else {
         addMessage('申し訳ございません。回答を取得できませんでした。', false);
@@ -233,18 +233,18 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     })
     .catch(error => {
       if (loadingDiv) loadingDiv.remove();
-      console.error('Chat error:', error);
-      addMessage('エラーが発生しました。しばらくしてから再度お試しください。', false);
-    });
-  }
-  
-  sendBtn?.addEventListener('click', sendMessage);
-  inputField?.addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      sendMessage();
-    }
+    console.error('Chat error:', error);
+    addMessage('エラーが発生しました。しばらくしてから再度お試しください。', false);
   });
+}
+
+sendBtn?.addEventListener('click', sendMessage);
+inputField?.addEventListener('keypress', function(e) {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    sendMessage();
+  }
+});
 
   window.WebGPTEmbed = {
     loaded: true,

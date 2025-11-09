@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Layout from '@/components/layout';
 
 const legalRows = [
-  { label: '販売事業者名', value: 'WEBGPT（運営会社：Tech Samurai合同会社）' },
+  { label: '販売事業者名', value: 'WEBGPT' },
   { label: '代表責任者', value: '川本 翔' },
   { label: '所在地', value: '東京都新宿区新宿1-36-2 新宿第七葉山ビル3F' },
   { label: '電話番号', value: '+81 852 52 7323' },

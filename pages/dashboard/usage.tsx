@@ -7,7 +7,6 @@ import { createSupabaseClient } from '@/utils/supabase-auth';
 interface MonthlyUsage {
   chat_count: number;
   embedding_tokens: number;
-  total_cost_usd: number;
 }
 
 interface User {
@@ -21,7 +20,6 @@ interface DailyUsage {
   date: string;
   chat_count: number;
   embedding_tokens: number;
-  cost_usd: number;
 }
 
 export default function UsagePage() {
@@ -104,12 +102,12 @@ export default function UsagePage() {
         );
 
         if (!usageError && usageData && usageData.length > 0) {
-          setMonthlyUsage(usageData[0]);
+          const { chat_count = 0, embedding_tokens = 0 } = usageData[0];
+          setMonthlyUsage({ chat_count, embedding_tokens });
         } else {
           setMonthlyUsage({
             chat_count: 0,
             embedding_tokens: 0,
-            total_cost_usd: 0,
           });
         }
 
@@ -123,7 +121,7 @@ export default function UsagePage() {
 
         const { data: logsData, error: logsError } = await supabase
           .from('usage_logs')
-          .select('created_at, action, tokens_consumed, cost_usd')
+          .select('created_at, action, tokens_consumed')
           .eq('user_id', session.user.id)
           .gte('created_at', startOfMonth.toISOString())
           .lte('created_at', endOfMonth.toISOString())
@@ -139,7 +137,6 @@ export default function UsagePage() {
               date,
               chat_count: 0,
               embedding_tokens: 0,
-              cost_usd: 0,
             };
 
             if (log.action === 'chat') {
@@ -147,8 +144,6 @@ export default function UsagePage() {
             } else if (log.action === 'embedding') {
               existing.embedding_tokens += log.tokens_consumed || 0;
             }
-
-            existing.cost_usd += parseFloat(log.cost_usd?.toString() || '0');
             dailyMap.set(date, existing);
           });
 
@@ -162,7 +157,6 @@ export default function UsagePage() {
                 date: dateStr,
                 chat_count: 0,
                 embedding_tokens: 0,
-                cost_usd: 0,
               }
             );
             currentDate.setDate(currentDate.getDate() + 1);
@@ -198,10 +192,6 @@ export default function UsagePage() {
     ...dailyUsage.map((d) => d.embedding_tokens),
     1
   );
-  const maxCost = Math.max(
-    ...dailyUsage.map((d) => d.cost_usd),
-    0.01
-  );
 
   if (authLoading || loading) {
     return (
@@ -235,7 +225,7 @@ export default function UsagePage() {
                   ← ダッシュボード
                 </Link>
                 <h1 className="mt-2 text-3xl font-semibold text-white">使用状況</h1>
-                <p className="mt-1 text-sm text-slate-300">今月の使用量とコストを確認できます</p>
+                <p className="mt-1 text-sm text-slate-300">今月の利用回数とトークン消費量を確認できます</p>
               </div>
               <label className="flex flex-col text-xs font-medium uppercase tracking-[0.25em] text-slate-400">
                 表示月
@@ -312,14 +302,6 @@ export default function UsagePage() {
               </div>
             </div>
 
-            {/* コスト */}
-            <div className="rounded-3xl border border-white/10 bg-gradient-to-br from-emerald-500/15 via-slate-900/60 to-slate-900 p-6 shadow-[0_25px_70px_rgba(3,15,10,0.65)]">
-              <h3 className="text-xs uppercase tracking-[0.3em] text-emerald-200">今月のコスト</h3>
-              <p className="mt-3 text-3xl font-semibold text-white">${monthlyUsage.total_cost_usd.toFixed(4)}</p>
-              <p className="text-sm text-slate-300">
-                約 ¥{(monthlyUsage.total_cost_usd * 150).toFixed(2)}（1USD=150円換算）
-              </p>
-            </div>
           </div>
         )}
 
@@ -384,38 +366,6 @@ export default function UsagePage() {
                   );
                 })}
               </div>
-            </div>
-          </div>
-        )}
-
-        {/* コストグラフ */}
-        {dailyUsage.length > 0 && (
-          <div className="rounded-[28px] border border-white/10 bg-white/5 p-6">
-            <h3 className="text-lg font-semibold text-white">日別コスト（USD）</h3>
-            <div className="mt-4 space-y-2">
-              {dailyUsage.map((day) => {
-                const height = maxCost > 0
-                  ? (day.cost_usd / maxCost) * 100
-                  : 0;
-                return (
-                  <div key={day.date} className="flex items-end gap-2">
-                    <div className="w-20 text-right text-xs text-slate-400">
-                      {new Date(day.date).getDate()}日
-                    </div>
-                    <div className="relative h-8 flex-1 rounded-full bg-white/5">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-cyan-300 via-blue-400 to-violet-500 transition-all"
-                        style={{ width: `${height}%` }}
-                      />
-                      {day.cost_usd > 0 && (
-                        <div className="absolute inset-0 flex items-center justify-center text-xs font-semibold text-slate-900">
-                          ${day.cost_usd.toFixed(4)}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
             </div>
           </div>
         )}

@@ -4,8 +4,9 @@ import Layout from '@/components/layout';
 const legalRows = [
   { label: '販売事業者名', value: 'WEBGPT（運営会社：Tech Samurai合同会社）' },
   { label: '代表責任者', value: '川本 翔' },
-  { label: '所在地', value: '愛知県（お問い合わせ時に詳細をご案内）' },
-  { label: 'メールアドレス', value: 'info@sitegpt.jp' },
+  { label: '所在地', value: '東京都新宿区新宿1-36-2 新宿第七葉山ビル3F' },
+  { label: '電話番号', value: '+81 852 52 7323' },
+  { label: 'メールアドレス', value: 'heartssh@gmail.com' },
   { label: '販売価格', value: '各プランの税込価格に基づきます（定期課金は更新時に自動請求）' },
   { label: '商品代金以外の料金', value: '通信費等はお客様のご負担となります' },
   { label: '支払方法', value: 'クレジットカード（Stripe決済）' },
@@ -75,7 +76,7 @@ export default function LegalPage() {
               <li key={item}>{item}</li>
             ))}
           </ul>
-          <p className="mt-4 text-xs text-slate-400">お問い合わせ: info@sitegpt.jp</p>
+          <p className="mt-4 text-xs text-slate-400">お問い合わせ: heartssh@gmail.com</p>
         </section>
       </div>
     </Layout>

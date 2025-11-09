@@ -1,5 +1,5 @@
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const DEFAULT_FROM = process.env.RESEND_FROM_EMAIL || 'WEBGPT <no-reply@sitegpt.jp>';
+const DEFAULT_FROM = process.env.RESEND_FROM_EMAIL || 'WEBGPT <heartssh@gmail.com>';
 
 interface SendEmailParams {
   to: string | string[];
@@ -52,7 +52,7 @@ export async function sendSiteRegistrationEmail(options: {
         </ul>
         <p>WEBGPT チームが順次学習・セットアップを行い、完了次第ご連絡いたします。</p>
         <p style="margin-top: 24px; font-size: 12px; color: #64748b;">
-          このメールに心当たりがない場合は support@sitegpt.jp までお問い合わせください。
+          このメールに心当たりがない場合は heartssh@gmail.com までお問い合わせください。
         </p>
       </div>
     `,

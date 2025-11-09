@@ -188,7 +188,7 @@ export default function Home() {
           <section className="rounded-[32px] border border-white/10 bg-white/5 p-6 text-sm text-slate-200">
             <h2 className="text-4xl font-semibold text-white">安心・誠実な運営体制</h2>
             <ul className="mt-4 list-disc space-y-2 pl-5">
-              <li>Tech Samurai合同会社（愛知県）による国内運営</li>
+              <li>Tech Samurai合同会社（東京都新宿区）による国内運営</li>
               <li>OpenAI / Supabase / Stripe の安全基準に準拠</li>
               <li>すべての通信をSSL/TLSで暗号化</li>
               <li>特定商取引法・利用規約・プライバシーポリシーを完備</li>
@@ -205,7 +205,7 @@ export default function Home() {
               <Link href="/auth/login" className="rounded-full bg-white px-6 py-3 text-xl font-semibold text-slate-900 shadow-[0_20px_45px_rgba(255,255,255,0.25)]">
                 あなたのサイトをAIで動かす →
               </Link>
-              <a href="mailto:info@sitegpt.jp" className="rounded-full border border-white/30 px-6 py-3 text-xl font-semibold text-white">
+              <a href="mailto:heartssh@gmail.com" className="rounded-full border border-white/30 px-6 py-3 text-xl font-semibold text-white">
                 担当者と相談する
               </a>
             </div>

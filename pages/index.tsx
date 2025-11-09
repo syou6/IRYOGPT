@@ -503,27 +503,27 @@ export default function Home() {
           <div>
             <p className="text-xs uppercase tracking-[0.35em] text-emerald-200">製品</p>
             <ul className="mt-3 space-y-2">
-              <li><a href="#features" className="transition hover:text-white">機能</a></li>
-              <li><a href="#pricing" className="transition hover:text-white">料金</a></li>
-              <li><a href="#integrations" className="transition hover:text-white">連携</a></li>
-              <li><a href="/docs" className="transition hover:text-white">API</a></li>
+              <li><Link href="#features" className="transition hover:text-white">機能</Link></li>
+              <li><Link href="#pricing" className="transition hover:text-white">料金</Link></li>
+              <li><Link href="#integrations" className="transition hover:text-white">連携</Link></li>
+              <li><Link href="/docs" className="transition hover:text-white">API</Link></li>
             </ul>
           </div>
           <div>
             <p className="text-xs uppercase tracking-[0.35em] text-emerald-200">会社</p>
             <ul className="mt-3 space-y-2">
-              <li><a href="/about" className="transition hover:text-white">について</a></li>
-              <li><a href="/blog" className="transition hover:text-white">ブログ</a></li>
-              <li><a href="/careers" className="transition hover:text-white">採用情報</a></li>
-              <li><a href="/press" className="transition hover:text-white">プレス</a></li>
+              <li><Link href="/about" className="transition hover:text-white">について</Link></li>
+              <li><Link href="/blog" className="transition hover:text-white">ブログ</Link></li>
+              <li><Link href="/careers" className="transition hover:text-white">採用情報</Link></li>
+              <li><Link href="/press" className="transition hover:text-white">プレス</Link></li>
             </ul>
           </div>
           <div>
             <p className="text-xs uppercase tracking-[0.35em] text-emerald-200">リソース</p>
             <ul className="mt-3 space-y-2">
-              <li><a href="/docs" className="transition hover:text-white">ドキュメント</a></li>
-              <li><a href="/help" className="transition hover:text-white">ヘルプセンター</a></li>
-              <li><a href="/community" className="transition hover:text-white">コミュニティ</a></li>
+              <li><Link href="/docs" className="transition hover:text-white">ドキュメント</Link></li>
+              <li><Link href="/help" className="transition hover:text-white">ヘルプセンター</Link></li>
+              <li><Link href="/community" className="transition hover:text-white">コミュニティ</Link></li>
               <li><Link href="/contact" className="transition hover:text-white">お問い合わせフォーム</Link></li>
             </ul>
           </div>
@@ -531,9 +531,9 @@ export default function Home() {
             <p className="text-xs uppercase tracking-[0.35em] text-emerald-200">法的情報</p>
             <ul className="mt-3 space-y-2">
               <li><Link href="/legal" className="transition hover:text-white">特定商取引法</Link></li>
-              <li><a href="/privacy" className="transition hover:text-white">プライバシー</a></li>
-              <li><a href="/terms" className="transition hover:text-white">利用規約</a></li>
-              <li><a href="/security" className="transition hover:text-white">セキュリティ</a></li>
+              <li><Link href="/privacy" className="transition hover:text-white">プライバシー</Link></li>
+              <li><Link href="/terms" className="transition hover:text-white">利用規約</Link></li>
+              <li><Link href="/security" className="transition hover:text-white">セキュリティ</Link></li>
             </ul>
           </div>
         </div>

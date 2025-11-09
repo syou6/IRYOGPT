@@ -129,6 +129,7 @@ export default function Dashboard() {
   }, [authLoading, supabase]);
 
   // サイト一覧を取得
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (authLoading) return;
 
@@ -312,6 +313,7 @@ export default function Dashboard() {
     }
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (trainingJobsIntervalRef.current) {
       clearInterval(trainingJobsIntervalRef.current);
@@ -340,6 +342,7 @@ export default function Dashboard() {
 
   const trainingSitesKey = Array.from(trainingSites).sort().join(',');
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const setupTrainingJobsRealtime = async () => {
       const {

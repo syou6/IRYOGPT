@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Script from 'next/script';
 
 interface LayoutProps {
   children?: React.ReactNode;
@@ -30,7 +31,7 @@ export default function Layout({ children }: LayoutProps) {
                 <Link
                   key={link.href}
                   href={link.href}
-                  className="inline-flex flex-1 justify-center rounded-full px-5 py-2 text-sm font-medium text-slate-200 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 hover:bg-white/5 hover:text-white"
+                  className="inline-flex flex-1 justify-center rounded-full px-5 py-2 text-sm font-medium text-slate-200 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/70 hover:bg白/5 hover:text-white"
                 >
                   {link.label}
                 </Link>
@@ -49,6 +50,10 @@ export default function Layout({ children }: LayoutProps) {
           {children}
         </main>
       </div>
+      <Script
+        src="https://www.webgpt.tokyo/api/embed/script?site_id=fe8aba45-7a35-41a5-9e57-9fbb88224c03&v=20250209"
+        strategy="afterInteractive"
+      />
     </div>
   );
 }

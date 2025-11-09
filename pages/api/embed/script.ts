@@ -55,7 +55,9 @@ export default async function handler(
     const script = generateEmbedScript(site_id, apiBaseUrl);
 
     res.setHeader('Content-Type', 'application/javascript');
-    res.setHeader('Cache-Control', 'public, max-age=3600'); // 1時間キャッシュ
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
     return res.status(200).send(script);
   } catch (error) {
     console.error('[Embed Script] Error:', error);
@@ -136,15 +138,21 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
   const toggleBtn = document.getElementById('webgpt-toggle-btn');
   const closeBtn = document.getElementById('webgpt-close-btn');
   const messagesDiv = document.getElementById('webgpt-messages');
-  const inputField = document.getElementById('webgpt-input') as HTMLInputElement | null;
+  const inputField = document.getElementById('webgpt-input');
   const sendBtn = document.getElementById('webgpt-send-btn');
+
+  function getInputElement() {
+    const el = document.getElementById('webgpt-input');
+    return el && el instanceof HTMLInputElement ? el : null;
+  }
 
   function toggleChat(open) {
     if (!widget || !chatContainer) return;
     const shouldOpen = typeof open === 'boolean' ? open : !widget.classList.contains('is-open');
     widget.classList.toggle('is-open', shouldOpen);
-    if (shouldOpen && inputField && typeof inputField.focus === 'function') {
-      setTimeout(() => inputField.focus(), 150);
+    const inputEl = getInputElement();
+    if (shouldOpen && inputEl) {
+      setTimeout(() => inputEl.focus(), 150);
     }
   }
 
@@ -172,13 +180,13 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
   }
 
   function sendMessage() {
-    if (!inputField) return;
-    if (!inputField || typeof inputField.value !== 'string') return;
-    const question = inputField.value.trim();
+    const inputEl = getInputElement();
+    if (!inputEl) return;
+    const question = inputEl.value.trim();
     if (!question) return;
 
     addMessage(question, true);
-    inputField.value = '';
+    inputEl.value = '';
 
     const loadingDiv = showLoading();
 

@@ -58,3 +58,24 @@ export async function sendSiteRegistrationEmail(options: {
     `,
   });
 }
+
+export async function sendContactInquiryEmail(options: {
+  name: string;
+  email: string;
+  message: string;
+}) {
+  const { name, email, message } = options;
+  const notifyTo = process.env.CONTACT_NOTIFY_EMAIL || 'heartssh@gmail.com';
+  await sendEmail({
+    to: notifyTo,
+    subject: `WEBGPT お問い合わせ: ${name}`,
+    html: `
+      <div style="font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; color: #0f172a;">
+        <h2 style="margin-bottom: 8px;">お問い合わせが届きました</h2>
+        <p><strong>送信者:</strong> ${name}</p>
+        <p><strong>メール:</strong> ${email}</p>
+        <p style="margin-top: 16px; white-space: pre-wrap;">${message}</p>
+      </div>
+    `,
+  });
+}

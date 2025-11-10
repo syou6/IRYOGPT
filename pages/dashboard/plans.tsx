@@ -9,6 +9,7 @@ import {
   PlanTier,
   InternalPlan,
   getPlanLabel,
+  getPlanConfigByInternalPlan,
 } from '@/lib/planConfig';
 
 interface User {
@@ -38,6 +39,7 @@ export default function PlansPage() {
   const [cancelLoading, setCancelLoading] = useState(false);
   const [resumeLoading, setResumeLoading] = useState(false);
   const [stripeError, setStripeError] = useState<string | null>(null);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
   const supabase = createSupabaseClient();
 
   // 認証チェック
@@ -57,6 +59,34 @@ export default function PlansPage() {
 
     checkAuth();
   }, [router, supabase]);
+
+  // Stripe決済完了クエリの検知
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    const localKey = 'recent_payment_success';
+
+    const setFromStorage = () => {
+      if (typeof window === 'undefined') return;
+      setPaymentSuccess(window.localStorage.getItem(localKey) === 'true');
+    };
+
+    if (router.query.payment === 'success') {
+      setPaymentSuccess(true);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(localKey, 'true');
+      }
+
+      const nextQuery = { ...router.query };
+      delete nextQuery.payment;
+      delete nextQuery.session_id;
+      router.replace({ pathname: router.pathname, query: nextQuery }, undefined, {
+        shallow: true,
+      });
+    } else {
+      setFromStorage();
+    }
+  }, [router]);
 
   // ユーザー情報を取得
   useEffect(() => {
@@ -262,11 +292,18 @@ export default function PlansPage() {
     }
   };
 
+  const dismissPaymentSuccess = () => {
+    setPaymentSuccess(false);
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('recent_payment_success');
+    }
+  };
+
   if (authLoading || loading) {
     return (
       <Layout>
         <div className="flex min-h-screen items-center justify-center">
-          <div className="rounded-full border border-white/10 bg-white/5 px-6 py-3 text-xs uppercase tracking-[0.25em] text-slate-200">
+          <div className="rounded-full border border-premium-stroke/60 bg-premium-surface/70 px-6 py-3 text-xs uppercase tracking-[0.25em] text-premium-muted">
             読み込み中...
           </div>
         </div>
@@ -275,51 +312,117 @@ export default function PlansPage() {
   }
 
   const currentPlanLabel = user ? getPlanLabel(user.plan) : null;
+  const currentPlanConfig = user ? getPlanConfigByInternalPlan(user.plan) : null;
+  const heroHighlights = [
+    {
+      label: '現在のプラン',
+      value: currentPlanLabel ?? '未契約',
+      helper: user?.stripe_subscription_id ? '決済済み' : 'お申し込み前',
+    },
+    {
+      label: 'URL登録上限',
+      value: currentPlanConfig?.siteLimitText ?? '未設定',
+      helper: '登録済みURLから運営が学習',
+    },
+    {
+      label: 'サポート',
+      value: user?.stripe_subscription_id ? '優先サポート' : 'チャットでご案内',
+      helper: '24時間以内に返信',
+    },
+  ];
+  const showPostPurchaseBanner = paymentSuccess;
 
   return (
     <Layout>
-      <div className="relative mx-auto max-w-6xl px-4 py-6 text-slate-100 sm:py-8">
-        <div className="pointer-events-none absolute inset-0">
-          <div className="absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-emerald-500/20 to-transparent blur-3xl" />
-          <div className="absolute bottom-[-20%] left-[-10%] h-72 w-72 rounded-full bg-teal-400/15 blur-[140px]" />
-        </div>
+      <div className="relative mx-auto max-w-6xl px-4 py-8 text-premium-text sm:py-12">
+        <div className="pointer-events-none absolute inset-0 -z-20 bg-premium-grid opacity-60" />
+        <div className="pointer-events-none absolute inset-0 -z-10 bg-premium-radial opacity-70" />
 
         <div className="relative space-y-8">
-          <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_35px_120px_rgba(1,6,3,0.55)] backdrop-blur-2xl">
-            <Link
-              href="/dashboard"
-              className="text-[11px] uppercase tracking-[0.35em] text-emerald-200/80"
-            >
-              ← ダッシュボード
-            </Link>
-            <h1 className="mt-2 text-3xl font-semibold text-white">プラン比較</h1>
-            <p className="text-sm text-slate-300">
-              スタータープランからStripe決済が利用可能です。プロ / ビジネスは近日公開予定。
-            </p>
-          </div>
+          <section className="rounded-5xl border border-premium-stroke/40 bg-premium-surface/80 p-6 shadow-premium backdrop-blur-2xl sm:p-10">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <Link
+                  href="/dashboard"
+                  className="text-[11px] uppercase tracking-[0.35em] text-premium-muted"
+                >
+                  ← ダッシュボード
+                </Link>
+                <h1 className="mt-3 text-3xl font-semibold text-premium-text sm:text-4xl">プラン比較</h1>
+                <p className="mt-2 max-w-xl text-sm text-premium-muted">
+                  スタータープランは即日Stripe決済が可能です。プロ / ビジネスは最終調整中のため、ご希望の場合はサポートにお問い合わせください。
+                </p>
+              </div>
+              <div className="rounded-full border border-premium-stroke/60 bg-premium-elevated/60 px-4 py-2 text-[11px] uppercase tracking-[0.3em] text-premium-muted">
+                Secure Stripe Checkout
+              </div>
+            </div>
+
+            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {heroHighlights.map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-4xl border border-premium-stroke/40 bg-premium-elevated/70 px-4 py-3 text-sm"
+                >
+                  <p className="text-[11px] uppercase tracking-[0.3em] text-premium-muted">{stat.label}</p>
+                  <p className="mt-2 text-xl font-semibold text-premium-text">{stat.value}</p>
+                  <p className="text-xs text-premium-muted">{stat.helper}</p>
+                </div>
+              ))}
+            </div>
+          </section>
+
+          {showPostPurchaseBanner && (
+            <div className="rounded-4xl border border-premium-accent/40 bg-premium-surface/80 p-5 text-sm text-premium-text shadow-glow">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-base font-semibold text-premium-text">ご契約ありがとうございます</p>
+                  <p className="mt-1 text-premium-muted">
+                    WEBGPT チームが登録済み URL をもとに学習を開始します。内容確認のうえ、稼働準備が整い次第メールとダッシュボードでお知らせします。
+                  </p>
+                  <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-premium-muted">
+                    <li>追加URLや修正依頼があればダッシュボードのサポートチャットへ</li>
+                    <li>優先対応キューに入った旨をメールでもご案内します</li>
+                    <li>オペレーターが学習完了後にステータスを更新します</li>
+                  </ul>
+                </div>
+                <button
+                  onClick={dismissPaymentSuccess}
+                  className="inline-flex items-center justify-center rounded-full border border-premium-stroke/60 px-4 py-1.5 text-xs font-semibold text-premium-muted transition hover:border-premium-accent hover:text-premium-text"
+                >
+                  表示を閉じる
+                </button>
+              </div>
+            </div>
+          )}
 
           {stripeError && (
-            <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-100">
+            <div className="rounded-4xl border border-premium-danger/40 bg-premium-base/60 px-4 py-3 text-sm text-premium-text">
               {stripeError}
             </div>
           )}
 
           {user && (
-            <div className="rounded-[28px] border border-white/10 bg-gradient-to-r from-emerald-500/10 via-green-400/5 to-cyan-300/10 p-4 text-sm text-emerald-50">
-              現在のプラン: <strong>{currentPlanLabel}</strong>
-              {user.stripe_subscription_id && (
-                <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="text-xs text-emerald-100">
-                    {user.cancel_at_period_end
-                      ? '解約予約済み：現在の請求期間終了後に自動停止します'
-                      : `サブスクリプション状態: ${user.subscription_status || 'active'}`}
-                  </div>
-                  <div className="flex gap-2">
+            <div className="rounded-4xl border border-premium-stroke/40 bg-premium-surface/70 p-5 text-sm shadow-premium">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <span className="text-premium-muted">現在のプラン</span>
+                  <span className="ml-2 text-base font-semibold text-premium-text">{currentPlanLabel}</span>
+                  {user.stripe_subscription_id && (
+                    <p className="text-xs text-premium-muted">
+                      {user.cancel_at_period_end
+                        ? '解約予約済み：現在の請求期間終了後に自動停止します'
+                        : `サブスクリプション状態: ${user.subscription_status || 'active'}`}
+                    </p>
+                  )}
+                </div>
+                {user.stripe_subscription_id && (
+                  <div className="flex flex-wrap gap-2">
                     {!user.cancel_at_period_end ? (
                       <button
                         onClick={handleCancelSubscription}
                         disabled={cancelLoading}
-                        className="inline-flex items-center justify-center rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="inline-flex items-center justify-center rounded-full border border-premium-stroke/60 px-4 py-2 text-xs font-semibold text-premium-text transition hover:border-premium-accent disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {cancelLoading ? '処理中...' : '次回更新で解約'}
                       </button>
@@ -327,18 +430,18 @@ export default function PlansPage() {
                       <button
                         onClick={handleResumeSubscription}
                         disabled={resumeLoading}
-                        className="inline-flex items-center justify-center rounded-full border border-white/20 px-4 py-2 text-xs font-semibold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="inline-flex items-center justify-center rounded-full border border-premium-accent/60 px-4 py-2 text-xs font-semibold text-premium-text transition hover:border-premium-accent disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         {resumeLoading ? '処理中...' : '解約予約を取り消す'}
                       </button>
                     )}
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           )}
 
-          <div className="rounded-[28px] border border-dashed border-white/15 bg-white/5 px-4 py-3 text-xs text-slate-300">
+          <div className="rounded-4xl border border-dashed border-premium-stroke/50 bg-premium-surface/60 px-4 py-3 text-xs text-premium-muted">
             プロ / ビジネス（旧プロ / エンタープライズ）プランは現在最終調整中です。公開までしばらくお待ちください。
           </div>
 
@@ -366,49 +469,49 @@ export default function PlansPage() {
               return (
                 <div
                   key={plan.tier}
-                  className={`relative overflow-hidden rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_35px_120px_rgba(1,3,6,0.55)] backdrop-blur-2xl ${
-                    plan.popular ? 'ring-1 ring-emerald-400/40' : ''
+                  className={`relative overflow-hidden rounded-4xl border border-premium-stroke/40 bg-premium-surface/80 p-6 shadow-premium backdrop-blur-xl ${
+                    plan.popular ? 'ring-1 ring-premium-accent/40' : ''
                   }`}
                 >
-                  <div className="pointer-events-none absolute inset-0 opacity-50">
+                  <div className="pointer-events-none absolute inset-0 opacity-40">
                     {plan.popular && (
-                      <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-emerald-500/30 blur-[90px]" />
+                      <div className="absolute right-0 top-0 h-32 w-32 rounded-full bg-premium-accent/30 blur-[90px]" />
                     )}
                   </div>
                   <div className="relative">
                     <div className="flex flex-wrap gap-2">
                       {plan.popular && (
-                        <span className="inline-flex items-center rounded-full bg-emerald-400/20 px-3 py-1 text-xs font-semibold text-emerald-100">
+                        <span className="inline-flex items-center rounded-full bg-premium-accent/10 px-3 py-1 text-xs font-semibold text-premium-accent">
                           人気
                         </span>
                       )}
                       {isComingSoon && (
-                        <span className="inline-flex items-center rounded-full bg-white/10 px-3 py-1 text-xs font-semibold text-slate-200">
+                        <span className="inline-flex items-center rounded-full border border-premium-stroke/50 px-3 py-1 text-xs font-semibold text-premium-muted">
                           近日公開
                         </span>
                       )}
                       {isCurrentPlan && (
-                        <span className="inline-flex items-center rounded-full border border-emerald-400/40 px-3 py-1 text-xs font-semibold text-emerald-100">
+                        <span className="inline-flex items-center rounded-full border border-premium-accent/40 px-3 py-1 text-xs font-semibold text-premium-accent">
                           現在のプラン
                         </span>
                       )}
                     </div>
 
                     <div className="mt-4">
-                      <h2 className="text-2xl font-semibold text-white">{plan.label}</h2>
-                      <p className="mt-1 text-sm text-slate-300">{plan.description}</p>
+                      <h2 className="text-2xl font-semibold text-premium-text">{plan.label}</h2>
+                      <p className="mt-1 text-sm text-premium-muted">{plan.description}</p>
                     </div>
 
                     <div className="mt-6">
-                      <div className="text-3xl font-semibold text-white">{plan.priceLabel}</div>
-                      <div className="text-xs uppercase tracking-[0.3em] text-slate-400">税込</div>
+                      <div className="text-3xl font-semibold text-premium-text">{plan.priceLabel}</div>
+                      <div className="text-xs uppercase tracking-[0.3em] text-premium-muted">税込</div>
                     </div>
 
                     <div className="mt-6 space-y-3">
                       {featureItems.map((label, index) => (
-                        <div key={index} className="flex items-start text-sm text-slate-200">
+                        <div key={index} className="flex items-start text-sm text-premium-text">
                           <svg
-                            className="mr-2 h-5 w-5 flex-shrink-0 text-emerald-300"
+                            className="mr-2 h-5 w-5 flex-shrink-0 text-premium-accent"
                             fill="none"
                             stroke="currentColor"
                             viewBox="0 0 24 24"
@@ -425,13 +528,13 @@ export default function PlansPage() {
                       disabled={buttonDisabled}
                       className={`mt-6 w-full rounded-full px-4 py-2.5 text-sm font-semibold transition ${
                         buttonDisabled
-                          ? 'cursor-not-allowed border border-white/10 bg-white/5 text-slate-400'
-                          : 'bg-gradient-to-r from-emerald-400 via-green-300 to-cyan-300 text-slate-900 shadow-[0_20px_45px_rgba(16,185,129,0.35)] hover:-translate-y-0.5'
+                          ? 'cursor-not-allowed border border-premium-stroke/40 bg-premium-base/40 text-premium-muted'
+                          : 'bg-gradient-to-r from-premium-accent via-premium-accentGlow to-premium-accent text-black shadow-glow hover:-translate-y-0.5'
                       }`}
                     >
                       {buttonLabel}
                     </button>
-                    <p className="mt-2 text-xs text-slate-400">
+                    <p className="mt-2 text-xs text-premium-muted">
                       {isCurrentPlan
                         ? 'ご利用中のプランです'
                         : isComingSoon
@@ -444,12 +547,12 @@ export default function PlansPage() {
             })}
           </div>
 
-          <div className="rounded-[28px] border border-amber-300/30 bg-amber-500/10 p-4 text-sm text-amber-50">
-            <h3 className="mb-2 font-semibold">⚠️ 注意事項</h3>
-            <ul className="list-disc space-y-1 pl-5 text-amber-100">
+          <div className="rounded-4xl border border-premium-warning/40 bg-premium-surface/70 p-4 text-sm text-premium-text">
+            <h3 className="mb-2 font-semibold text-premium-text">⚠️ 注意事項</h3>
+            <ul className="list-disc space-y-1 pl-5 text-premium-muted">
               <li>スタータープランのお申し込みはStripe決済完了後に自動で反映されます。</li>
-              <li>近日公開プランを希望される場合はサポートまでご連絡ください。</li>
-              <li>プラン変更後のチャット/トークンクォータは次の課金期間から適用されます。</li>
+              <li>近日公開プランをご希望の場合はサポートチャットまたはメールでご連絡ください。</li>
+              <li>プラン変更後のチャット / トークン枠は次の課金期間から適用されます。</li>
             </ul>
           </div>
         </div>

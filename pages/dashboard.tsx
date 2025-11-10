@@ -76,6 +76,7 @@ export default function Dashboard() {
   const trainingJobsIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const trainingJobsChannelRef = useRef<any>(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [paymentSuccess, setPaymentSuccess] = useState(false);
   const supabase = createSupabaseClient();
   const channelRef = useRef<any>(null);
 
@@ -130,6 +131,38 @@ export default function Dashboard() {
 
     checkOnboarding();
   }, [authLoading, supabase]);
+
+  // Stripe決済完了後の案内表示制御
+  useEffect(() => {
+    if (!router.isReady) return;
+
+    const localKey = 'recent_payment_success';
+
+    const setFlagFromLocalStorage = () => {
+      if (typeof window === 'undefined') return;
+      const stored = window.localStorage.getItem(localKey);
+      if (stored === 'true') {
+        setPaymentSuccess(true);
+      }
+    };
+
+    if (router.query.payment === 'success') {
+      setPaymentSuccess(true);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(localKey, 'true');
+      }
+
+      const newQuery = { ...router.query };
+      delete newQuery.payment;
+      delete newQuery.session_id;
+
+      router.replace({ pathname: router.pathname, query: newQuery }, undefined, {
+        shallow: true,
+      });
+    } else {
+      setFlagFromLocalStorage();
+    }
+  }, [router]);
 
   // ユーザープラン取得（サブスク誘導表示用）
   useEffect(() => {
@@ -795,6 +828,34 @@ export default function Dashboard() {
                 プランを確認する
               </Link>
             </div>
+          </div>
+        )}
+
+        {sites.length > 0 &&
+          !planLoading &&
+          !isAdmin &&
+          ((userPlan && userPlan !== 'pending') || paymentSuccess) && (
+            <div className="mb-6 rounded-3xl border border-white/15 bg-white/5 p-4 text-sm text-slate-100 shadow-[0_25px_80px_rgba(15,23,42,0.45)] sm:p-5">
+            <p className="text-base font-semibold text-white">ご契約ありがとうございます！</p>
+            <p className="mt-1 text-xs text-slate-200 sm:text-sm">
+              WEBGPT チームが登録済み URL をもとにチャットボットの学習を開始します。対応完了までは管理者からのご連絡をお待ちください。
+            </p>
+            <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-slate-300">
+              <li>登録内容に不足がある場合はメールで確認させていただきます</li>
+              <li>学習完了後、ダッシュボードとメールで稼働開始をお知らせします</li>
+              <li>お急ぎの際はサポートチャットからご連絡ください</li>
+            </ul>
+            <button
+              onClick={() => {
+                setPaymentSuccess(false);
+                if (typeof window !== 'undefined') {
+                  window.localStorage.removeItem('recent_payment_success');
+                }
+              }}
+              className="mt-4 inline-flex items-center justify-center rounded-full border border-white/20 px-4 py-1.5 text-xs font-semibold text-white transition hover:border-white/40"
+            >
+              表示を閉じる
+            </button>
           </div>
         )}
 

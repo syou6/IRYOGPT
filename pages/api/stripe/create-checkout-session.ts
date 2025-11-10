@@ -27,6 +27,7 @@ export default async function handler(
 
   try {
     const user = await getAuthUser(req);
+    const baseUrl = req.headers.origin || appUrl;
     const { plan } = req.body as { plan: PlanTier };
 
     if (!isPlanTier(plan)) {
@@ -52,8 +53,8 @@ export default async function handler(
         plan,
       },
       allow_promotion_codes: true,
-      success_url: `${appUrl}/dashboard?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${appUrl}/dashboard/plans?payment=cancelled`,
+      success_url: `${baseUrl}/dashboard?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${baseUrl}/dashboard/plans?payment=cancelled`,
     });
 
     return res.status(200).json({ url: session.url });

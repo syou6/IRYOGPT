@@ -191,6 +191,12 @@ const FINAL_POINTS = [
   '期間中いつでもキャンセルOK',
 ];
 
+const FLOW_STEPS = [
+  { title: 'URLを登録', body: '学習させたいサイトURLを入力するだけで準備完了。' },
+  { title: 'WEBGPTが学習', body: '運営チームが内容を確認し最適な返答をセットアップ。' },
+  { title: '埋め込み＆公開', body: 'コードを貼るだけで、デモと同じ会話を本番に。' },
+];
+
 export default function Home() {
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
   return (
@@ -272,6 +278,16 @@ export default function Home() {
               <p className="text-3xl font-semibold text-premium-text">{item.value}</p>
               <p className="text-sm text-premium-muted">{item.label}</p>
             </div>
+          ))}
+        </Surface>
+
+        <Surface className="grid gap-6 lg:grid-cols-3">
+          {FLOW_STEPS.map((step, idx) => (
+            <Card key={step.title} className="border border-premium-stroke/40 bg-premium-surface/80 p-5 text-sm text-premium-muted">
+              <p className="text-xs uppercase tracking-[0.35em] text-premium-muted">Step {String(idx + 1).padStart(2, '0')}</p>
+              <h3 className="mt-2 text-xl font-semibold text-premium-text">{step.title}</h3>
+              <p className="mt-1 text-sm">{step.body}</p>
+            </Card>
           ))}
         </Surface>
 

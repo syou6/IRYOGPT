@@ -1,10 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '@/components/layout';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
-import Card from '@/components/ui/Card';
-import Surface from '@/components/ui/Surface';
 import { createSupabaseClient } from '@/utils/supabase-auth';
 import Onboarding from '@/components/Onboarding';
 import { InternalPlan } from '@/lib/planConfig';
@@ -236,11 +234,10 @@ export default function Dashboard() {
   }, [authLoading, supabase]);
 
   // サイト一覧を取得
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (authLoading) return;
 
-    const fetchSitesWithAuth = async () => {
+    const fetchSites = async () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
@@ -279,7 +276,7 @@ export default function Dashboard() {
       }
     };
 
-    fetchSitesWithAuth();
+    fetchSites();
 
     // Supabase Realtimeでsitesテーブルの変更を監視
     const setupRealtime = async () => {
@@ -309,7 +306,7 @@ export default function Dashboard() {
             if (process.env.NODE_ENV === 'development') {
               console.log('[Realtime] Sites table changed, fetching sites...', payload);
             }
-            fetchSitesWithAuth();
+            fetchSites();
           }
         )
         .subscribe((status: any) => {
@@ -339,35 +336,7 @@ export default function Dashboard() {
     };
   }, [authLoading, router, supabase]);
 
-  const fetchSites = async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) return;
-
-    try {
-      const response = await fetch('/api/sites', {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-      });
-      if (!response.ok) throw new Error('Failed to fetch sites');
-      const data: Site[] = await response.json();
-      setSites(data);
-      
-      // Training中のサイトを追跡
-      const training = new Set<string>(
-        data.filter((s: Site) => s.status === 'training').map((s: Site) => s.id)
-      );
-      setTrainingSites(training);
-      await loadTrainingJobs(training);
-    } catch (error) {
-      console.error('Error fetching sites:', error);
-    }
-  };
-
-  async function loadTrainingJobs(trainingSet: Set<string>) {
+  const loadTrainingJobs = useCallback(async (trainingSet: Set<string>) => {
     const siteIds = Array.from(trainingSet);
 
     if (siteIds.length === 0) {
@@ -418,11 +387,11 @@ export default function Dashboard() {
     } catch (error) {
       console.error('Error loading training jobs:', error);
     }
-  }
+  }, [supabase]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
-    if (trainingJobsIntervalRef.current) {
+  if (trainingJobsIntervalRef.current) {
       clearInterval(trainingJobsIntervalRef.current);
       trainingJobsIntervalRef.current = null;
     }
@@ -769,6 +738,8 @@ export default function Dashboard() {
     ? formatDate(recentSite.last_trained_at)
     : '-';
 
+  const hasReadySite = sites.some((site) => site.status === 'ready');
+  const readySite = sites.find((site) => site.status === 'ready');
   const heroStats = [
     { label: '総サイト数', value: sites.length },
     { label: '学習中', value: trainingSites.size, accent: true },
@@ -845,16 +816,7 @@ export default function Dashboard() {
             ))}
           </section>
 
-          {!isAdmin && (
-            <Card variant="dashed" className="mb-8 px-5 py-4 text-sm text-premium-muted">
-              <p>
-                現在、チャットボットの学習と埋め込み設定は WEBGPT チームが代行します。必要な URL を登録しておくだけで大丈夫です。
-              </p>
-              <p className="mt-2 text-xs text-premium-muted">
-                {userEmail ? `ログイン中: ${userEmail}` : 'ログインユーザー情報を取得しています…'} / 学習は順次対応します。
-              </p>
-            </Card>
-          )}
+          {!isAdmin && (<></>)}
 
           {isAdmin && (
             <div className="mb-6 flex justify-end">

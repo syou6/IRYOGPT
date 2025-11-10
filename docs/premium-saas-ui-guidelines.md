@@ -91,10 +91,17 @@
 - [ ] モーション仕様（タイムライン / Easing / 状態遷移）がドキュメント化されている
 - [ ] Stripe 決済後のサクセスフローでユーザーの次アクションが必ず提示される
 
+## 12. 実装計画との連携
+- 実装フェーズの進行は `docs/premium-saas-ui-implementation-plan.md` に準拠し、各フェーズ開始時に本ガイドの該当節をレビューする。
+- ガイドライン整合チェック表（Implementation Plan 参照）を最新化し、差分が出た場合は本ドキュメントとトークン定義を同時に更新する。
+- フェーズ5のモーション仕様やアクセシビリティ要件は Phase 5 セクションと `モーション & 状態設計` をセットで参照する。
+- UI監査テンプレート（Notion/FigJam）とトークン草案・アクセシビリティ検証フローは、Implementation Plan の「次アクション詳細」を参照し、本ガイドの該当章番号を必ず記録する。
+
 ---
 
 ### 付録：参考リンク
 - Apple Human Interface Guidelines – https://developer.apple.com/design/human-interface-guidelines/
+
 - Material Design 3 – https://m3.material.io/
 - Fluent 2 – https://fluent2.microsoft.design/
 - Carbon Design System – https://carbondesignsystem.com/
@@ -104,3 +111,8 @@
 - Lightning Design System – https://www.lightningdesignsystem.com/
 - Base Web – https://baseweb.design/
 - Ant Design – https://ant.design/
+
+## モーション & 状態設計（Phase 5）
+- ボタン：hover時に `hover:-translate-y-0.5`、focus-visibleで `ring-premium-accent/60`。Disabledは自動的に `cursor-not-allowed`。
+- 進捗バー：training状態ではBar幅を1秒でアニメーション更新、カード全体に`transition`付与。
+- バナー/アラート：閉じる際は`opacity`と`translate-y`のトランジション（200ms）を採用。

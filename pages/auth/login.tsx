@@ -13,6 +13,11 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
 
   const supabase = createSupabaseClient();
+  const onboardingSteps = [
+    { label: 'アカウント登録', helper: 'URLを登録するだけで準備完了' },
+    { label: 'WEBGPTが学習', helper: '運営が内容を確認しオペレーション' },
+    { label: '埋め込み & 公開', helper: 'コードを貼るだけでチャット稼働' },
+  ];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,6 +170,24 @@ export default function Login() {
                 ? '既にアカウントをお持ちですか？ログイン'
                 : 'アカウントをお持ちでない方は新規登録'}
             </button>
+          </div>
+
+          <div className="mt-6 rounded-3xl border border-premium-stroke/40 bg-premium-surface/70 px-5 py-4 text-sm text-premium-muted">
+            <p className="text-xs uppercase tracking-[0.35em] text-premium-muted">ご利用の流れ</p>
+            <ol className="mt-3 space-y-2 text-xs">
+              {onboardingSteps.map((step, idx) => (
+                <li key={step.label} className="flex items-start gap-3">
+                  <span className="text-premium-accent">{String(idx + 1).padStart(2, '0')}</span>
+                  <div>
+                    <p className="text-premium-text">{step.label}</p>
+                    <p className="text-[11px]">{step.helper}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+            <p className="mt-3 text-xs">
+              URL登録 → WEBGPTが学習 → 埋め込みコードを貼るだけでチャットが稼働します。
+            </p>
           </div>
         </div>
       </div>

@@ -3,6 +3,8 @@ import { useRouter } from 'next/router';
 import Layout from '@/components/layout';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
+import Card from '@/components/ui/Card';
+import Surface from '@/components/ui/Surface';
 import { createSupabaseClient } from '@/utils/supabase-auth';
 import {
   PLAN_CONFIG,
@@ -31,6 +33,7 @@ const planCards = planOrder.map((tier) => ({
   comingSoon: !AVAILABLE_PLAN_TIERS.includes(tier),
 }));
 
+// Plans hero: uses Surface, timeline cards, CTA for chat/embed guidance
 export default function PlansPage() {
   const router = useRouter();
   const [authLoading, setAuthLoading] = useState(true);
@@ -314,6 +317,11 @@ export default function PlansPage() {
 
   const currentPlanLabel = user ? getPlanLabel(user.plan) : null;
   const currentPlanConfig = user ? getPlanConfigByInternalPlan(user.plan) : null;
+  const planTimeline = [
+    { label: 'URL登録', done: Boolean(user) },
+    { label: 'WEBGPTが学習', done: Boolean(user?.stripe_subscription_id) },
+    { label: 'チャット埋め込み & 公開', done: ['starter', 'pro', 'enterprise'].includes(user?.plan ?? '') },
+  ];
   const heroHighlights = [
     {
       label: '現在のプラン',
@@ -340,7 +348,7 @@ export default function PlansPage() {
         <div className="pointer-events-none absolute inset-0 -z-10 bg-premium-radial opacity-70" />
 
         <div className="relative space-y-8">
-          <section className="rounded-5xl border border-premium-stroke/40 bg-premium-surface/80 p-6 shadow-premium backdrop-blur-2xl sm:p-10">
+          <Surface className="p-6 sm:p-10">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
                 <Link
@@ -371,7 +379,44 @@ export default function PlansPage() {
                 </div>
               ))}
             </div>
-          </section>
+            <Card className="mt-6 space-y-3 px-5 py-4 text-sm text-premium-muted">
+              <p className="text-xs uppercase tracking-[0.35em] text-premium-muted">導入ステップ</p>
+              <div className="flex flex-col gap-3 lg:flex-row">
+                <ol className="flex-1 space-y-2 text-xs">
+                  {planTimeline.map((step, idx) => (
+                    <li key={step.label} className="flex items-center gap-2">
+                      <span className={`h-2 w-2 rounded-full ${step.done ? 'bg-premium-accent' : 'bg-premium-stroke/60'}`} />
+                      <span className={step.done ? 'text-premium-text' : undefined}>
+                        {idx + 1}. {step.label}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+                <div className="flex-1 rounded-2xl border border-premium-stroke/40 bg-premium-elevated/70 px-4 py-3 text-xs">
+                  <p className="font-semibold text-premium-text">チャット公開までの動き</p>
+                  <p className="mt-1 text-premium-muted">
+                    URLを登録するとWEBGPTが学習し、準備が整えば埋め込みコードを貼るだけでデモの会話をそのまま本番化できます。
+                  </p>
+                  <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                    <Button size="md" onClick={() => router.push('/dashboard')}>
+                      ダッシュボードで進捗確認
+                    </Button>
+                    <Button
+                      size="md"
+                      variant="secondary"
+                      onClick={() => {
+                        if (typeof window !== 'undefined') {
+                          window.open('mailto:heartssh@gmail.com', '_blank');
+                        }
+                      }}
+                    >
+                      サポートに相談
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          </Surface>
 
           {showPostPurchaseBanner && (
             <div className="rounded-4xl border border-premium-accent/40 bg-premium-surface/80 p-5 text-sm text-premium-text shadow-glow">

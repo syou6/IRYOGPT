@@ -264,14 +264,83 @@ export default function InsightsPage() {
                 </h1>
                 <p className="text-sm text-premium-muted">{site.name}</p>
               </div>
-              {siteId && typeof siteId === 'string' && (
-                <Link
-                  href={`/dashboard/${siteId}`}
-                  className="rounded-full border border-premium-stroke/40 bg-premium-surface/70 px-4 py-2 text-sm font-medium text-premium-text hover:bg-premium-surface transition"
-                >
-                  チャットに戻る
-                </Link>
-              )}
+              <div className="flex items-center gap-3">
+                {siteId && typeof siteId === 'string' && (
+                  <>
+                    <button
+                      onClick={async () => {
+                        try {
+                          const {
+                            data: { session },
+                          } = await supabase.auth.getSession();
+                          if (!session) return;
+
+                          // エクスポートURLを生成
+                          const params = new URLSearchParams({
+                            site_id: siteId,
+                            format: 'csv',
+                          });
+                          if (period === 'week') {
+                            const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+                            params.append('start_date', weekAgo.toISOString());
+                          } else if (period === 'month') {
+                            const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+                            params.append('start_date', monthAgo.toISOString());
+                          }
+
+                          const url = `/api/insights/export?${params.toString()}`;
+                          
+                          // ダウンロードを開始
+                          const response = await fetch(url, {
+                            headers: {
+                              Authorization: `Bearer ${session.access_token}`,
+                            },
+                          });
+
+                          if (!response.ok) {
+                            throw new Error('エクスポートに失敗しました');
+                          }
+
+                          const blob = await response.blob();
+                          const downloadUrl = window.URL.createObjectURL(blob);
+                          const a = document.createElement('a');
+                          a.href = downloadUrl;
+                          a.download = `${site.name}_${new Date().toISOString().split('T')[0]}.csv`;
+                          document.body.appendChild(a);
+                          a.click();
+                          document.body.removeChild(a);
+                          window.URL.revokeObjectURL(downloadUrl);
+                        } catch (error) {
+                          console.error('Export error:', error);
+                          alert('エクスポートに失敗しました');
+                        }
+                      }}
+                      className="rounded-full border border-emerald-400/40 bg-emerald-400/15 px-4 py-2 text-sm font-medium text-emerald-100 transition hover:bg-emerald-400/25 flex items-center gap-2"
+                    >
+                      <svg
+                        className="h-4 w-4"
+                        fill="none"
+                        stroke="currentColor"
+                        viewBox="0 0 24 24"
+                      >
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                        />
+                      </svg>
+                      CSVエクスポート
+                    </button>
+                    <Link
+                      href={`/dashboard/${siteId}`}
+                      className="rounded-full border border-premium-stroke/40 bg-premium-surface/70 px-4 py-2 text-sm font-medium text-premium-text hover:bg-premium-surface transition"
+                    >
+                      チャットに戻る
+                    </Link>
+                  </>
+                )}
+              </div>
             </div>
           </div>
 

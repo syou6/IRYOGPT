@@ -542,7 +542,6 @@ export default function SiteChat() {
                   )}
                   {siteIdForLinks && (
                     <Button
-                      size="sm"
                       variant="secondary"
                       onClick={() => {
                         if (siteIdForLinks) {

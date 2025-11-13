@@ -536,6 +536,14 @@ export default function SiteChat() {
                       埋め込み設定
                     </Link>
                   )}
+                  {siteIdForLinks && (
+                    <Link
+                      href={`/dashboard/${siteIdForLinks}/insights`}
+                      className="rounded-full border border-emerald-400/40 bg-emerald-400/15 px-4 py-1.5 text-xs font-medium text-emerald-100 transition hover:bg-emerald-400/25"
+                    >
+                      質問インサイト
+                    </Link>
+                  )}
                   <button
                     onClick={() => setShowSidebar(true)}
                     className="inline-flex items-center gap-1 rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-xs font-medium text-slate-100 transition hover:bg-white/15 lg:hidden"

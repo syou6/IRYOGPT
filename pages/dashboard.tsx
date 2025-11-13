@@ -700,6 +700,13 @@ export default function Dashboard() {
               >
                 この場でチャットをテスト
               </Button>
+              <Button
+                size="md"
+                variant="secondary"
+                onClick={() => router.push(`/dashboard/${site.id}/insights`)}
+              >
+                質問インサイト
+              </Button>
             </div>
           )}
         </Card>

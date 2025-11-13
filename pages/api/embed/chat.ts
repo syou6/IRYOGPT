@@ -262,6 +262,28 @@ export default async function handler(
         }
       }
 
+      // Parole機能: chat_logsに質問と回答を保存
+      try {
+        // セッションIDを生成（クライアントから送られてくるか、サーバーで生成）
+        const sessionId =
+          req.body.session_id ||
+          `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        await supabaseClient.from('chat_logs').insert({
+          user_id: userId,
+          site_id: site_id,
+          question: sanitizedQuestion,
+          answer: outputText,
+          session_id: sessionId,
+          source: 'embed',
+          user_agent: req.headers['user-agent'] || null,
+          referrer: req.headers['referer'] || null,
+        });
+      } catch (logError) {
+        // ログ保存のエラーは無視（チャット機能には影響しない）
+        console.error('[Embed Chat API] Failed to save chat log:', logError);
+      }
+
       if (process.env.NODE_ENV === 'development') {
         console.log('[Embed Chat API] Chain invoke completed', {
           inputTokens,

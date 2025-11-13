@@ -485,9 +485,12 @@ export default function SiteChat() {
   }
 
   // site.idが確実に存在することを確認
-  const siteIdForLinks = site?.id;
+  const siteIdForLinks = (siteId && typeof siteId === 'string') ? siteId : site?.id;
   const embedHref = siteIdForLinks && typeof siteIdForLinks === 'string' && siteIdForLinks.length > 0 
     ? `/dashboard/sites/${siteIdForLinks}/embed` 
+    : null;
+  const insightsHref = siteIdForLinks && typeof siteIdForLinks === 'string' && siteIdForLinks.length > 0
+    ? `/dashboard/${siteIdForLinks}/insights`
     : null;
 
   return (
@@ -536,9 +539,9 @@ export default function SiteChat() {
                       埋め込み設定
                     </Link>
                   )}
-                  {siteIdForLinks && (
+                  {insightsHref && (
                     <Link
-                      href={`/dashboard/${siteIdForLinks}/insights`}
+                      href={insightsHref}
                       className="rounded-full border border-emerald-400/40 bg-emerald-400/15 px-4 py-1.5 text-xs font-medium text-emerald-100 transition hover:bg-emerald-400/25"
                     >
                       質問インサイト

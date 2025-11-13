@@ -688,7 +688,7 @@ export default function Dashboard() {
             </p>
             <p className="mt-1 text-xs text-premium-muted">{statusMessage}</p>
           </div>
-          {isReady && (
+          {isReady && site?.id && (
             <div className="flex flex-col gap-2 sm:flex-row">
               <Button size="md" onClick={() => router.push(`/dashboard/sites/${site.id}/embed`)}>
                 埋め込みコードを見る
@@ -703,7 +703,11 @@ export default function Dashboard() {
               <Button
                 size="md"
                 variant="secondary"
-                onClick={() => router.push(`/dashboard/${site.id}/insights`)}
+                onClick={() => {
+                  if (site?.id) {
+                    router.push(`/dashboard/${site.id}/insights`);
+                  }
+                }}
               >
                 質問インサイト
               </Button>

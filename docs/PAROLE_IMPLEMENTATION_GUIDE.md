@@ -1,12 +1,12 @@
-# 🚀 Parole機能実装ガイド
+# 🚀 Parole 機能実装ガイド
 
 ## 📋 実装の進め方
 
-このガイドでは、Parole機能を段階的に実装する方法を説明します。
+このガイドでは、Parole 機能を段階的に実装する方法を説明します。
 
 ---
 
-## 🎯 Phase 1: MVP実装（1-2週間）
+## 🎯 Phase 1: MVP 実装（1-2 週間）
 
 ### **Step 1: データベーススキーマの作成**
 
@@ -17,7 +17,7 @@
 psql -h your-db-host -U postgres -d postgres -f supabase/migrations/20241201_add_chat_logs.sql
 ```
 
-または、SupabaseダッシュボードのSQL Editorで実行してください。
+または、Supabase ダッシュボードの SQL Editor で実行してください。
 
 2. **動作確認**
 
@@ -31,7 +31,7 @@ SELECT proname FROM pg_proc WHERE proname LIKE 'get_question%';
 
 ---
 
-### **Step 2: チャットAPIの修正**
+### **Step 2: チャット API の修正**
 
 既存の`/api/chat`と`/api/embed/chat`に、ログ保存機能を追加します。
 
@@ -43,12 +43,14 @@ SELECT proname FROM pg_proc WHERE proname LIKE 'get_question%';
 // ストリーミング完了後、ログを保存
 try {
   // ... 既存のコード ...
-  
+
   // ログを保存（Parole機能）
   try {
     // セッションIDを生成（クライアントから送られてくるか、サーバーで生成）
-    const sessionId = req.body.session_id || `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+    const sessionId =
+      req.body.session_id ||
+      `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
     await supabaseClient.from('chat_logs').insert({
       user_id: userId,
       site_id: site_id,
@@ -72,9 +74,9 @@ try {
 
 ---
 
-### **Step 3: 分析APIの動作確認**
+### **Step 3: 分析 API の動作確認**
 
-作成したAPIエンドポイントをテストします。
+作成した API エンドポイントをテストします。
 
 ```bash
 # 質問ランキングを取得
@@ -92,7 +94,7 @@ curl -X GET "http://localhost:3000/api/insights/timeline?site_id=YOUR_SITE_ID&in
 
 ---
 
-### **Step 4: ダッシュボードUIの作成**
+### **Step 4: ダッシュボード UI の作成**
 
 新しいページ `/dashboard/[siteId]/insights` を作成します。
 
@@ -116,29 +118,40 @@ export default function InsightsPage() {
 
   useEffect(() => {
     if (!siteId) return;
-    
+
     const fetchInsights = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) return;
 
       // 質問ランキングを取得
-      const questionsRes = await fetch(`/api/insights/questions?site_id=${siteId}&limit=10`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
+      const questionsRes = await fetch(
+        `/api/insights/questions?site_id=${siteId}&limit=10`,
+        {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        },
+      );
       const questionsData = await questionsRes.json();
       setQuestions(questionsData.questions || []);
 
       // キーワードを取得
-      const keywordsRes = await fetch(`/api/insights/keywords?site_id=${siteId}&limit=20`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
+      const keywordsRes = await fetch(
+        `/api/insights/keywords?site_id=${siteId}&limit=20`,
+        {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        },
+      );
       const keywordsData = await keywordsRes.json();
       setKeywords(keywordsData.keywords || []);
 
       // 時系列データを取得
-      const timelineRes = await fetch(`/api/insights/timeline?site_id=${siteId}&interval=day`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
+      const timelineRes = await fetch(
+        `/api/insights/timeline?site_id=${siteId}&interval=day`,
+        {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        },
+      );
       const timelineData = await timelineRes.json();
       setTimeline(timelineData.timeline || []);
 
@@ -156,7 +169,7 @@ export default function InsightsPage() {
     <Layout>
       <div className="container mx-auto px-4 py-8">
         <h1 className="text-3xl font-bold mb-8">質問インサイト</h1>
-        
+
         {/* 質問ランキング */}
         <section className="mb-8">
           <h2 className="text-2xl font-semibold mb-4">よくある質問 TOP 10</h2>
@@ -175,7 +188,9 @@ export default function InsightsPage() {
 
         {/* キーワード */}
         <section className="mb-8">
-          <h2 className="text-2xl font-semibold mb-4">よく使われるキーワード</h2>
+          <h2 className="text-2xl font-semibold mb-4">
+            よく使われるキーワード
+          </h2>
           <div className="flex flex-wrap gap-2">
             {keywords.map((kw: any, index: number) => (
               <span
@@ -200,7 +215,15 @@ export default function InsightsPage() {
                 <div className="flex-1 bg-gray-200 rounded-full h-6 relative">
                   <div
                     className="bg-blue-500 h-6 rounded-full"
-                    style={{ width: `${(item.question_count / Math.max(...timeline.map((t: any) => t.question_count))) * 100}%` }}
+                    style={{
+                      width: `${
+                        (item.question_count /
+                          Math.max(
+                            ...timeline.map((t: any) => t.question_count),
+                          )) *
+                        100
+                      }%`,
+                    }}
                   />
                   <span className="absolute inset-0 flex items-center justify-center text-xs text-white">
                     {item.question_count}
@@ -218,11 +241,11 @@ export default function InsightsPage() {
 
 ---
 
-## 🎯 Phase 2: クラスタリング機能（3-4週間）
+## 🎯 Phase 2: クラスタリング機能（3-4 週間）
 
 ### **Step 1: ベクトル拡張機能の追加**
 
-1. **pgvector拡張機能の有効化**
+1. **pgvector 拡張機能の有効化**
 
 ```sql
 -- Supabaseでpgvectorが有効になっているか確認
@@ -233,43 +256,43 @@ CREATE EXTENSION IF NOT EXISTS vector;
 
 ```sql
 -- 既存のchat_logsテーブルにベクトルインデックスを追加
-CREATE INDEX IF NOT EXISTS idx_chat_logs_embedding 
+CREATE INDEX IF NOT EXISTS idx_chat_logs_embedding
 ON chat_logs USING ivfflat (question_embedding vector_cosine_ops)
 WITH (lists = 100);
 ```
 
 3. **質問のベクトル化処理**
 
-新しいAPIエンドポイント `/api/insights/cluster` を作成して、質問をベクトル化し、クラスタリングを実行します。
+新しい API エンドポイント `/api/insights/cluster` を作成して、質問をベクトル化し、クラスタリングを実行します。
 
 ---
 
 ## 📊 実装の優先順位
 
-### **今すぐ実装可能（1-2週間）**
+### **今すぐ実装可能（1-2 週間）**
 
-1. ✅ **データベーススキーマ作成** - 1日
-2. ✅ **チャットAPI修正（ログ保存）** - 2-3日
-3. ✅ **分析API作成** - 3-5日
-4. ✅ **基本的なダッシュボードUI** - 5-7日
+1. ✅ **データベーススキーマ作成** - 1 日
+2. ✅ **チャット API 修正（ログ保存）** - 2-3 日
+3. ✅ **分析 API 作成** - 3-5 日
+4. ✅ **基本的なダッシュボード UI** - 5-7 日
 
-**合計: 約2週間**
+**合計: 約 2 週間**
 
-### **1-2ヶ月で実装可能**
+### **1-2 ヶ月で実装可能**
 
-5. ✅ **類似質問クラスタリング** - 2-3週間
-6. ✅ **購入前/購入後分析** - 1-2週間
-7. ✅ **CSVエクスポート** - 3-5日
+5. ✅ **類似質問クラスタリング** - 2-3 週間
+6. ✅ **購入前/購入後分析** - 1-2 週間
+7. ✅ **CSV エクスポート** - 3-5 日
 
-**合計: 約1-2ヶ月**
+**合計: 約 1-2 ヶ月**
 
-### **3-6ヶ月で実装可能**
+### **3-6 ヶ月で実装可能**
 
-8. ✅ **AI改善提案** - 1-2ヶ月
-9. ✅ **外部連携（Slack/Notion）** - 2-4週間
-10. ✅ **マルチユーザー共有** - 2-3週間
+8. ✅ **AI 改善提案** - 1-2 ヶ月
+9. ✅ **外部連携（Slack/Notion）** - 2-4 週間
+10. ✅ **マルチユーザー共有** - 2-3 週間
 
-**合計: 約3-6ヶ月**
+**合計: 約 3-6 ヶ月**
 
 ---
 
@@ -277,19 +300,19 @@ WITH (lists = 100);
 
 ### **パフォーマンス**
 
-- **大量データ対応**: 10万件以上のログが蓄積される可能性があるため、パーティション化を検討
+- **大量データ対応**: 10 万件以上のログが蓄積される可能性があるため、パーティション化を検討
 - **インデックス最適化**: よく使われるクエリに合わせてインデックスを調整
-- **キャッシュ**: Redisを使用して頻繁にアクセスされるデータをキャッシュ
+- **キャッシュ**: Redis を使用して頻繁にアクセスされるデータをキャッシュ
 
 ### **コスト**
 
-- **OpenAI Embeddings**: 質問1件あたり約$0.00002（512次元）
-- **ストレージ**: Supabaseの無料プランで約500MB（約10万件のログ）
+- **OpenAI Embeddings**: 質問 1 件あたり約$0.00002（512 次元）
+- **ストレージ**: Supabase の無料プランで約 500MB（約 10 万件のログ）
 - **計算リソース**: クラスタリングはバッチ処理で実行し、リアルタイム処理を避ける
 
 ### **セキュリティ**
 
-- **RLS**: Row Level Securityでユーザー間のデータ分離を徹底
+- **RLS**: Row Level Security でユーザー間のデータ分離を徹底
 - **個人情報**: 必要に応じて個人情報をマスキング
 - **アクセスログ**: 誰がいつデータにアクセスしたかを記録
 
@@ -298,9 +321,8 @@ WITH (lists = 100);
 ## 🚦 次のステップ
 
 1. **データベーススキーマの作成**から始める
-2. **チャットAPIの修正**でログ保存機能を追加
-3. **基本的な分析API**を作成
-4. **ダッシュボードUI**を実装
+2. **チャット API の修正**でログ保存機能を追加
+3. **基本的な分析 API**を作成
+4. **ダッシュボード UI**を実装
 
 実装を開始する準備ができたら、まずデータベーススキーマの作成から始めましょう！
-

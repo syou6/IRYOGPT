@@ -31,6 +31,24 @@ interface TimelineItem {
   question_count: number;
 }
 
+interface PrePostAnalysis {
+  question: string;
+  pre_count: number;
+  post_count: number;
+  total_count: number;
+  conversion_rate: number;
+  first_asked_at: string;
+  last_asked_at: string;
+}
+
+interface ConversionImpact {
+  question: string;
+  conversion_count: number;
+  non_conversion_count: number;
+  conversion_rate: number;
+  impact_score: number;
+}
+
 interface InsightsData {
   questions: QuestionRanking[];
   keywords: Keyword[];
@@ -40,6 +58,8 @@ interface InsightsData {
     thisMonth: number;
     total: number;
   };
+  prePostAnalysis?: PrePostAnalysis[];
+  conversionImpact?: ConversionImpact[];
 }
 
 export default function InsightsPage() {
@@ -193,6 +213,40 @@ export default function InsightsPage() {
             0,
           ) || 0;
 
+        // 購入前/購入後分析を取得（エラーが発生しても続行）
+        let prePostAnalysis: PrePostAnalysis[] = [];
+        try {
+          const prePostUrl = `/api/insights/pre-post-analysis?site_id=${siteId}${
+            startDate ? `&start_date=${startDate.toISOString()}` : ''
+          }`;
+          const prePostRes = await fetch(prePostUrl, {
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          });
+          if (prePostRes.ok) {
+            const prePostData = await prePostRes.json();
+            prePostAnalysis = prePostData.analysis || [];
+          }
+        } catch (error) {
+          console.error('Error fetching pre-post analysis:', error);
+        }
+
+        // コンバージョン影響質問を取得（エラーが発生しても続行）
+        let conversionImpact: ConversionImpact[] = [];
+        try {
+          const impactUrl = `/api/insights/conversion-impact?site_id=${siteId}&limit=10${
+            startDate ? `&start_date=${startDate.toISOString()}` : ''
+          }`;
+          const impactRes = await fetch(impactUrl, {
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          });
+          if (impactRes.ok) {
+            const impactData = await impactRes.json();
+            conversionImpact = impactData.questions || [];
+          }
+        } catch (error) {
+          console.error('Error fetching conversion impact:', error);
+        }
+
         setInsights({
           questions: questionsData.questions || [],
           keywords: keywordsData.keywords || [],
@@ -205,6 +259,8 @@ export default function InsightsPage() {
               0,
             ) || 0,
           },
+          prePostAnalysis,
+          conversionImpact,
         });
       } catch (error) {
         console.error('Error fetching insights:', error);
@@ -527,6 +583,87 @@ export default function InsightsPage() {
                   </div>
                 )}
               </Card>
+
+              {/* 購入前/購入後分析 */}
+              {insights.prePostAnalysis && insights.prePostAnalysis.length > 0 && (
+                <Card className="mb-8 p-6">
+                  <h2 className="mb-4 text-xl font-semibold text-premium-text">
+                    購入前/購入後の質問パターン
+                  </h2>
+                  <div className="space-y-3">
+                    {insights.prePostAnalysis.slice(0, 10).map((item, index) => (
+                      <div
+                        key={index}
+                        className="rounded-xl border border-premium-stroke/40 bg-premium-surface/50 p-4 transition hover:bg-premium-surface/70"
+                      >
+                        <p className="mb-3 text-sm font-medium text-premium-text">
+                          {item.question}
+                        </p>
+                        <div className="grid grid-cols-3 gap-4 text-xs">
+                          <div>
+                            <span className="text-premium-muted">購入前:</span>
+                            <span className="ml-2 font-semibold text-premium-text">
+                              {item.pre_count}回
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-premium-muted">購入後:</span>
+                            <span className="ml-2 font-semibold text-premium-text">
+                              {item.post_count}回
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-premium-muted">転換率:</span>
+                            <span className="ml-2 font-semibold text-emerald-400">
+                              {item.conversion_rate.toFixed(1)}%
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
+
+              {/* コンバージョン影響質問 */}
+              {insights.conversionImpact && insights.conversionImpact.length > 0 && (
+                <Card className="mb-8 p-6">
+                  <h2 className="mb-4 text-xl font-semibold text-premium-text">
+                    コンバージョンに影響する質問 TOP 10
+                  </h2>
+                  <div className="space-y-3">
+                    {insights.conversionImpact.map((item, index) => (
+                      <div
+                        key={index}
+                        className="flex items-start gap-4 rounded-xl border border-premium-stroke/40 bg-premium-surface/50 p-4 transition hover:bg-premium-surface/70"
+                      >
+                        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-400/20 text-sm font-semibold text-emerald-400">
+                          {index + 1}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="mb-2 text-sm font-medium text-premium-text">
+                            {item.question}
+                          </p>
+                          <div className="flex items-center gap-4 text-xs text-premium-muted">
+                            <span>
+                              コンバージョン: <span className="font-semibold text-emerald-400">{item.conversion_count}</span>
+                            </span>
+                            <span>
+                              非コンバージョン: <span className="font-semibold">{item.non_conversion_count}</span>
+                            </span>
+                            <span>
+                              コンバージョン率: <span className="font-semibold text-emerald-400">{item.conversion_rate.toFixed(1)}%</span>
+                            </span>
+                            <span>
+                              インパクトスコア: <span className="font-semibold text-premium-accent">{item.impact_score.toFixed(1)}</span>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </Card>
+              )}
             </>
           ) : (
             <div className="py-20 text-center text-sm text-premium-muted">

@@ -227,6 +227,9 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     inputEl.value = '';
 
     const loadingDiv = showLoading();
+    let streamingMessageDiv = null;
+    let answer = '';
+    let sources = [];
 
     fetch(apiBaseUrl + '/api/embed/chat', {
       method: 'POST',
@@ -243,44 +246,128 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
       if (!response.ok) {
         throw new Error('Network response was not ok');
       }
-      return response.text();
-    })
-    .then(text => {
+      
       if (loadingDiv) loadingDiv.remove();
-
-      const lines = text.split('\\n');
-      let answer = '';
-      let sources = [];
-      for (const line of lines) {
-        if (!line.startsWith('data: ')) continue;
-        const payload = line.substring(6);
-        if (payload === '[DONE]') break;
-        try {
-          const parsed = JSON.parse(payload);
-          if (parsed.data) {
-            answer += parsed.data;
-          }
-          if (parsed.sources && Array.isArray(parsed.sources)) {
-            sources = parsed.sources;
-          }
-        } catch (err) {
-          console.warn('WEBGPT embed parse error', err);
-        }
+      
+      // ストリーミング用のメッセージ要素を作成
+      streamingMessageDiv = document.createElement('div');
+      streamingMessageDiv.className = 'sgpt-message bot';
+      if (messagesDiv) {
+        messagesDiv.appendChild(streamingMessageDiv);
+        messagesDiv.scrollTop = messagesDiv.scrollHeight;
       }
 
-      if (answer) {
-        const cleaned = answer.split('**').join('');
-        addMessage(cleaned, false, sources);
-      } else {
-        addMessage('申し訳ございません。回答を取得できませんでした。', false);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      function readStream() {
+        reader.read().then(({ done, value }) => {
+          if (done) {
+            // ストリーミング完了
+            if (streamingMessageDiv) {
+              updateStreamingMessage(streamingMessageDiv, answer, sources);
+            }
+            return;
+          }
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\\n');
+          buffer = lines.pop() || ''; // 最後の不完全な行を保持
+
+          for (const line of lines) {
+            if (!line.startsWith('data: ')) continue;
+            const payload = line.substring(6);
+            if (payload === '[DONE]') {
+              if (streamingMessageDiv) {
+                updateStreamingMessage(streamingMessageDiv, answer, sources);
+              }
+              return;
+            }
+            try {
+              const parsed = JSON.parse(payload);
+              if (parsed.data) {
+                answer += parsed.data;
+                // リアルタイムで更新
+                if (streamingMessageDiv) {
+                  updateStreamingMessage(streamingMessageDiv, answer, sources);
+                }
+              }
+              if (parsed.sources && Array.isArray(parsed.sources)) {
+                sources = parsed.sources;
+                if (streamingMessageDiv) {
+                  updateStreamingMessage(streamingMessageDiv, answer, sources);
+                }
+              }
+            } catch (err) {
+              console.warn('WEBGPT embed parse error', err);
+            }
+          }
+
+          readStream();
+        }).catch(error => {
+          console.error('Stream read error:', error);
+          if (loadingDiv) loadingDiv.remove();
+          if (streamingMessageDiv) streamingMessageDiv.remove();
+          addMessage('エラーが発生しました。しばらくしてから再度お試しください。', false);
+        });
       }
+
+      readStream();
     })
     .catch(error => {
       if (loadingDiv) loadingDiv.remove();
-    console.error('Chat error:', error);
-    addMessage('エラーが発生しました。しばらくしてから再度お試しください。', false);
-  });
-}
+      console.error('Chat error:', error);
+      addMessage('エラーが発生しました。しばらくしてから再度お試しください。', false);
+    });
+  }
+
+  function updateStreamingMessage(messageDiv, text, sources) {
+    if (!messageDiv) return;
+    
+    // 既存の内容をクリア
+    messageDiv.innerHTML = '';
+    
+    // テキストを追加
+    const textNode = document.createTextNode(text.split('**').join(''));
+    messageDiv.appendChild(textNode);
+    
+    // 引用元URLを追加
+    if (sources && sources.length > 0) {
+      const sourcesDiv = document.createElement('div');
+      sourcesDiv.style.marginTop = '12px';
+      sourcesDiv.style.paddingTop = '12px';
+      sourcesDiv.style.borderTop = '1px solid rgba(255,255,255,0.1)';
+      sourcesDiv.style.fontSize = '0.75rem';
+      sourcesDiv.style.color = '#94a3b8';
+      
+      const sourcesLabel = document.createElement('div');
+      sourcesLabel.textContent = '引用元:';
+      sourcesLabel.style.marginBottom = '8px';
+      sourcesDiv.appendChild(sourcesLabel);
+      
+      sources.forEach(function(url) {
+        const link = document.createElement('a');
+        link.href = url;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = url;
+        link.style.color = '#34d399';
+        link.style.textDecoration = 'underline';
+        link.style.display = 'block';
+        link.style.marginBottom = '4px';
+        link.style.wordBreak = 'break-all';
+        sourcesDiv.appendChild(link);
+      });
+      
+      messageDiv.appendChild(sourcesDiv);
+    }
+    
+    // スクロールを更新
+    if (messagesDiv) {
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
+    }
+  }
 
 sendBtn?.addEventListener('click', sendMessage);
 inputField?.addEventListener('keypress', function(e) {

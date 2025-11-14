@@ -225,6 +225,13 @@ export default function SiteChat() {
     messageListRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, pending]);
 
+  // pendingが存在する時はloadingをfalseにしてストリーミング表示に切り替え
+  useEffect(() => {
+    if (pending && pending.length > 0 && loading) {
+      setLoading(false);
+    }
+  }, [pending, loading]);
+
   // フォーム送信
   async function handleSubmit(e: any) {
     e.preventDefault();
@@ -253,9 +260,9 @@ export default function SiteChat() {
       pending: undefined,
     }));
 
-    setLoading(true);
     setQuery('');
     setMessageState((state) => ({ ...state, pending: '' }));
+    setLoading(true);
 
     const ctrl = new AbortController();
 
@@ -627,7 +634,7 @@ export default function SiteChat() {
                         </div>
                       </div>
                     ))}
-                    {loading && (
+                    {loading && !pending && (
                       <div className="flex justify-start">
                         <div className="rounded-3xl border border-white/10 bg-white/10 px-4 py-2">
                           <LoadingDots color="#33F699" />

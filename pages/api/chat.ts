@@ -158,10 +158,16 @@ export default async function handler(
       }
 
       // コンテキストテキストを保存（トークン数計算用）
+      // similarityスコアが0.7以上のもののみを引用元として表示（関連性が高いもののみ）
+      const SIMILARITY_THRESHOLD = 0.7;
       const documents = (data || []).map((row: any) => {
         usageTracker.contextText += row.content + '\n\n';
-        // metadataからURLを抽出して収集
-        if (row.metadata?.source && typeof row.metadata.source === 'string') {
+        // similarityスコアが高いもののみを引用元として収集
+        if (
+          row.similarity >= SIMILARITY_THRESHOLD &&
+          row.metadata?.source &&
+          typeof row.metadata.source === 'string'
+        ) {
           sourceUrls.add(row.metadata.source);
         }
         return new Document({

@@ -272,7 +272,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
           }
 
           buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\\n');
+          const lines = buffer.split('\n');
           buffer = lines.pop() || ''; // 最後の不完全な行を保持
 
           for (const line of lines) {

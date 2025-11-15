@@ -70,6 +70,10 @@ export default async function handler(
  * 埋め込みスクリプトを生成
  */
 function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
+  // 変数を安全にエスケープ
+  const escapedSiteId = JSON.stringify(siteId);
+  const escapedApiBaseUrl = JSON.stringify(apiBaseUrl);
+  
   return `(function() {
   'use strict';
   
@@ -77,8 +81,8 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     return;
   }
 
-  const siteId = '${siteId}';
-  const apiBaseUrl = '${apiBaseUrl}';
+  const siteId = ${escapedSiteId};
+  const apiBaseUrl = ${escapedApiBaseUrl};
 
   const styles = [
     '.sgpt-widget{position:fixed;right:24px;bottom:24px;z-index:9999;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;color:#e2e8f0}',
@@ -156,13 +160,17 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     }
   }
 
-  toggleBtn?.addEventListener('click', () => toggleChat());
-  closeBtn?.addEventListener('click', () => toggleChat(false));
+  if (toggleBtn) {
+    toggleBtn.addEventListener('click', () => toggleChat());
+  }
+  if (closeBtn) {
+    closeBtn.addEventListener('click', () => toggleChat(false));
+  }
 
   function addMessage(text, isUser, sources) {
     if (!messagesDiv) return;
     const messageDiv = document.createElement('div');
-    messageDiv.className = \'sgpt-message \'+ (isUser ? 'user' : 'bot');
+    messageDiv.className = 'sgpt-message ' + (isUser ? 'user' : 'bot');
     
     if (isUser) {
       messageDiv.textContent = text;
@@ -272,7 +280,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
           }
 
           buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split('\n');
+          const lines = buffer.split('\\n');
           buffer = lines.pop() || ''; // 最後の不完全な行を保持
 
           for (const line of lines) {
@@ -369,13 +377,17 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     }
   }
 
-sendBtn?.addEventListener('click', sendMessage);
-inputField?.addEventListener('keypress', function(e) {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    sendMessage();
-  }
-});
+if (sendBtn) {
+  sendBtn.addEventListener('click', sendMessage);
+}
+if (inputField) {
+  inputField.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+}
 
   window.WebGPTEmbed = {
     loaded: true,

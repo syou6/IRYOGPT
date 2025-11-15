@@ -931,6 +931,12 @@ export default function Dashboard() {
 
                   <div className="mb-4 space-y-2 text-xs text-premium-muted md:text-sm">
                     <div>
+                      <span className="font-medium text-premium-muted">サイトID:</span>{' '}
+                      <code className="rounded bg-premium-elevated/50 px-1.5 py-0.5 font-mono text-[10px] text-premium-accent">
+                        {site.id}
+                      </code>
+                    </div>
+                    <div>
                       <span className="font-medium text-premium-muted">URL:</span>{' '}
                       <a
                         href={site.base_url}

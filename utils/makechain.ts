@@ -27,10 +27,11 @@ const QA_PROMPT = PromptTemplate.fromTemplate(
 Instructions:
 - Answer in Japanese if the question is in Japanese, otherwise answer in the same language as the question.
 - Use the context provided below to answer the question as accurately as possible.
-- If the context contains relevant information, use it to provide a helpful answer.
+- Even if the context seems partially relevant, try to extract and provide useful information from it.
+- If the context contains relevant information (even if it's not a perfect match), use it to provide a helpful answer.
 - If the context doesn't contain enough information to fully answer the question, you can say "提供された情報だけでは完全に答えられませんが、" and provide what you can infer from the context.
 - Only use hyperlinks as references that are explicitly listed as a source in the context below. Do NOT make up a hyperlink that is not listed below.
-- If the context is completely irrelevant to the question, you can say "申し訳ございませんが、提供された情報からは質問にお答えできません。"
+- Only say "申し訳ございませんが、提供された情報からは質問にお答えできません。" if the context is completely empty or contains absolutely no relevant information at all.
 
 Question: {question}
 =========
@@ -46,14 +47,14 @@ export const makeChain = (
 ) => {
   // 質問生成用のLLM
   const questionGenerator = new ChatOpenAI({
-    temperature: 0,
-    model: 'gpt-4o-mini',
+    temperature: 1,
+    model: 'gpt-5-mini',
   });
 
   // 回答生成用のLLM（ストリーミング対応）
   const answerLLM = new ChatOpenAI({
-    temperature: 0,
-    model: 'gpt-4o-mini',
+    temperature: 1,
+    model: 'gpt-5-mini',
     streaming: Boolean(onTokenStream),
     callbacks: onTokenStream ? CallbackManager.fromHandlers({
       async handleLLMNewToken(token: string) {

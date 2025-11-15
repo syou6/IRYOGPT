@@ -222,7 +222,7 @@ export default function SiteChat() {
   }, []);
 
   useEffect(() => {
-    messageListRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messageListRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, [messages, pending]);
 
   // pendingが存在する時はloadingをfalseにしてストリーミング表示に切り替え
@@ -593,6 +593,7 @@ export default function SiteChat() {
                     {chatMessages.map((message, index) => (
                       <div
                         key={index}
+                        ref={index === chatMessages.length - 1 ? messageListRef : undefined}
                         className={`flex ${
                           message.type === 'userMessage' ? 'justify-end' : 'justify-start'
                         }`}
@@ -641,7 +642,7 @@ export default function SiteChat() {
                         </div>
                       </div>
                     )}
-                    <div ref={messageListRef} />
+                    {/* sentinel removed; ref attached to last message */}
                   </div>
                 )}
               </div>

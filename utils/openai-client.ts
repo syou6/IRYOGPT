@@ -4,13 +4,15 @@ if (!process.env.OPENAI_API_KEY) {
   throw new Error('Missing OpenAI Credentials');
 }
 
+const DEFAULT_MODEL = 'gpt-5-mini';
+
 export const openai = new ChatOpenAI({
-  temperature: 0,
-  modelName: 'gpt-4o-mini', // 最も安価なモデル
+  temperature: 1,
+  modelName: DEFAULT_MODEL,
 });
 
 export const openaiStream = new ChatOpenAI({
-  temperature: 0,
-  modelName: 'gpt-4o-mini', // 最も安価なモデル
+  temperature: 1,
+  modelName: DEFAULT_MODEL,
   streaming: true,
 });

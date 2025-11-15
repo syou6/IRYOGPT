@@ -20,7 +20,9 @@
     "check:queue": "tsx -r dotenv/config scripts/check-queue-status.ts",
     "worker": "tsx -r dotenv/config scripts/start-worker.ts",
     "check-schema": "tsx -r dotenv/config scripts/check-schema.ts",
-    "pdf-to-markdown": "tsx scripts/pdf-to-markdown.ts"
+    "pdf-to-markdown": "tsx scripts/pdf-to-markdown.ts",
+    "train:markdown": "tsx -r dotenv/config scripts/train-markdown-files.ts",
+    "test:embedding-search": "tsx -r dotenv/config scripts/test-embedding-search.ts"
   },
   "dependencies": {
     "@langchain/community": "^1.0.0",

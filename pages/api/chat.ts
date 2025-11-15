@@ -122,6 +122,11 @@ export default async function handler(
   const { BaseRetriever } = await import('@langchain/core/retrievers');
   const { Document } = await import('@langchain/core/documents');
   
+  const questionKeywords = sanitizedQuestion
+    .toLowerCase()
+    .split(/[^\p{Letter}\p{Number}]+/u)
+    .filter((token) => token.length >= 2);
+
   const retriever = new (class extends BaseRetriever {
     lc_namespace = ['langchain', 'retrievers', 'supabase'];
     
@@ -132,9 +137,10 @@ export default async function handler(
       usageTracker.embeddingTokens += 512;
       
       // match_documents関数を直接呼び出し
+      // 検索結果を増やして、関連ドキュメントを見つけやすくする
       const { data, error } = await supabaseClient.rpc('match_documents', {
         query_embedding: queryEmbedding,
-        match_count: 10,
+        match_count: 15,
         filter: {},
         match_site_id: site_id || null, // site_idがあればフィルタ、なければ全ドキュメント
       });
@@ -157,12 +163,46 @@ export default async function handler(
         throw error;
       }
 
+      const boostedRows = (data || []).map((row: any) => {
+        let keywordHits = 0;
+        const haystacks = [
+          (row.metadata?.title || '').toLowerCase(),
+          (row.metadata?.fileName || '').toLowerCase(),
+          row.content?.toLowerCase() || '',
+        ];
+        for (const keyword of questionKeywords) {
+          if (!keyword) continue;
+          for (const text of haystacks) {
+            if (text && text.includes(keyword)) {
+              keywordHits += 1;
+              break;
+            }
+          }
+        }
+        const boost = keywordHits * 0.03;
+        return { ...row, keywordHits, customScore: row.similarity + boost };
+      });
+
+      boostedRows.sort((a: any, b: any) => b.customScore - a.customScore);
+
+      const orderedRows: any[] = [];
+      const keywordPreferred = boostedRows.find((row: any) => row.keywordHits > 0);
+      if (keywordPreferred) {
+        orderedRows.push(keywordPreferred);
+      }
+      for (const row of boostedRows) {
+        if (keywordPreferred && row.id === keywordPreferred.id) continue;
+        orderedRows.push(row);
+      }
+
+      const bestRow = orderedRows[0];
+      const MAX_RESULTS = bestRow && bestRow.similarity >= 0.85 ? 4 : 8;
+      const topRows = orderedRows.slice(0, MAX_RESULTS);
+
       // コンテキストテキストを保存（トークン数計算用）
-      // similarityスコアが0.7以上のもののみを引用元として表示（関連性が高いもののみ）
-      const SIMILARITY_THRESHOLD = 0.7;
-      const documents = (data || []).map((row: any) => {
+      const SIMILARITY_THRESHOLD = 0.6;
+      const documents = topRows.map((row: any) => {
         usageTracker.contextText += row.content + '\n\n';
-        // similarityスコアが高いもののみを引用元として収集
         if (
           row.similarity >= SIMILARITY_THRESHOLD &&
           row.metadata?.source &&

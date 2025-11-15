@@ -148,9 +148,10 @@ export default async function handler(
         usageTracker.embeddingTokens += 512;
         
         // match_documents関数を直接呼び出し（site_idフィルタ付き）
+        // 検索結果を増やして、関連ドキュメントを見つけやすくする
         const { data, error } = await supabaseClient.rpc('match_documents', {
           query_embedding: queryEmbedding,
-          match_count: 10,
+          match_count: 20, // 10から20に増加
           filter: {},
           match_site_id: site_id,
         });
@@ -160,8 +161,9 @@ export default async function handler(
         }
 
         // コンテキストテキストを保存（トークン数計算用）
-        // similarityスコアが0.7以上のもののみを引用元として表示（関連性が高いもののみ）
-        const SIMILARITY_THRESHOLD = 0.7;
+        // similarityスコアが0.3以上のもののみを引用元として表示（関連性が高いもののみ）
+        // 注意: 実際の検索にはすべてのドキュメントが使用されるが、引用元表示は閾値以上のみ
+        const SIMILARITY_THRESHOLD = 0.3; // 0.7から0.3に下げて、より多くのドキュメントを引用元として表示
         const documents = (data || []).map((row: any) => {
           usageTracker.contextText += row.content + '\n\n';
           // similarityスコアが高いもののみを引用元として収集

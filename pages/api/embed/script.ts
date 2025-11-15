@@ -106,6 +106,9 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     '.sgpt-loading{font-size:.85rem;color:#94a3b8}',
     '.sgpt-widget .sgpt-chip{display:inline-flex;padding:4px 10px;border-radius:999px;background:rgba(52,211,153,.18);color:#a7f3d0;font-size:.75rem;letter-spacing:.15em}',
     '.sgpt-widget .sgpt-footer{padding:0 20px 16px;text-align:center;font-size:.7rem;color:#475569}',
+    '.sgpt-sticky-slot{position:sticky;top:0;z-index:5;margin-bottom:12px;display:flex;justify-content:flex-end}',
+    '.sgpt-sticky-slot .sgpt-message{max-width:80%;font-size:.93rem}',
+    '.sgpt-sticky-slot .sgpt-message.user{box-shadow:0 20px 45px rgba(16,185,129,0.45)}',
     '.sgpt-scroll-hint{position:absolute;right:24px;bottom:96px;background:rgba(15,23,42,.9);border:1px solid rgba(148,163,184,.4);color:#cbd5f5;padding:8px 14px;border-radius:999px;font-size:.75rem;display:flex;align-items:center;gap:6px;box-shadow:0 15px 40px rgba(2,6,23,.6);opacity:0;pointer-events:none;transition:opacity .25s ease}',
     '.sgpt-scroll-hint svg{width:14px;height:14px}',
     '.sgpt-scroll-hint.is-visible{opacity:1;pointer-events:auto}'
@@ -145,6 +148,9 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
   const toggleBtn = document.getElementById('webgpt-toggle-btn');
   const closeBtn = document.getElementById('webgpt-close-btn');
   const messagesDiv = document.getElementById('webgpt-messages');
+  const stickySlot = document.createElement('div');
+  stickySlot.className = 'sgpt-sticky-slot';
+  chatContainer?.insertBefore(stickySlot, messagesDiv);
   const inputField = document.getElementById('webgpt-input');
   const sendBtn = document.getElementById('webgpt-send-btn');
   const scrollHint = document.createElement('button');
@@ -152,8 +158,6 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
   scrollHint.setAttribute('type', 'button');
   scrollHint.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg><span>下へスクロール</span>';
   chatContainer?.appendChild(scrollHint);
-
-  let anchorMessage = null;
 
   function getInputElement() {
     const el = document.getElementById('webgpt-input');
@@ -204,8 +208,19 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     
     if (isUser) {
       messageDiv.textContent = text;
-      anchorMessage = messageDiv;
-    } else {
+      if (stickySlot) {
+        stickySlot.innerHTML = '';
+        stickySlot.appendChild(messageDiv);
+      }
+      if (messagesDiv) {
+        messagesDiv.scrollTop = 0;
+      }
+      scrollHint.classList.remove('is-visible');
+      return;
+    }
+
+    // bot message branch
+    {
       // ボットメッセージの場合、テキストと引用元URLを表示
       const textNode = document.createTextNode(text);
       messageDiv.appendChild(textNode);
@@ -240,15 +255,9 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
         messageDiv.appendChild(sourcesDiv);
       }
     }
-    
+
     messagesDiv.appendChild(messageDiv);
-    if (isUser) {
-      const target = Math.max(messageDiv.offsetTop - 20, 0);
-      messagesDiv.scrollTo({ top: target, behavior: 'smooth' });
-      scrollHint.classList.remove('is-visible');
-    } else {
-      updateScrollHint();
-    }
+    updateScrollHint();
   }
 
   function showLoading() {
@@ -407,9 +416,15 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
       
       messageDiv.appendChild(sourcesDiv);
     }
-    if (anchorMessage && messagesDiv) {
-      const target = Math.max(anchorMessage.offsetTop - 20, 0);
-      messagesDiv.scrollTo({ top: target });
+    if (stickySlot && stickySlot.firstChild && messagesDiv) {
+      // ensure回答開始部分が見えるように上部へ余白を確保
+      const firstAnswer = messagesDiv.querySelector('.sgpt-message.bot:last-child');
+      if (firstAnswer) {
+        const offset = firstAnswer.offsetTop - messagesDiv.offsetTop;
+        if (offset > 0) {
+          messagesDiv.scrollTop = Math.min(offset, messagesDiv.scrollHeight);
+        }
+      }
     }
     updateScrollHint();
   }

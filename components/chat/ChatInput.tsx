@@ -51,7 +51,6 @@ export const ChatInput: React.FC<ChatInputProps> = ({
                       transition">
         <textarea
           {...getTextareaProps({
-            ref: textareaRef,
             value,
             onChange: (e) => onChange(e.target.value),
             placeholder,
@@ -61,6 +60,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
               "placeholder:text-slate-400 outline-none",
             disabled,
           })}
+          ref={textareaRef as React.Ref<HTMLTextAreaElement>}
         />
       </div>
       <button

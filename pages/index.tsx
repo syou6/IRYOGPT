@@ -131,7 +131,7 @@ const ARTICLE_ITEMS = [
   },
   {
     title: 'Docs: Embed Spec v2',
-    summary: 'catnose 仕様のUIを保ちながらサイトごとにアクセントを切り替えるトークン設計。',
+    summary: '埋め込みチャットのデザインルールとアクセント切り替えのトークン設計を整理した新版ドキュメント。',
     date: '2025.01.15',
     tag: 'Docs update',
     href: '/docs',
@@ -143,8 +143,8 @@ const TIMELINE = [
     year: '2025',
     items: [
       {
-        title: 'LPをcatnose仕様へリビルド',
-        description: 'Hero / Stats / Members / Timeline をTeam Blog Hubスタイルに統一。',
+        title: 'LPを新デザインにリビルド',
+        description: 'Hero / Stats / Members / Timeline を独自トーンで再構築。',
         date: 'Feb',
       },
       {
@@ -163,8 +163,8 @@ const TIMELINE = [
         date: 'Dec',
       },
       {
-        title: 'Team Blog Hub 風のMembers/Articles',
-        description: 'LP構造の再整理と ship note の見せ方をcatnose流に移行。',
+        title: 'Members/Articlesセクションを刷新',
+        description: 'LP構造と ship note の見せ方を統一し、読みやすさを優先。',
         date: 'Nov',
       },
     ],
@@ -250,7 +250,7 @@ export default function Home() {
   return (
     <Layout showShellHeader={false} fullWidth>
       <div className="relative mx-auto w-full max-w-3xl px-4 pb-16 pt-6 sm:px-6 lg:px-8">
-        <header className="sticky top-0 z-40 border-b border-premium-stroke/60 bg-premium-base/95 pb-6 backdrop-blur supports-[backdrop-filter]:bg-premium-base/80">
+        <header className="sticky top-0 z-40 border-b border-premium-stroke/60 bg-premium-base/90 pb-5 backdrop-blur supports-[backdrop-filter]:bg-premium-base/80">
           <div className="space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <Link href="/" className="flex items-center gap-3">
@@ -291,9 +291,10 @@ export default function Home() {
 
           <main className="space-y-16 sm:space-y-20">
             <section
-              className="relative overflow-hidden rounded-[36px] border border-premium-stroke/40 bg-gradient-to-b from-premium-surface/80 via-premium-surface/30 to-transparent px-6 pb-12 pt-16 sm:px-8 animate-fade-up section-fade shadow-[0_45px_120px_rgba(1,8,4,0.65)]"
+              className="relative overflow-hidden rounded-[36px] border border-premium-stroke/40 bg-premium-surface/80 px-6 pb-12 pt-16 sm:px-8 section-fade shadow-[0_45px_120px_rgba(1,8,4,0.65)]"
               style={{ animationDelay: '0.05s' }}
             >
+              <div className="pointer-events-none absolute inset-0 bg-premium-grid opacity-25" />
               <div className="pointer-events-none absolute -right-10 top-0 h-64 w-64 rounded-full bg-[radial-gradient(circle_at_top,_rgba(122,244,193,0.25),_transparent_70%)] blur-3xl" />
               <div className="pointer-events-none absolute -left-10 bottom-0 h-64 w-64 rounded-full bg-[radial-gradient(circle_at_bottom,_rgba(25,195,125,0.2),_transparent_70%)] blur-3xl" />
               <p className="text-xs uppercase tracking-[0.35em] text-premium-muted">AI SUPPORT OS</p>
@@ -313,7 +314,7 @@ export default function Home() {
               </div>
               <div className="mt-8 grid gap-3 text-sm text-premium-muted sm:grid-cols-2">
                 {HERO_FEATURES.map((feature) => (
-                  <div key={feature} className="rounded-2xl border border-premium-stroke/60 bg-premium-card/30 px-4 py-3">
+                  <div key={feature} className="rounded-2xl border border-premium-stroke/50 bg-premium-card/40 px-4 py-3">
                     <span className="text-premium-accent">✓</span>
                     <span className="ml-3">{feature}</span>
                   </div>
@@ -333,14 +334,16 @@ export default function Home() {
               className="section-fade border-t border-premium-stroke/60 pt-14"
               style={{ animationDelay: '0.12s' }}
             >
-              <SectionHeading eyebrow="STATS" title="数字で把握する現在地" align="left" />
-              <div className="grid gap-4 sm:grid-cols-2">
-                {STAT_ITEMS.map((item) => (
-                  <div key={item.label} className="rounded-2xl border border-premium-stroke/60 bg-premium-card/30 px-6 py-5">
-                    <p className="text-3xl font-semibold">{item.value}</p>
-                    <p className="text-sm text-premium-muted">{item.label}</p>
-                  </div>
-                ))}
+              <div className="rounded-[32px] border border-premium-stroke/40 bg-premium-card/20 px-6 py-8 sm:px-8">
+                <SectionHeading eyebrow="STATS" title="数字で把握する現在地" align="left" />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {STAT_ITEMS.map((item) => (
+                    <div key={item.label} className="rounded-2xl border border-premium-stroke/60 bg-premium-card/30 px-6 py-5">
+                      <p className="text-3xl font-semibold">{item.value}</p>
+                      <p className="text-sm text-premium-muted">{item.label}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </section>
 
@@ -349,19 +352,21 @@ export default function Home() {
               className="section-fade border-t border-premium-stroke/60 pt-14"
               style={{ animationDelay: '0.18s' }}
             >
-              <SectionHeading
-                eyebrow="FLOW"
-                title="申し込みから本番運用まで同じチームで"
-                description="申し込みから本番公開まで、すべての工程を一緒に進められます。"
-              />
-              <div className="space-y-5">
-                {STEPS.map((step) => (
-                  <div key={step.number} className="rounded-2xl border border-premium-stroke/60 bg-premium-card/30 p-5">
-                    <p className="text-xs uppercase tracking-[0.35em] text-premium-muted">STEP {step.number}</p>
-                    <h3 className="mt-2 text-xl font-semibold">{step.title}</h3>
-                    <p className="mt-2 text-sm text-premium-muted leading-relaxed">{step.description}</p>
-                  </div>
-                ))}
+              <div className="rounded-[32px] border border-premium-stroke/40 bg-premium-card/20 px-6 py-8 sm:px-8">
+                <SectionHeading
+                  eyebrow="FLOW"
+                  title="申し込みから本番運用まで同じチームで"
+                  description="申し込みから本番公開まで、すべての工程を一緒に進められます。"
+                />
+                <div className="space-y-5">
+                  {STEPS.map((step) => (
+                    <div key={step.number} className="rounded-2xl border border-premium-stroke/60 bg-premium-card/30 p-5">
+                      <p className="text-xs uppercase tracking-[0.35em] text-premium-muted">STEP {step.number}</p>
+                      <h3 className="mt-2 text-xl font-semibold">{step.title}</h3>
+                      <p className="mt-2 text-sm text-premium-muted leading-relaxed">{step.description}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </section>
 
@@ -369,22 +374,24 @@ export default function Home() {
               className="section-fade border-t border-premium-stroke/60 pt-14"
               style={{ animationDelay: '0.24s' }}
             >
-              <SectionHeading eyebrow="Before / After" title="現場の声から逆算した会話体験" />
-              <div className="grid gap-5 md:grid-cols-2">
-                {Object.entries({ before: 'よくあるチャットボットの困りごと', after: 'WEBGPT導入後に得られる体験' }).map(([key, title]) => (
-                  <div key={key} className="rounded-2xl border border-premium-stroke/60 bg-premium-card/30 p-5">
-                    <p className="text-xs uppercase tracking-[0.35em] text-premium-muted">{key === 'before' ? 'BEFORE' : 'AFTER'}</p>
-                    <h3 className="mt-2 text-xl font-semibold">{title}</h3>
-                    <ul className="mt-3 space-y-2 text-sm text-premium-muted">
-                      {(key === 'before' ? ['回答の精度が日によってバラバラ', '夜間は誰も対応できない', 'ブランドらしさが失われる', '結局サポート工数は減らない'] : ['24時間365日の即時応答', 'ブランドトーンに合わせた会話', '社内ナレッジを安全に活用', '一次対応を自動化してコスト削減']).map((point) => (
-                        <li key={point} className="flex items-start gap-3">
-                          <span>{key === 'before' ? '・' : '✓'}</span>
-                          <span>{point}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
+              <div className="rounded-[32px] border border-premium-stroke/40 bg-premium-card/20 px-6 py-8 sm:px-8">
+                <SectionHeading eyebrow="Before / After" title="現場の声から逆算した会話体験" />
+                <div className="grid gap-5 md:grid-cols-2">
+                  {Object.entries({ before: 'よくあるチャットボットの困りごと', after: 'WEBGPT導入後に得られる体験' }).map(([key, title]) => (
+                    <div key={key} className="rounded-2xl border border-premium-stroke/60 bg-premium-card/30 p-5">
+                      <p className="text-xs uppercase tracking-[0.35em] text-premium-muted">{key === 'before' ? 'BEFORE' : 'AFTER'}</p>
+                      <h3 className="mt-2 text-xl font-semibold">{title}</h3>
+                      <ul className="mt-3 space-y-2 text-sm text-premium-muted">
+                        {(key === 'before' ? ['回答の精度が日によってバラバラ', '夜間は誰も対応できない', 'ブランドらしさが失われる', '結局サポート工数は減らない'] : ['24時間365日の即時応答', 'ブランドトーンに合わせた会話', '社内ナレッジを安全に活用', '一次対応を自動化してコスト削減']).map((point) => (
+                          <li key={point} className="flex items-start gap-3">
+                            <span>{key === 'before' ? '・' : '✓'}</span>
+                            <span>{point}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
               </div>
             </section>
 
@@ -393,28 +400,30 @@ export default function Home() {
               className="section-fade border-t border-premium-stroke/60 pt-14"
               style={{ animationDelay: '0.3s' }}
             >
-              <SectionHeading
-                eyebrow="FEATURES"
-                title="サポート現場の「こうだったら」を詰め込みました"
-                description="よく使う機能を厳選し、初めてでも迷わず扱えます。"
-              />
-              <div className="grid gap-4 md:grid-cols-2">
-                {DETAILED_FEATURES.map((feature) => (
-                  <div key={feature.title} className="rounded-2xl border border-premium-stroke/60 bg-premium-card/30 p-5">
-                    <span className="text-xs uppercase tracking-[0.35em] text-premium-muted">{feature.badge}</span>
-                    <h3 className="mt-3 text-2xl font-semibold">{feature.title}</h3>
-                    <p className="mt-2 text-sm text-premium-muted leading-relaxed">{feature.description}</p>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                {FEATURE_CARDS.map((card) => (
-                  <div key={card.title} className="rounded-2xl border border-premium-stroke/60 bg-premium-card/20 p-4">
-                    <div className="text-2xl">{card.icon}</div>
-                    <h3 className="mt-3 text-xl font-semibold">{card.title}</h3>
-                    <p className="mt-2 text-sm text-premium-muted leading-relaxed">{card.description}</p>
-                  </div>
-                ))}
+              <div className="rounded-[32px] border border-premium-stroke/40 bg-premium-card/20 px-6 py-8 sm:px-8">
+                <SectionHeading
+                  eyebrow="FEATURES"
+                  title="サポート現場の「こうだったら」を詰め込みました"
+                  description="よく使う機能を厳選し、初めてでも迷わず扱えます。"
+                />
+                <div className="grid gap-4 md:grid-cols-2">
+                  {DETAILED_FEATURES.map((feature) => (
+                    <div key={feature.title} className="rounded-2xl border border-premium-stroke/60 bg-premium-card/30 p-5">
+                      <span className="text-xs uppercase tracking-[0.35em] text-premium-muted">{feature.badge}</span>
+                      <h3 className="mt-3 text-2xl font-semibold">{feature.title}</h3>
+                      <p className="mt-2 text-sm text-premium-muted leading-relaxed">{feature.description}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                  {FEATURE_CARDS.map((card) => (
+                    <div key={card.title} className="rounded-2xl border border-premium-stroke/60 bg-premium-card/20 p-4">
+                      <div className="text-2xl">{card.icon}</div>
+                      <h3 className="mt-3 text-xl font-semibold">{card.title}</h3>
+                      <p className="mt-2 text-sm text-premium-muted leading-relaxed">{card.description}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </section>
 
@@ -423,27 +432,29 @@ export default function Home() {
               className="section-fade border-t border-premium-stroke/60 pt-14"
               style={{ animationDelay: '0.36s' }}
             >
-              <SectionHeading
-                eyebrow="MEMBERS"
-                title="Team Blog Hub 風のカードでサポートメンバーを紹介"
-                action={{ label: 'See Details →', href: '/about' }}
-              />
-              <div className="grid gap-4 sm:grid-cols-2">
-                {MEMBER_CARDS.map((member) => (
-                  <div key={member.name} className="rounded-2xl border border-premium-stroke/60 bg-premium-card/40 p-5">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-premium-stroke/70 text-sm font-semibold text-premium-accent">
-                        {getInitials(member.name)}
+              <div className="rounded-[32px] border border-premium-stroke/40 bg-premium-card/20 px-6 py-8 sm:px-8">
+                <SectionHeading
+                  eyebrow="MEMBERS"
+                  title="Team Blog Hub 風のカードでサポートメンバーを紹介"
+                  action={{ label: 'See Details →', href: '/about' }}
+                />
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {MEMBER_CARDS.map((member) => (
+                    <div key={member.name} className="rounded-2xl border border-premium-stroke/60 bg-premium-card/40 p-5">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-premium-stroke/70 text-sm font-semibold text-premium-accent">
+                          {getInitials(member.name)}
+                        </div>
+                        <div>
+                          <p className="text-sm uppercase tracking-[0.25em] text-premium-muted">{member.role}</p>
+                          <h3 className="text-lg font-semibold">{member.name}</h3>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm uppercase tracking-[0.25em] text-premium-muted">{member.role}</p>
-                        <h3 className="text-lg font-semibold">{member.name}</h3>
-                      </div>
+                      <p className="mt-3 text-sm text-premium-muted leading-relaxed">{member.focus}</p>
+                      <p className="mt-2 text-xs text-premium-muted">Timezone: {member.timezone}</p>
                     </div>
-                    <p className="mt-3 text-sm text-premium-muted leading-relaxed">{member.focus}</p>
-                    <p className="mt-2 text-xs text-premium-muted">Timezone: {member.timezone}</p>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </section>
 
@@ -452,29 +463,31 @@ export default function Home() {
               className="section-fade border-t border-premium-stroke/60 pt-14"
               style={{ animationDelay: '0.42s' }}
             >
-              <SectionHeading
-                eyebrow="ARTICLES"
-                title="Ship Notes / Team Memo"
-                action={{ label: 'See All →', href: '/blog' }}
-              />
-              <div className="space-y-4">
-                {ARTICLE_ITEMS.map((article) => (
-                  <Link
-                    key={article.title}
-                    href={article.href}
-                    className="block rounded-2xl border border-premium-stroke/60 bg-premium-card/30 p-5 transition hover:border-premium-accent/60"
-                  >
-                    <div className="flex items-center justify-between text-xs text-premium-muted">
-                      <span className="rounded-full border border-premium-stroke/60 px-3 py-1 uppercase tracking-[0.35em]">{article.tag}</span>
-                      <span>{article.date}</span>
-                    </div>
-                    <h3 className="mt-3 text-xl font-semibold">{article.title}</h3>
-                    <p className="mt-2 text-sm text-premium-muted leading-relaxed">{article.summary}</p>
-                    <span className="mt-4 inline-flex items-center text-[0.65rem] uppercase tracking-[0.35em] text-premium-accent">
-                      Read note →
-                    </span>
-                  </Link>
-                ))}
+              <div className="rounded-[32px] border border-premium-stroke/40 bg-premium-card/20 px-6 py-8 sm:px-8">
+                <SectionHeading
+                  eyebrow="ARTICLES"
+                  title="Ship Notes / Team Memo"
+                  action={{ label: 'See All →', href: '/blog' }}
+                />
+                <div className="space-y-4">
+                  {ARTICLE_ITEMS.map((article) => (
+                    <Link
+                      key={article.title}
+                      href={article.href}
+                      className="block rounded-2xl border border-premium-stroke/60 bg-premium-card/30 p-5 transition hover:border-premium-accent/60"
+                    >
+                      <div className="flex items-center justify-between text-xs text-premium-muted">
+                        <span className="rounded-full border border-premium-stroke/60 px-3 py-1 uppercase tracking-[0.35em]">{article.tag}</span>
+                        <span>{article.date}</span>
+                      </div>
+                      <h3 className="mt-3 text-xl font-semibold">{article.title}</h3>
+                      <p className="mt-2 text-sm text-premium-muted leading-relaxed">{article.summary}</p>
+                      <span className="mt-4 inline-flex items-center text-[0.65rem] uppercase tracking-[0.35em] text-premium-accent">
+                        Read note →
+                      </span>
+                    </Link>
+                  ))}
+                </div>
               </div>
             </section>
 
@@ -483,29 +496,30 @@ export default function Home() {
               className="section-fade border-t border-premium-stroke/60 pt-14"
               style={{ animationDelay: '0.48s' }}
             >
-              <SectionHeading eyebrow="TIMELINE" title="README風の縦軸で更新履歴を整理" />
-              <div className="space-y-12">
-                {TIMELINE.map((block) => (
-                  <div key={block.year} className="flex gap-6">
-                    <div className="sticky top-24 w-20 text-center">
-                      <span className="inline-flex w-full items-center justify-center rounded-full border border-premium-stroke/70 px-3 py-1 text-sm font-semibold">
-                        {block.year}
-                      </span>
+              <div className="rounded-[32px] border border-premium-stroke/40 bg-premium-card/20 px-6 py-8 sm:px-8">
+                <SectionHeading eyebrow="TIMELINE" title="README風の縦軸で更新履歴を整理" />
+                <div className="space-y-16">
+                  {TIMELINE.map((block) => (
+                    <div key={block.year} className="grid gap-6 sm:grid-cols-[120px,1fr]">
+                      <div className="sm:sticky top-28">
+                        <span className="inline-flex w-full items-center justify-center rounded-full border border-premium-stroke/70 px-3 py-1 text-sm font-semibold">
+                          {block.year}
+                        </span>
+                      </div>
+                      <div className="relative pl-6">
+                        <span className="absolute left-0 top-4 h-full w-px bg-premium-stroke/40" />
+                        {block.items.map((item, idx) => (
+                          <div key={`${block.year}-${item.title}`} className="relative mb-8 rounded-2xl border border-premium-stroke/60 bg-premium-card/30 p-5 shadow-[0_25px_70px_rgba(1,8,4,0.35)]">
+                            <span className="absolute -left-[11px] top-6 h-4 w-4 rounded-full border-2 border-premium-base bg-premium-accent" />
+                            <p className="text-xs uppercase tracking-[0.35em] text-premium-muted">{item.date}</p>
+                            <h3 className="mt-2 text-lg font-semibold">{item.title}</h3>
+                            <p className="mt-2 text-sm text-premium-muted leading-relaxed">{item.description}</p>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                    <div className="flex-1 border-l border-premium-stroke/40 pl-6">
-                      {block.items.map((item) => (
-                        <div key={`${block.year}-${item.title}`} className="relative pb-10">
-                          <span className="absolute -left-[13px] top-1.5 h-3 w-3 rounded-full bg-premium-accent" />
-                          <p className="text-xs uppercase tracking-[0.35em] text-premium-muted">{item.date}</p>
-                          <h3 className="mt-2 text-lg font-semibold underline decoration-premium-stroke underline-offset-4">
-                            {item.title}
-                          </h3>
-                          <p className="mt-2 text-sm text-premium-muted leading-relaxed">{item.description}</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
             </section>
 
@@ -514,19 +528,21 @@ export default function Home() {
               className="section-fade border-t border-premium-stroke/60 pt-14"
               style={{ animationDelay: '0.54s' }}
             >
-              <SectionHeading
-                eyebrow="DEMO"
-                title="埋め込みチャットはローカルでも同じ振る舞い"
-                description="scriptタグを貼るだけで、LPで確認した体験をそのまま持ち込めます。"
-              />
-              <div className="rounded-2xl border border-premium-stroke/60 bg-premium-card/30 p-5">
-                <p className="text-sm text-premium-muted">開発用スニペット（Streamingインジケーター付き）</p>
-                <pre className="mt-3 overflow-x-auto rounded-xl border border-premium-stroke/60 bg-premium-elevated/60 p-4 text-xs text-premium-muted">
+              <div className="rounded-[32px] border border-premium-stroke/40 bg-premium-card/20 px-6 py-8 sm:px-8">
+                <SectionHeading
+                  eyebrow="DEMO"
+                  title="埋め込みチャットはローカルでも同じ振る舞い"
+                  description="scriptタグを貼るだけで、LPで確認した体験をそのまま持ち込めます。"
+                />
+                <div className="rounded-2xl border border-premium-stroke/60 bg-premium-card/30 p-5">
+                  <p className="text-sm text-premium-muted">開発用スニペット（Streamingインジケーター付き）</p>
+                  <pre className="mt-3 overflow-x-auto rounded-xl border border-premium-stroke/60 bg-premium-elevated/60 p-4 text-xs text-premium-muted">
 {EMBED_SNIPPET}
-                </pre>
-                <p className="mt-3 text-xs text-premium-muted">
-                  Script は MIT ライセンスで公開。二重UIを避けた構造とストリーム中のプレースホルダーを同封しています。
-                </p>
+                  </pre>
+                  <p className="mt-3 text-xs text-premium-muted">
+                    Script は MIT ライセンスで公開。二重UIを避けた構造とストリーム中のプレースホルダーを同封しています。
+                  </p>
+                </div>
               </div>
             </section>
 
@@ -535,42 +551,44 @@ export default function Home() {
               className="section-fade border-t border-premium-stroke/60 pt-14"
               style={{ animationDelay: '0.6s' }}
             >
-              <SectionHeading
-                eyebrow="PRICING"
-                title="初期導入（30〜60万円）＋月次費用の二段構成"
-                description="標準は１案件あたり30〜60万円でセットアップ。その後は毎月の手数料とAPI実費をご請求します。"
-              />
-              <div className="grid gap-4 md:grid-cols-3">
-                {PRICING_PLANS.map((plan) => (
-                  <div
-                    key={plan.name}
-                    className="rounded-2xl border border-premium-stroke/60 bg-premium-card/30 p-6"
-                  >
-                    {plan.tag && (
-                      <span className="inline-flex rounded-full border border-premium-stroke/60 px-3 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.3em] text-premium-muted">
-                        {plan.tag}
-                      </span>
-                    )}
-                    <h3 className="mt-3 text-2xl font-semibold">{plan.name}</h3>
-                    <p className="mt-1 text-sm text-premium-muted">{plan.description}</p>
-                    <p className="mt-4 text-2xl font-semibold text-premium-accent">{plan.price}</p>
-                    <ul className="mt-4 space-y-2 text-sm text-premium-muted">
-                      {plan.features.map((feature) => (
-                        <li key={feature} className="flex items-center gap-2">
-                          <span className="text-premium-accent">✓</span>
-                          <span>{feature}</span>
-                        </li>
-                      ))}
-                    </ul>
-                    {plan.cta && (
-                      <Link href={plan.cta.href} className="mt-6 block">
-                        <Button className="w-full" size="full" variant="secondary">
-                          {plan.cta.label}
-                        </Button>
-                      </Link>
-                    )}
-                  </div>
-                ))}
+              <div className="rounded-[32px] border border-premium-stroke/40 bg-premium-card/20 px-6 py-8 sm:px-8">
+                <SectionHeading
+                  eyebrow="PRICING"
+                  title="初期導入（30〜60万円）＋月次費用の二段構成"
+                  description="標準は１案件あたり30〜60万円でセットアップ。その後は毎月の手数料とAPI実費をご請求します。"
+                />
+                <div className="grid gap-4 md:grid-cols-3">
+                  {PRICING_PLANS.map((plan) => (
+                    <div
+                      key={plan.name}
+                      className="rounded-2xl border border-premium-stroke/60 bg-premium-card/30 p-6"
+                    >
+                      {plan.tag && (
+                        <span className="inline-flex rounded-full border border-premium-stroke/60 px-3 py-1 text-[0.62rem] font-semibold uppercase tracking-[0.3em] text-premium-muted">
+                          {plan.tag}
+                        </span>
+                      )}
+                      <h3 className="mt-3 text-2xl font-semibold">{plan.name}</h3>
+                      <p className="mt-1 text-sm text-premium-muted">{plan.description}</p>
+                      <p className="mt-4 text-2xl font-semibold text-premium-accent">{plan.price}</p>
+                      <ul className="mt-4 space-y-2 text-sm text-premium-muted">
+                        {plan.features.map((feature) => (
+                          <li key={feature} className="flex items-center gap-2">
+                            <span className="text-premium-accent">✓</span>
+                            <span>{feature}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      {plan.cta && (
+                        <Link href={plan.cta.href} className="mt-6 block">
+                          <Button className="w-full" size="full" variant="secondary">
+                            {plan.cta.label}
+                          </Button>
+                        </Link>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
             </section>
 
@@ -579,32 +597,34 @@ export default function Home() {
               className="section-fade border-t border-premium-stroke/60 pt-14"
               style={{ animationDelay: '0.66s' }}
             >
-              <SectionHeading
-                eyebrow="FAQ"
-                title="初期費用＋月次費用まわりの質問"
-                description="運用モデル、API実費、契約期間などよく聞かれる内容をまとめました。その他は heartssh@gmail.com まで。"
-              />
-              <div className="space-y-3">
-                {FAQ_ITEMS.map((faq, idx) => {
-                  const isOpen = openFaqIndex === idx;
-                  return (
-                    <button
-                      key={faq.question}
-                      type="button"
-                      onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
-                      className="w-full rounded-2xl border border-premium-stroke/60 bg-premium-card/30 px-4 py-4 text-left text-sm text-premium-muted transition hover:border-premium-accent/60"
-                    >
-                      <div className="flex items-center justify-between">
-                        <p className="font-semibold text-premium-text">
-                          <span className="mr-3 text-premium-muted">Q{String(idx + 1).padStart(2, '0')}.</span>
-                          {faq.question}
-                        </p>
-                        <span>{isOpen ? '−' : '+'}</span>
-                      </div>
-                      {isOpen && <p className="mt-2 text-premium-muted leading-relaxed">{faq.answer}</p>}
-                    </button>
-                  );
-                })}
+              <div className="rounded-[32px] border border-premium-stroke/40 bg-premium-card/20 px-6 py-8 sm:px-8">
+                <SectionHeading
+                  eyebrow="FAQ"
+                  title="初期費用＋月次費用まわりの質問"
+                  description="運用モデル、API実費、契約期間などよく聞かれる内容をまとめました。その他は heartssh@gmail.com まで。"
+                />
+                <div className="space-y-3">
+                  {FAQ_ITEMS.map((faq, idx) => {
+                    const isOpen = openFaqIndex === idx;
+                    return (
+                      <button
+                        key={faq.question}
+                        type="button"
+                        onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
+                        className="w-full rounded-2xl border border-premium-stroke/60 bg-premium-card/30 px-4 py-4 text-left text-sm text-premium-muted transition hover:border-premium-accent/60"
+                      >
+                        <div className="flex items-center justify-between">
+                          <p className="font-semibold text-premium-text">
+                            <span className="mr-3 text-premium-muted">Q{String(idx + 1).padStart(2, '0')}.</span>
+                            {faq.question}
+                          </p>
+                          <span>{isOpen ? '−' : '+'}</span>
+                        </div>
+                        {isOpen && <p className="mt-2 text-premium-muted leading-relaxed">{faq.answer}</p>}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </section>
 
@@ -640,7 +660,7 @@ export default function Home() {
 
           <footer className="mt-16 border-t border-premium-stroke/60 pt-6 text-xs text-premium-muted">
             <p>© {new Date().getFullYear()} WEBGPT. This LP and embed UI are MIT Licensed.</p>
-            <p className="mt-2">サイト全体が catnose x WEBGPT のカラーガイドに基づいています。</p>
+            <p className="mt-2">カラーやレイアウトは WEBGPT の独自ガイドラインに沿って設計しています。</p>
           </footer>
         </div>
     </Layout>
@@ -665,7 +685,7 @@ function SectionHeading({ eyebrow, title, description, action, align = 'left' }:
         } ${action ? 'sm:flex-row sm:items-end sm:justify-between' : ''}`}
       >
         <div className={align === 'center' ? 'max-w-2xl' : 'w-full'}>
-          <h2 className="text-3xl font-semibold text-premium-text">{title}</h2>
+          <h2 className="font-display text-3xl font-semibold text-premium-text">{title}</h2>
           {description && <p className="mt-2 text-sm text-premium-muted leading-relaxed">{description}</p>}
         </div>
         {action && (

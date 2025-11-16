@@ -93,13 +93,9 @@ export default async function handler(
       p_action: 'chat',
     });
 
-    if (quotaError || !quotaCheck) {
-      console.error('[Embed Chat API] Quota check error:', quotaError);
-      return res.status(500).json({ message: 'Failed to check quota' });
-    }
-
-    if (!quotaCheck) {
-      // クォータ超過
+    if (quotaError) {
+      console.warn('[Embed Chat API] Quota check error (allowing request):', quotaError);
+    } else if (quotaCheck === false || quotaCheck === null) {
       return res.status(403).json({
         message: 'Quota exceeded',
         error: 'このサイトのチャット上限に達しました。',
@@ -331,5 +327,4 @@ export default async function handler(
     });
   }
 }
-
 

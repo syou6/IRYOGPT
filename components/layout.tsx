@@ -74,7 +74,7 @@ export default function Layout({ children, showShellHeader = true, fullWidth = f
         </main>
       </div>
       <Script
-        src="/api/embed/script?site_id=fe8aba45-7a35-41a5-9e57-9fbb88224c03&v=20250209"
+        src="http://localhost:3000/api/embed/script?site_id=fe8aba45-7a35-41a5-9e57-9fbb88224c03"
         strategy="afterInteractive"
       />
     </div>

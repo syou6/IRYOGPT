@@ -2,11 +2,11 @@ import clsx from 'clsx';
 import { ButtonHTMLAttributes, forwardRef } from 'react';
 
 const BASE_CLASS =
-  'inline-flex items-center justify-center rounded-full font-semibold leading-tight whitespace-nowrap transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-premium-accent/60 disabled:cursor-not-allowed disabled:opacity-60';
+  'inline-flex items-center justify-center rounded-full font-semibold leading-tight whitespace-nowrap tracking-[0.08em] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-premium-accent/40 disabled:cursor-not-allowed disabled:opacity-60';
 
 const VARIANTS = {
   primary:
-    'bg-gradient-to-r from-premium-accent via-premium-accentGlow to-premium-accent text-black shadow-glow hover:-translate-y-0.5',
+    'bg-gradient-to-r from-premium-accent via-premium-accentGlow to-premium-accent text-premium-base shadow-glow hover:shadow-premium',
   secondary:
     'border border-premium-stroke/60 bg-premium-surface/80 text-premium-text hover:border-premium-accent/70',
   ghost: 'text-premium-text hover:text-premium-accent',

@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@200;400;600;800&family=IBM+Plex+Mono:wght@200;400;600&family=IBM+Plex+Sans:wght@100;300;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -21,12 +23,50 @@
   body {
     background-color: var(--color-base);
     color: var(--color-text);
-    font-family: 'Inter', 'SF Pro Display', 'SF Pro Text', -apple-system, BlinkMacSystemFont,
+    font-family: 'IBM Plex Sans', 'Inter', 'SF Pro Display', 'SF Pro Text', -apple-system,
+      BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  }
+
+  .font-display {
+    font-family: 'Bricolage Grotesque', 'Inter', 'Söhne', -apple-system, BlinkMacSystemFont,
       'Segoe UI', sans-serif;
+    letter-spacing: -0.01em;
+  }
+
+  .font-plex-sans {
+    font-family: 'IBM Plex Sans', 'Inter', 'Söhne', -apple-system, BlinkMacSystemFont, 'Segoe UI',
+      sans-serif;
+  }
+
+  .font-plex-mono {
+    font-family: 'IBM Plex Mono', 'SFMono-Regular', 'Consolas', 'Liberation Mono', monospace;
   }
 
   ::selection {
     background-color: var(--color-accent);
     color: #041009;
+  }
+}
+
+@layer utilities {
+  @keyframes fade-up {
+    0% {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .animate-fade-up {
+    animation: fade-up 0.75s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 0;
+  }
+
+  .section-fade {
+    animation: fade-up 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    opacity: 0;
   }
 }

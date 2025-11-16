@@ -124,6 +124,12 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
 
   const widgetHTML = [
     '<div class="sgpt-widget" id="webgpt-widget">',
+    '  <button class="sgpt-fab" id="webgpt-toggle-btn" type="button" aria-expanded="false" aria-label="WEBGPTと会話する">💬</button>',
+    '</div>'
+  ].join('');
+
+  const chatPanelTemplate = [
+    '<div class="sgpt-panel-slot" id="webgpt-panel-slot">',
     '  <div class="sgpt-chat-panel" id="webgpt-chat-container">',
     '    <div class="sgpt-chat-header">',
     '      <div>',
@@ -139,7 +145,6 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     '    </div>',
     '    <div class="sgpt-footer">Powered by WEBGPT</div>',
     '  </div>',
-    '  <button class="sgpt-fab" id="webgpt-toggle-btn">💬</button>',
     '</div>'
   ].join('');
 
@@ -148,37 +153,72 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
   document.body.appendChild(wrapper);
 
   const widget = document.getElementById('webgpt-widget');
-  const chatContainer = document.getElementById('webgpt-chat-container');
   const toggleBtn = document.getElementById('webgpt-toggle-btn');
-  const closeBtn = document.getElementById('webgpt-close-btn');
-  const messagesDiv = document.getElementById('webgpt-messages');
-  const stickySlot = document.createElement('div');
-  stickySlot.className = 'sgpt-sticky-slot';
-  const stickyQuestionWrap = document.createElement('div');
-  stickyQuestionWrap.className = 'sgpt-sticky-question';
-  const thinkingIndicator = document.createElement('div');
-  thinkingIndicator.className = 'sgpt-sticky-indicator';
-  thinkingIndicator.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg><span>考えています…</span>';
-  stickySlot.appendChild(stickyQuestionWrap);
-  stickySlot.appendChild(thinkingIndicator);
-  chatContainer?.insertBefore(stickySlot, messagesDiv);
-  const inputField = document.getElementById('webgpt-input');
-  const sendBtn = document.getElementById('webgpt-send-btn');
-  const scrollHint = document.createElement('button');
-  scrollHint.className = 'sgpt-scroll-hint';
-  scrollHint.setAttribute('type', 'button');
-  scrollHint.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg><span>下へスクロール</span>';
-  chatContainer?.appendChild(scrollHint);
 
-  function getInputElement() {
-    const el = document.getElementById('webgpt-input');
-    return el && el instanceof HTMLInputElement ? el : null;
-  }
-
+  let chatContainer = null;
+  let panelSlot = null;
+  let closeBtn = null;
+  let messagesDiv = null;
+  let stickySlot = null;
+  let stickyQuestionWrap = null;
+  let thinkingIndicator = null;
+  let inputField = null;
+  let sendBtn = null;
+  let scrollHint = null;
   let autoScroll = true;
 
+  function ensureChatMounted() {
+    if (!widget || panelSlot) return;
+    widget.insertAdjacentHTML('beforeend', chatPanelTemplate);
+    panelSlot = document.getElementById('webgpt-panel-slot');
+    chatContainer = document.getElementById('webgpt-chat-container');
+    closeBtn = document.getElementById('webgpt-close-btn');
+    messagesDiv = document.getElementById('webgpt-messages');
+    inputField = document.getElementById('webgpt-input');
+    sendBtn = document.getElementById('webgpt-send-btn');
+    scrollHint = document.createElement('button');
+    scrollHint.className = 'sgpt-scroll-hint';
+    scrollHint.setAttribute('type', 'button');
+    scrollHint.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg><span>下へスクロール</span>';
+    chatContainer?.appendChild(scrollHint);
+
+    stickySlot = document.createElement('div');
+    stickySlot.className = 'sgpt-sticky-slot';
+    stickyQuestionWrap = document.createElement('div');
+    stickyQuestionWrap.className = 'sgpt-sticky-question';
+    thinkingIndicator = document.createElement('div');
+    thinkingIndicator.className = 'sgpt-sticky-indicator';
+    thinkingIndicator.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/><circle cx="5" cy="12" r="1"/></svg><span>考えています…</span>';
+    stickySlot.appendChild(stickyQuestionWrap);
+    stickySlot.appendChild(thinkingIndicator);
+    chatContainer?.insertBefore(stickySlot, messagesDiv || null);
+
+    closeBtn && closeBtn.addEventListener('click', () => toggleChat(false));
+    sendBtn && sendBtn.addEventListener('click', () => sendMessage());
+    if (inputField) {
+      inputField.addEventListener('keypress', function (event) {
+        if (event.key === 'Enter' && !event.shiftKey) {
+          event.preventDefault();
+          sendMessage();
+        }
+      });
+    }
+    if (scrollHint) {
+      scrollHint.addEventListener('click', () => {
+        autoScroll = true;
+        scrollHint.classList.remove('is-visible');
+        scrollToBottom({ smooth: true });
+      });
+    }
+    messagesDiv && messagesDiv.addEventListener('scroll', updateScrollHint);
+  }
+
+  function getInputElement() {
+    return inputField && inputField instanceof HTMLInputElement ? inputField : null;
+  }
+
   function updateScrollHint() {
-    if (!messagesDiv) return;
+    if (!messagesDiv || !scrollHint) return;
     const nearBottom = messagesDiv.scrollHeight - (messagesDiv.scrollTop + messagesDiv.clientHeight) < 40;
     if (nearBottom) {
       scrollHint.classList.remove('is-visible');
@@ -189,25 +229,18 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     }
   }
 
-  if (messagesDiv) {
-    messagesDiv.addEventListener('scroll', updateScrollHint);
-  }
-
   function scrollToBottom(options = { smooth: true }) {
     if (!messagesDiv) return;
     const behavior = options.smooth ? 'smooth' : 'auto';
     messagesDiv.scrollTo({ top: messagesDiv.scrollHeight, behavior });
   }
 
-  scrollHint.addEventListener('click', () => {
-    autoScroll = true;
-    scrollHint.classList.remove('is-visible');
-    scrollToBottom({ smooth: true });
-  });
-
   function toggleChat(open) {
-    if (!widget || !chatContainer) return;
+    if (!widget) return;
     const shouldOpen = typeof open === 'boolean' ? open : !widget.classList.contains('is-open');
+    if (shouldOpen) {
+      ensureChatMounted();
+    }
     widget.classList.toggle('is-open', shouldOpen);
     const inputEl = getInputElement();
     if (shouldOpen && inputEl) {
@@ -219,9 +252,6 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
   if (toggleBtn) {
     toggleBtn.addEventListener('click', () => toggleChat());
   }
-  if (closeBtn) {
-    closeBtn.addEventListener('click', () => toggleChat(false));
-  }
 
   function addMessage(text, isUser, sources) {
     if (!messagesDiv) return;
@@ -230,7 +260,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     
     if (isUser) {
       messageDiv.textContent = text;
-      if (stickySlot) {
+      if (stickySlot && stickyQuestionWrap && thinkingIndicator) {
         stickyQuestionWrap.innerHTML = '';
         stickyQuestionWrap.appendChild(messageDiv.cloneNode(true));
         stickySlot.classList.add('active');
@@ -238,7 +268,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
       }
       messagesDiv.appendChild(messageDiv);
       autoScroll = true;
-      scrollHint.classList.remove('is-visible');
+      scrollHint && scrollHint.classList.remove('is-visible');
       scrollToBottom({ smooth: true });
       return;
     }
@@ -280,7 +310,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     if (autoScroll) {
       scrollToBottom({ smooth: true });
     } else {
-      scrollHint.classList.add('is-visible');
+      scrollHint && scrollHint.classList.add('is-visible');
     }
   }
 
@@ -296,6 +326,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
   }
 
   function sendMessage() {
+    ensureChatMounted();
     const inputEl = getInputElement();
     if (!inputEl) return;
     const question = inputEl.value.trim();
@@ -442,23 +473,13 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
       
       messageDiv.appendChild(sourcesDiv);
     }
-    thinkingIndicator.style.display = 'none';
+    if (thinkingIndicator) {
+      thinkingIndicator.style.display = 'none';
+    }
     if (autoScroll) {
       scrollToBottom({ smooth: false });
     }
     updateScrollHint();
-  }
-
-  if (sendBtn) {
-    sendBtn.addEventListener('click', sendMessage);
-  }
-  if (inputField) {
-    inputField.addEventListener('keypress', function(e) {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        sendMessage();
-      }
-    });
   }
 
   window.WebGPTEmbed = {

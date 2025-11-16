@@ -313,6 +313,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
         if (autoScroll) {
           scrollToBottom({ smooth: true });
         }
+        updateStreamingMessage(streamingMessageDiv, '▌ WEBGPT が回答を準備しています...', []);
       }
 
       const reader = response.body.getReader();

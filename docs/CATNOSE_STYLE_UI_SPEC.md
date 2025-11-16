@@ -1,18 +1,18 @@
 # catnose 風ダークテーマ UI の仕様書
 
-（Team Blog Hub / timeline ベース、WebGPTカラーパレット適用版）
+（Team Blog Hub / timeline ベース、WebGPT カラーパレット適用版）
 
 ## 0. コンセプト
 
-* ベースは **ダークグリーン + 白 + アクセント1色（エメラルドグリーン）** のミニマル構成。
+- ベースは **ダークグリーン + 白 + アクセント 1 色（エメラルドグリーン）** のミニマル構成。
 
-* 余白は広め、要素は少なめで「静か・落ち着いている」ことを最優先。
+- 余白は広め、要素は少なめで「静か・落ち着いている」ことを最優先。
 
-* 装飾より **タイポグラフィとカードの構成** で見せる。
+- 装飾より **タイポグラフィとカードの構成** で見せる。
 
-* UI の「動き」はほんの少し（hover でちょっと明るくなる程度）。
+- UI の「動き」はほんの少し（hover でちょっと明るくなる程度）。
 
-* **色は現在のWebGPTのpremium.*カラーパレット（エメラルドグリーン系）を維持**。
+- **色は現在の WebGPT の premium.\*カラーパレット（エメラルドグリーン系）を維持**。
 
 ---
 
@@ -20,131 +20,131 @@
 
 ### 1-1. カラー
 
-現在のWebGPTのTailwind設定（`tailwind.config.cjs`）をベースに、catnose風の構造に適用します。
+現在の WebGPT の Tailwind 設定（`tailwind.config.cjs`）をベースに、catnose 風の構造に適用します。
 
 ```css
 /* Tailwindのpremium.*トークン（現在の設定） */
 :root {
-  --premium-base: #040607;              /* ページ背景（深い黒） */
-  --premium-surface: #0B1410;            /* カード背景（深緑がかった黒） */
-  --premium-elevated: #131F1A;           /* 浮いたカード背景 */
+  --premium-base: #040607; /* ページ背景（深い黒） */
+  --premium-surface: #0b1410; /* カード背景（深緑がかった黒） */
+  --premium-elevated: #131f1a; /* 浮いたカード背景 */
   --premium-card: rgba(11, 20, 16, 0.82); /* カード背景（半透明） */
-  --premium-stroke: #1F2A23;             /* 枠線・区切り線 */
-  --premium-accent: #19C37D;             /* アクセント（エメラルドグリーン） */
-  --premium-accentDeep: #0F8A5F;         /* アクセント（深いエメラルド） */
-  --premium-accentGlow: #7AF4C1;         /* アクセント（明るいエメラルド） */
-  --premium-text: #F5F7F4;               /* メインテキスト（白） */
-  --premium-muted: #8BA39B;              /* サブテキスト・メタ情報 */
+  --premium-stroke: #1f2a23; /* 枠線・区切り線 */
+  --premium-accent: #19c37d; /* アクセント（エメラルドグリーン） */
+  --premium-accentDeep: #0f8a5f; /* アクセント（深いエメラルド） */
+  --premium-accentGlow: #7af4c1; /* アクセント（明るいエメラルド） */
+  --premium-text: #f5f7f4; /* メインテキスト（白） */
+  --premium-muted: #8ba39b; /* サブテキスト・メタ情報 */
 }
 ```
 
-**Tailwindクラスでの使用例:**
+**Tailwind クラスでの使用例:**
 
-| 役割               | Tailwindクラス例                      | 備考                              |
-| ---------------- | ----------------------------------- | ------------------------------- |
-| ページ背景            | `bg-premium-base`                   | 全体の背景色                         |
-| 浮いたカード背景         | `bg-premium-surface` または `bg-premium-elevated` | カード・Surfaceコンポーネント          |
-| メインテキスト          | `text-premium-text`                 | 見出し・本文                          |
-| サブテキスト・メタ情報      | `text-premium-muted`                 | 日付・説明文・ラベル                     |
-| 枠線・区切り線          | `border-premium-stroke`              | カードのボーダー、セクション区切り            |
-| アクセント背景（Badge等）  | `bg-premium-accent`                  | バッジ・ボタン（アクティブ）                 |
-| アクセントテキスト・hover色 | `text-premium-accent` または `text-premium-accentGlow` | リンク・ホバー状態                       |
+| 役割                         | Tailwind クラス例                                      | 備考                               |
+| ---------------------------- | ------------------------------------------------------ | ---------------------------------- |
+| ページ背景                   | `bg-premium-base`                                      | 全体の背景色                       |
+| 浮いたカード背景             | `bg-premium-surface` または `bg-premium-elevated`      | カード・Surface コンポーネント     |
+| メインテキスト               | `text-premium-text`                                    | 見出し・本文                       |
+| サブテキスト・メタ情報       | `text-premium-muted`                                   | 日付・説明文・ラベル               |
+| 枠線・区切り線               | `border-premium-stroke`                                | カードのボーダー、セクション区切り |
+| アクセント背景（Badge 等）   | `bg-premium-accent`                                    | バッジ・ボタン（アクティブ）       |
+| アクセントテキスト・hover 色 | `text-premium-accent` または `text-premium-accentGlow` | リンク・ホバー状態                 |
 
 **ルール:**
 
-* ページ全体は `bg-premium-base` 一色で塗る。
+- ページ全体は `bg-premium-base` 一色で塗る。
 
-* コンテンツの箱（Surface/Card）は必ず `bg-premium-surface` または `bg-premium-elevated` を使う。
+- コンテンツの箱（Surface/Card）は必ず `bg-premium-surface` または `bg-premium-elevated` を使う。
 
-* テキストカラーは **基本 `text-premium-text`**、補足は `text-premium-muted` のみ。色を増やさない。
+- テキストカラーは **基本 `text-premium-text`**、補足は `text-premium-muted` のみ。色を増やさない。
 
-* アクセント色（エメラルドグリーン）は
+- アクセント色（エメラルドグリーン）は
 
-  * リンク・バッジ・小さなボタンだけに限定する（乱用しない）。
+  - リンク・バッジ・小さなボタンだけに限定する（乱用しない）。
 
-  * hover時は `text-premium-accentGlow` や `bg-premium-accent/20` など透明度を活用。
+  - hover 時は `text-premium-accentGlow` や `bg-premium-accent/20` など透明度を活用。
 
 ---
 
 ### 1-2. タイポグラフィ
 
-厳密な px 値はソースから取れないので、**catnose風のバランス**を Tailwind に落とした推奨値です。
+厳密な px 値はソースから取れないので、**catnose 風のバランス**を Tailwind に落とした推奨値です。
 
 **フォントファミリー**
 
-* 現在の設定を維持: `font-sans`（Inter, Söhne, system-ui 系）
+- 現在の設定を維持: `font-sans`（Inter, Söhne, system-ui 系）
 
-  * `Inter, Söhne, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif`
+  - `Inter, Söhne, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif`
 
 **フォントサイズ（目安）**
 
-| 用途            | Tailwind の例      | 備考                              |
-| ------------- | ---------------- | ------------------------------- |
+| 用途                   | Tailwind の例     | 備考                                  |
+| ---------------------- | ----------------- | ------------------------------------- |
 | ページタイトル（Hero） | `text-4xl`〜`5xl` | Team Blog Hub / timeline っぽい大きさ |
-| セクションタイトル     | `text-xl`〜`2xl`  | `Members`, `Articles` など        |
-| カードタイトル（記事）   | `text-lg`        | `font-semibold`                 |
-| 本文            | `text-sm`〜`base` | 行間は `leading-relaxed`           |
-| メタ情報・日付       | `text-xs`        | `text-premium-muted`          |
+| セクションタイトル     | `text-xl`〜`2xl`  | `Members`, `Articles` など            |
+| カードタイトル（記事） | `text-lg`         | `font-semibold`                       |
+| 本文                   | `text-sm`〜`base` | 行間は `leading-relaxed`              |
+| メタ情報・日付         | `text-xs`         | `text-premium-muted`                  |
 
 **その他ルール**
 
-* 行間は必ず広め（`leading-relaxed` 以上）。
+- 行間は必ず広め（`leading-relaxed` 以上）。
 
-* セクションタイトルは **全部小文字 or 単語先頭だけ大文字**など統一する。
+- セクションタイトルは **全部小文字 or 単語先頭だけ大文字**など統一する。
 
-* マイクロコピーは短く：`See Details →`, `Articles`, `Members` のようにシンプル。
+- マイクロコピーは短く：`See Details →`, `Articles`, `Members` のようにシンプル。
 
-* ラベルは `text-xs uppercase tracking-[0.2em] text-premium-muted` で統一。
+- ラベルは `text-xs uppercase tracking-[0.2em] text-premium-muted` で統一。
 
 ---
 
 ### 1-3. スペーシング
 
-catnose風の「距離感」を数値化したイメージです。
+catnose 風の「距離感」を数値化したイメージです。
 
 **ページ全体**
 
-* ページ上部余白: `py-8`〜`py-12`
+- ページ上部余白: `py-8`〜`py-12`
 
-* セクション間余白: `py-10`〜`py-12`
+- セクション間余白: `py-10`〜`py-12`
 
-* コンテンツ左右マージン: `px-4 sm:px-6 lg:px-8`
+- コンテンツ左右マージン: `px-4 sm:px-6 lg:px-8`
 
-* コンテナ最大幅: `max-w-3xl`〜`max-w-4xl`（だいたい 720〜960px くらい）
+- コンテナ最大幅: `max-w-3xl`〜`max-w-4xl`（だいたい 720〜960px くらい）
 
 **カード内**
 
-* 上下: `py-4`〜`py-5`
+- 上下: `py-4`〜`py-5`
 
-* 左右: `px-4`〜`px-5`
+- 左右: `px-4`〜`px-5`
 
-* カード同士の縦間隔（Articles）：`space-y-3`〜`space-y-4`
+- カード同士の縦間隔（Articles）：`space-y-3`〜`space-y-4`
 
 ---
 
 ### 1-4. 角丸・ボーダー・シャドウ
 
-catnose風の見え方ベース。
+catnose 風の見え方ベース。
 
-* カードの角丸: `rounded-xl`〜`rounded-2xl`
+- カードの角丸: `rounded-xl`〜`rounded-2xl`
 
-* Badge / Chip: `rounded-full`
+- Badge / Chip: `rounded-full`
 
-* ボーダー:
+- ボーダー:
 
-  * `border border-premium-stroke/40` または `border-premium-stroke/60`
+  - `border border-premium-stroke/40` または `border-premium-stroke/60`
 
-  * ページの区切り線は `border-t border-premium-stroke/60`
+  - ページの区切り線は `border-t border-premium-stroke/60`
 
-* シャドウ:
+- シャドウ:
 
-  * ほぼ使わない or ごく控えめ
+  - ほぼ使わない or ごく控えめ
 
-  * Tailwind なら `shadow-sm`〜`shadow-md` 程度
+  - Tailwind なら `shadow-sm`〜`shadow-md` 程度
 
-  * 影ではなく **背景色の差 + ボーダー** で段差を作る思想
+  - 影ではなく **背景色の差 + ボーダー** で段差を作る思想
 
-  * 現在の `shadow-premium` や `shadow-glow` は控えめに使用
+  - 現在の `shadow-premium` や `shadow-glow` は控えめに使用
 
 ---
 
@@ -156,31 +156,31 @@ Team Blog Hub デモから構造を抽出すると：
 
 1. **ヘッダー**
 
-   * 左: ロゴ（丸アイコン）
+   - 左: ロゴ（丸アイコン）
 
-   * 右: テキストリンク `About / Company / GitHub`
+   - 右: テキストリンク `About / Company / GitHub`
 
-   * 高さはそこまで高くない（`py-3`〜`py-4`）
+   - 高さはそこまで高くない（`py-3`〜`py-4`）
 
 2. **Hero**
 
-   * `h1`: サイト名（例: Team Blog Hub）
+   - `h1`: サイト名（例: Team Blog Hub）
 
-   * `p`: サブタイトル（1〜2行）
+   - `p`: サブタイトル（1〜2 行）
 
-   * Hero 全体は中央寄せ、上下に広い余白 (`py-8`〜`py-10`)
+   - Hero 全体は中央寄せ、上下に広い余白 (`py-8`〜`py-10`)
 
 3. **セクション（Members / Articles）**
 
-   * セクションヘッダー行：
+   - セクションヘッダー行：
 
-     * 左: `h2`（セクション名）
+     - 左: `h2`（セクション名）
 
-     * 右: 小さなリンク `See Details →`
+     - 右: 小さなリンク `See Details →`
 
-   * ヘッダーの下にコンテンツ（カード or リスト）
+   - ヘッダーの下にコンテンツ（カード or リスト）
 
-**Tailwind 例（WebGPTカラー適用）**
+**Tailwind 例（WebGPT カラー適用）**
 
 ```tsx
 <div className="min-h-screen bg-premium-base text-premium-text">
@@ -193,10 +193,16 @@ Team Blog Hub デモから構造を抽出すると：
       </div>
       {/* Nav Links */}
       <nav className="flex gap-6">
-        <a href="#" className="text-sm text-premium-muted hover:text-premium-accentGlow transition">
+        <a
+          href="#"
+          className="text-sm text-premium-muted hover:text-premium-accentGlow transition"
+        >
           About
         </a>
-        <a href="#" className="text-sm text-premium-muted hover:text-premium-accentGlow transition">
+        <a
+          href="#"
+          className="text-sm text-premium-muted hover:text-premium-accentGlow transition"
+        >
           Dashboard
         </a>
       </nav>
@@ -221,21 +227,21 @@ Team Blog Hub デモから構造を抽出すると：
 
 ### 2-2. Members セクション
 
-* `Members` のタイトル + `See Details →` のリンク行。
+- `Members` のタイトル + `See Details →` のリンク行。
 
-* 下に、メンバーカードを横に並べるレイアウト。
+- 下に、メンバーカードを横に並べるレイアウト。
 
-**メンバーカード仕様（WebGPTカラー適用）**
+**メンバーカード仕様（WebGPT カラー適用）**
 
-* 横幅：固定 200〜240px 程度（`w-52`〜`w-60`）
+- 横幅：固定 200〜240px 程度（`w-52`〜`w-60`）
 
-* 要素構造：
+- 要素構造：
 
-  * 丸いアバター
+  - 丸いアバター
 
-  * 名前（太字）
+  - 名前（太字）
 
-  * ロール（薄いグレーの小さな文字）
+  - ロール（薄いグレーの小さな文字）
 
 Tailwind っぽく書くと：
 
@@ -244,7 +250,10 @@ Tailwind っぽく書くと：
   {/* セクションヘッダー */}
   <div className="mb-6 flex items-center justify-between">
     <h2 className="text-xl font-semibold">Members</h2>
-    <a href="#" className="text-xs text-premium-muted hover:text-premium-accentGlow transition">
+    <a
+      href="#"
+      className="text-xs text-premium-muted hover:text-premium-accentGlow transition"
+    >
       See Details →
     </a>
   </div>
@@ -265,35 +274,35 @@ Tailwind っぽく書くと：
 
 ### 2-3. Articles セクション
 
-* `Articles` タイトル行の下に、記事カードが縦に並ぶ。
+- `Articles` タイトル行の下に、記事カードが縦に並ぶ。
 
 **各記事カードの構造**
 
 1. 一番上: メタ
 
-   * `Author · 6 days ago` のような文
+   - `Author · 6 days ago` のような文
 
-   * `text-xs text-premium-muted`
+   - `text-xs text-premium-muted`
 
 2. タイトル:
 
-   * `a` 要素で全体がクリックできる
+   - `a` 要素で全体がクリックできる
 
-   * `text-lg font-semibold`
+   - `text-lg font-semibold`
 
 3. 場合によっては右上に `NEW` Badge
 
-**見た目のルール（WebGPTカラー適用）**
+**見た目のルール（WebGPT カラー適用）**
 
-* カード背景: `bg-premium-surface` または `bg-premium-elevated`
+- カード背景: `bg-premium-surface` または `bg-premium-elevated`
 
-* 角丸大きめ + 薄い border: `rounded-xl border border-premium-stroke/40`
+- 角丸大きめ + 薄い border: `rounded-xl border border-premium-stroke/40`
 
-* hover:
+- hover:
 
-  * `bg-premium-surface` → `bg-premium-elevated`
+  - `bg-premium-surface` → `bg-premium-elevated`
 
-  * `border-premium-stroke/40` → `border-premium-accent/30`
+  - `border-premium-stroke/40` → `border-premium-accent/30`
 
 **実装例:**
 
@@ -302,17 +311,21 @@ Tailwind っぽく書くと：
   {/* セクションヘッダー */}
   <div className="mb-6 flex items-center justify-between">
     <h2 className="text-xl font-semibold">Articles</h2>
-    <a href="#" className="text-xs text-premium-muted hover:text-premium-accentGlow transition">
+    <a
+      href="#"
+      className="text-xs text-premium-muted hover:text-premium-accentGlow transition"
+    >
       See Details →
     </a>
   </div>
 
   {/* 記事カードリスト */}
   <div className="space-y-4">
-    <a href="#" className="block rounded-xl bg-premium-surface border border-premium-stroke/40 p-5 transition hover:bg-premium-elevated hover:border-premium-accent/30">
-      <div className="mb-2 text-xs text-premium-muted">
-        Author · 6 days ago
-      </div>
+    <a
+      href="#"
+      className="block rounded-xl bg-premium-surface border border-premium-stroke/40 p-5 transition hover:bg-premium-elevated hover:border-premium-accent/30"
+    >
+      <div className="mb-2 text-xs text-premium-muted">Author · 6 days ago</div>
       <h3 className="text-lg font-semibold text-premium-text">
         Article Title Here
       </h3>
@@ -330,21 +343,21 @@ timeline のスクショから読み取れる構造：
 
 1. **Hero**（左寄せ）
 
-   * `Hi, I'm catnose`（大きな見出し）
+   - `Hi, I'm catnose`（大きな見出し）
 
-   * 1〜2段落の自己紹介文
+   - 1〜2 段落の自己紹介文
 
-   * 下に細いボーダーで区切り
+   - 下に細いボーダーで区切り
 
 2. **タイムライン**
 
-   * 左側に縦線（`border-l`）
+   - 左側に縦線（`border-l`）
 
-   * 年ごとに pill バッジ `2021` など
+   - 年ごとに pill バッジ `2021` など
 
-   * その右に各イベント（記事、登壇など）
+   - その右に各イベント（記事、登壇など）
 
-Tailwind での骨組み例（WebGPTカラー適用）：
+Tailwind での骨組み例（WebGPT カラー適用）：
 
 ```tsx
 <div className="mb-12">
@@ -390,27 +403,27 @@ Tailwind での骨組み例（WebGPTカラー適用）：
 
 **Surface（大きな箱、チャット全体など）**
 
-* 背景: `bg-premium-surface` または `bg-premium-elevated`
+- 背景: `bg-premium-surface` または `bg-premium-elevated`
 
-* 枠線: `border border-premium-stroke/40`
+- 枠線: `border border-premium-stroke/40`
 
-* 角丸: `rounded-3xl` くらいまで大きくしても良い
+- 角丸: `rounded-3xl` くらいまで大きくしても良い
 
-* パディング: `p-5`〜`p-6`
+- パディング: `p-5`〜`p-6`
 
 **Card（Members / Articles / Timeline イベント）**
 
-* 背景: `bg-premium-surface`
+- 背景: `bg-premium-surface`
 
-* 枠線: `border border-premium-stroke/40`
+- 枠線: `border border-premium-stroke/40`
 
-* 角丸: `rounded-xl` or `rounded-2xl`
+- 角丸: `rounded-xl` or `rounded-2xl`
 
-* hover:
+- hover:
 
-  * `bg-premium-surface` → `bg-premium-elevated`
+  - `bg-premium-surface` → `bg-premium-elevated`
 
-  * `border-premium-stroke/40` → `border-premium-accent/30`
+  - `border-premium-stroke/40` → `border-premium-accent/30`
 
 **実装例:**
 
@@ -430,17 +443,17 @@ Tailwind での骨組み例（WebGPTカラー適用）：
 
 ### 3-2. Badge / Pill
 
-timeline の年バッジや `NEW` ラベルのイメージ（WebGPTカラー適用）。
+timeline の年バッジや `NEW` ラベルのイメージ（WebGPT カラー適用）。
 
-* `inline-flex items-center rounded-full px-3 py-1`
+- `inline-flex items-center rounded-full px-3 py-1`
 
-* フォント: `text-xs font-semibold`
+- フォント: `text-xs font-semibold`
 
-* 背景:
+- 背景:
 
-  * 標準：`bg-premium-elevated border border-premium-stroke/40`
+  - 標準：`bg-premium-elevated border border-premium-stroke/40`
 
-  * アクセント：`bg-premium-accent/20 text-premium-accentGlow border border-premium-accent/30`
+  - アクセント：`bg-premium-accent/20 text-premium-accentGlow border border-premium-accent/30`
 
 **実装例:**
 
@@ -460,21 +473,21 @@ timeline の年バッジや `NEW` ラベルのイメージ（WebGPTカラー適�
 
 ### 3-3. リンク / ボタン
 
-* 見た目はできるだけ「テキスト」に近くする。
+- 見た目はできるだけ「テキスト」に近くする。
 
-* ヘッダー右のナビや `See Details →` は
+- ヘッダー右のナビや `See Details →` は
 
-  * `text-sm text-premium-muted`
+  - `text-sm text-premium-muted`
 
-  * hover で `text-premium-accentGlow` に変化
+  - hover で `text-premium-accentGlow` に変化
 
-* ボタンは
+- ボタンは
 
-  * `rounded-full`
+  - `rounded-full`
 
-  * `px-4 py-1.5 text-sm font-medium`
+  - `px-4 py-1.5 text-sm font-medium`
 
-  * 影は `shadow-sm` 程度
+  - 影は `shadow-sm` 程度
 
 **実装例:**
 
@@ -499,21 +512,21 @@ timeline の年バッジや `NEW` ラベルのイメージ（WebGPTカラー適�
 
 ## 4. チャット画面に適用するときの指針
 
-WebGPTチャットにこのUIを持ってくるときの「仕様」っぽいまとめ。
+WebGPT チャットにこの UI を持ってくるときの「仕様」っぽいまとめ。
 
 ### 4-1. ページ全体
 
-* 背景：`bg-premium-base`
+- 背景：`bg-premium-base`
 
-* 中央に `max-w-3xl` のチャットカード（Surface）を 1 個置く
+- 中央に `max-w-3xl` のチャットカード（Surface）を 1 個置く
 
-* 上に小さなヘッダコピー：
+- 上に小さなヘッダコピー：
 
-  * ラベル: `WEBGPT CHATBOT`（`text-[11px] uppercase tracking-[0.2em] text-premium-muted`）
+  - ラベル: `WEBGPT CHATBOT`（`text-[11px] uppercase tracking-[0.2em] text-premium-muted`）
 
-  * タイトル: `text-3xl font-semibold text-premium-text`
+  - タイトル: `text-3xl font-semibold text-premium-text`
 
-  * サブ: `text-sm text-premium-muted`
+  - サブ: `text-sm text-premium-muted`
 
 **実装例:**
 
@@ -544,30 +557,32 @@ WebGPTチャットにこのUIを持ってくるときの「仕様」っぽいま
 
 ### 4-2. メッセージバブル
 
-* **User**
+- **User**
 
-  * 右寄せ (`justify-end`)
+  - 右寄せ (`justify-end`)
 
-  * 背景: `bg-premium-elevated` または `bg-slate-900` みたいに真っ黒に近い色でも OK
+  - 背景: `bg-premium-elevated` または `bg-slate-900` みたいに真っ黒に近い色でも OK
 
-  * 角丸: `rounded-2xl rounded-br-sm`（右下だけ小さく）
+  - 角丸: `rounded-2xl rounded-br-sm`（右下だけ小さく）
 
-* **Assistant**
+- **Assistant**
 
-  * 左寄せ (`justify-start`)
+  - 左寄せ (`justify-start`)
 
-  * 背景: `bg-premium-surface`
+  - 背景: `bg-premium-surface`
 
-  * 枠線: `border border-premium-stroke/40`
+  - 枠線: `border border-premium-stroke/40`
 
-  * 角丸: `rounded-2xl rounded-bl-sm`
+  - 角丸: `rounded-2xl rounded-bl-sm`
 
 ラベル（`You`, `Bot`）は `text-[11px] uppercase tracking-[0.16em] text-premium-muted`。
 
 **実装例:**
 
 ```tsx
-{/* User Message */}
+{
+  /* User Message */
+}
 <div className="flex justify-end mb-4">
   <div className="max-w-[80%]">
     <p className="text-[11px] uppercase tracking-[0.16em] text-premium-muted mb-1">
@@ -577,9 +592,11 @@ WebGPTチャットにこのUIを持ってくるときの「仕様」っぽいま
       <p className="text-sm text-premium-text">User message here</p>
     </div>
   </div>
-</div>
+</div>;
 
-{/* Assistant Message */}
+{
+  /* Assistant Message */
+}
 <div className="flex justify-start mb-4">
   <div className="max-w-[80%]">
     <p className="text-[11px] uppercase tracking-[0.16em] text-premium-muted mb-1">
@@ -589,20 +606,20 @@ WebGPTチャットにこのUIを持ってくるときの「仕様」っぽいま
       <p className="text-sm text-premium-text">Assistant response here</p>
     </div>
   </div>
-</div>
+</div>;
 ```
 
 ---
 
 ### 4-3. 入力欄
 
-* 1行〜複数行の textarea をカード内に埋め込む。
+- 1 行〜複数行の textarea をカード内に埋め込む。
 
-* 枠は `border-premium-stroke/40` → フォーカス時に `border-premium-accent` + `ring-1 ring-premium-accent/60`
+- 枠は `border-premium-stroke/40` → フォーカス時に `border-premium-accent` + `ring-1 ring-premium-accent/60`
 
-* 説明テキストでショートカットを表示（`Cmd+Enter で送信` など）。
+- 説明テキストでショートカットを表示（`Cmd+Enter で送信` など）。
 
-* Enter 周りの UX は `use-chat-submit` をそのまま使うと catnose 本人の実装由来になります。
+- Enter 周りの UX は `use-chat-submit` をそのまま使うと catnose 本人の実装由来になります。
 
 **実装例:**
 
@@ -614,7 +631,11 @@ WebGPTチャットにこのUIを持ってくるときの「仕様」っぽいま
     rows={3}
   />
   <p className="mt-2 text-xs text-premium-muted">
-    Press <kbd className="px-1.5 py-0.5 rounded bg-premium-elevated border border-premium-stroke/40">Cmd+Enter</kbd> to send
+    Press{' '}
+    <kbd className="px-1.5 py-0.5 rounded bg-premium-elevated border border-premium-stroke/40">
+      Cmd+Enter
+    </kbd>{' '}
+    to send
   </p>
 </div>
 ```
@@ -625,7 +646,7 @@ WebGPTチャットにこのUIを持ってくるときの「仕様」っぽいま
 
 ### 5-1. フィルタリングバー
 
-catnose風の軽量なフィルタUI（WebGPTカラー適用）。
+catnose 風の軽量なフィルタ UI（WebGPT カラー適用）。
 
 ```tsx
 <div className="mb-6 flex flex-wrap items-center gap-3 border-b border-premium-stroke/60 pb-4">
@@ -658,9 +679,7 @@ catnose風の軽量なフィルタUI（WebGPTカラー適用）。
   </div>
 
   {/* 結果数 */}
-  <div className="text-xs text-premium-muted">
-    5 sites
-  </div>
+  <div className="text-xs text-premium-muted">5 sites</div>
 </div>
 ```
 
@@ -668,7 +687,7 @@ catnose風の軽量なフィルタUI（WebGPTカラー適用）。
 
 ### 5-2. サイトカード
 
-catnose風のシンプルなカード（WebGPTカラー適用）。
+catnose 風のシンプルなカード（WebGPT カラー適用）。
 
 ```tsx
 <div className="rounded-xl bg-premium-surface border border-premium-stroke/40 p-5 transition hover:bg-premium-elevated hover:border-premium-accent/30">
@@ -718,34 +737,38 @@ catnose風のシンプルなカード（WebGPTカラー適用）。
 
 ## 6. ライセンス的な注意
 
-* **Team Blog Hub / timeline のコードは MIT** なので、色・レイアウト・クラス設計はかなり自由に参考にして OK。
+- **Team Blog Hub / timeline のコードは MIT** なので、色・レイアウト・クラス設計はかなり自由に参考にして OK。
 
-* timeline だけ「ロゴ画像（`/public/icon.*`）は除く」と書かれているので、ロゴは必ず自作する。
+- timeline だけ「ロゴ画像（`/public/icon.*`）は除く」と書かれているので、ロゴは必ず自作する。
 
-* 「完全コピペ」ではなく、色や角丸を少しだけ自分のサービス寄りに調整すると安全。
+- 「完全コピペ」ではなく、色や角丸を少しだけ自分のサービス寄りに調整すると安全。
 
-* **このドキュメントでは、catnose風の構造・レイアウトパターンを採用しつつ、色はWebGPTの既存カラーパレット（エメラルドグリーン系）を維持**しています。
+- **このドキュメントでは、catnose 風の構造・レイアウトパターンを採用しつつ、色は WebGPT の既存カラーパレット（エメラルドグリーン系）を維持**しています。
 
 ---
 
 ## 7. 実装チェックリスト
 
 ### Phase 1: 基本レイアウト ✅
+
 - [ ] Page Shell の実装
 - [ ] Hero セクションの実装
 - [ ] セクションヘッダーの実装
 
 ### Phase 2: コンポーネント ✅
+
 - [ ] Surface / Card コンポーネント
 - [ ] Badge / Pill コンポーネント
 - [ ] リンク / ボタンコンポーネント
 
 ### Phase 3: チャット画面 ✅
+
 - [ ] チャットページのレイアウト
 - [ ] メッセージバブルのスタイル
 - [ ] 入力欄のスタイル
 
 ### Phase 4: ダッシュボード ✅
+
 - [ ] フィルタリングバーの実装
 - [ ] サイトカードのリデザイン
 - [ ] 空状態の改善
@@ -754,8 +777,8 @@ catnose風のシンプルなカード（WebGPTカラー適用）。
 
 ## 8. 参考リンク
 
-- [catnose99さんのGitHub](https://github.com/catnose99?tab=repositories)
-- [catnose99さんのウェブサイト](https://catnose.me)
+- [catnose99 さんの GitHub](https://github.com/catnose99?tab=repositories)
+- [catnose99 さんのウェブサイト](https://catnose.me)
 - [Team Blog Hub](https://github.com/catnose99/team-blog-hub)
 - [timeline](https://github.com/catnose99/timeline)
 
@@ -765,11 +788,10 @@ catnose風のシンプルなカード（WebGPTカラー適用）。
 
 このドキュメントをベースに、
 
-* `tailwind.config.cjs` の `premium.*` を確認・調整（必要に応じて）
+- `tailwind.config.cjs` の `premium.*` を確認・調整（必要に応じて）
 
-* `PageShell` / `ChatShell` / `MessageBubble` を仕様どおり実装
+- `PageShell` / `ChatShell` / `MessageBubble` を仕様どおり実装
 
-* ダッシュボードのフィルタリングとカードをcatnose風にリデザイン
+- ダッシュボードのフィルタリングとカードを catnose 風にリデザイン
 
-ところまでいけば、かなり **「見た目は catnose っぽいけど、WebGPTのエメラルドグリーンカラーを維持した UI」** にできます。
-
+ところまでいけば、かなり **「見た目は catnose っぽいけど、WebGPT のエメラルドグリーンカラーを維持した UI」** にできます。

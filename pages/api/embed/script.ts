@@ -94,10 +94,16 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     '.sgpt-chat-header{padding:20px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.06)}',
     '.sgpt-title{font-size:1.1rem;font-weight:600;margin:0;color:#f8fafc}',
     '.sgpt-close-btn{border:none;background:none;color:#94a3b8;font-size:1.4rem;cursor:pointer}',
-    '.sgpt-messages{flex:1;padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:12px}',
-    '.sgpt-message{padding:12px 16px;border-radius:18px;font-size:.93rem;line-height:1.5;max-width:92%;box-shadow:0 15px 40px rgba(2,6,23,.35)}',
-    '.sgpt-message.user{margin-left:auto;background:linear-gradient(120deg,#34d399,#22d3ee);color:#0f172a}',
-    '.sgpt-message.bot{background:rgba(2,6,23,.7);border:1px solid rgba(148,163,184,.2);color:#e2e8f0}',
+    '.sgpt-messages{flex:1;padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:0}',
+    '.sgpt-thread{display:flex;flex-direction:column;gap:12px;padding:16px 0;border-bottom:1px solid rgba(255,255,255,.06)}',
+    '.sgpt-question-box{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.05);border:1px solid rgba(148,163,184,.25);border-radius:16px;padding:12px 14px}',
+    '.sgpt-question-box span{font-size:.72rem;letter-spacing:.25em;text-transform:uppercase;color:rgba(226,232,240,.65)}',
+    '.sgpt-question-text{color:#f8fafc;font-size:1rem;font-family:"IBM Plex Sans",Inter,sans-serif}',
+    '.sgpt-answer{background:rgba(2,6,23,.7);border:1px solid rgba(148,163,184,.2);border-radius:20px;padding:16px;box-shadow:0 25px 70px rgba(1,8,4,.45);display:flex;flex-direction:column;gap:10px}',
+    '.sgpt-answer-header{display:flex;align-items:center;gap:10px;margin-bottom:8px}',
+    '.sgpt-answer-header span{font-size:.72rem;letter-spacing:.25em;text-transform:uppercase;color:rgba(226,232,240,.65)}',
+    '.sgpt-answer-tagline{font-size:.78rem;color:rgba(226,232,240,.7);font-family:"IBM Plex Mono",monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.sgpt-answer-body{color:#e2e8f0;font-size:.95rem;line-height:1.7;padding-right:6px}',
     '.sgpt-input-bar{padding:16px 20px;border-top:1px solid rgba(255,255,255,.06);display:flex;gap:12px;align-items:center}',
     '.sgpt-input{flex:1;border-radius:16px;border:1px solid rgba(148,163,184,.3);background:rgba(15,23,42,.8);color:#f1f5f9;padding:12px 16px;font-size:.95rem;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}',
     '.sgpt-input::placeholder{color:#64748b}',
@@ -121,7 +127,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     '    <div class="sgpt-chat-header">',
     '      <div>',
     '        <p class="sgpt-chip">WEBGPT</p>',
-    '        <p class="sgpt-title">WEBGPT サポート</p>',
+    '        <p class="sgpt-title">💬 WEBGPT サポート</p>',
     '      </div>',
     '      <button class="sgpt-close-btn" id="webgpt-close-btn">×</button>',
     '    </div>',
@@ -159,7 +165,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     return el && el instanceof HTMLInputElement ? el : null;
   }
 
-  let autoScroll = true;
+  let autoScroll = false;
 
   function updateScrollHint() {
     if (!messagesDiv) return;
@@ -184,7 +190,6 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
   }
 
   scrollHint.addEventListener('click', () => {
-    autoScroll = true;
     scrollHint.classList.remove('is-visible');
     scrollToBottom({ smooth: true });
   });
@@ -207,70 +212,85 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     closeBtn.addEventListener('click', () => toggleChat(false));
   }
 
-  function addMessage(text, isUser, sources) {
-    if (!messagesDiv) return;
-    const messageDiv = document.createElement('div');
-    messageDiv.className = 'sgpt-message ' + (isUser ? 'user' : 'bot');
-    
+  let lastAnswerBody = null;
+
+  function addMessage(text, isUser) {
+    if (!messagesDiv) return null;
+
     if (isUser) {
-      messageDiv.textContent = text;
-      messagesDiv.appendChild(messageDiv);
-      autoScroll = true;
-      scrollHint.classList.remove('is-visible');
-      scrollToBottom({ smooth: true });
-      return;
-    }
+      const thread = document.createElement('div');
+      thread.className = 'sgpt-thread';
 
-    const textNode = document.createTextNode(text);
-    messageDiv.appendChild(textNode);
-    
-    if (sources && sources.length > 0) {
-        const sourcesDiv = document.createElement('div');
-        sourcesDiv.style.marginTop = '12px';
-        sourcesDiv.style.paddingTop = '12px';
-        sourcesDiv.style.borderTop = '1px solid rgba(255,255,255,0.1)';
-        sourcesDiv.style.fontSize = '0.75rem';
-        sourcesDiv.style.color = '#94a3b8';
-        
-        const sourcesLabel = document.createElement('div');
-        sourcesLabel.textContent = '引用元:';
-        sourcesLabel.style.marginBottom = '8px';
-        sourcesDiv.appendChild(sourcesLabel);
-        
-        sources.forEach(function(url) {
-          const link = document.createElement('a');
-          link.href = url;
-          link.target = '_blank';
-          link.rel = 'noopener noreferrer';
-          link.textContent = url;
-          link.style.color = '#34d399';
-          link.style.textDecoration = 'underline';
-          link.style.display = 'block';
-          link.style.marginBottom = '4px';
-          link.style.wordBreak = 'break-all';
-          sourcesDiv.appendChild(link);
-        });
-        
-        messageDiv.appendChild(sourcesDiv);
-      }
+      const questionBox = document.createElement('div');
+      questionBox.className = 'sgpt-question-box';
+      const questionLabel = document.createElement('span');
+      questionLabel.textContent = 'Q';
+      const questionBody = document.createElement('div');
+      questionBody.className = 'sgpt-question-text';
+      questionBody.textContent = text;
+      questionBox.appendChild(questionLabel);
+      questionBox.appendChild(questionBody);
 
-    messagesDiv.appendChild(messageDiv);
-    if (autoScroll) {
-      scrollToBottom({ smooth: true });
-    } else {
+      const answerDiv = document.createElement('div');
+      answerDiv.className = 'sgpt-answer';
+      const answerHeader = document.createElement('div');
+      answerHeader.className = 'sgpt-answer-header';
+      const answerLabel = document.createElement('span');
+      answerLabel.textContent = 'A';
+      answerHeader.appendChild(answerLabel);
+      const answerBody = document.createElement('div');
+      answerBody.className = 'sgpt-answer-body';
+      answerDiv.appendChild(answerHeader);
+      answerDiv.appendChild(answerBody);
+
+      thread.appendChild(questionBox);
+      thread.appendChild(answerDiv);
+      messagesDiv.appendChild(thread);
+      lastAnswerBody = answerBody;
       scrollHint.classList.add('is-visible');
+      return answerBody;
     }
+
+    if (lastAnswerBody) {
+      return lastAnswerBody;
+    }
+
+    const fallbackThread = document.createElement('div');
+    fallbackThread.className = 'sgpt-thread';
+    const placeholderQuestion = document.createElement('div');
+    placeholderQuestion.className = 'sgpt-question-box';
+    const placeholderLabel = document.createElement('span');
+    placeholderLabel.textContent = 'Q';
+    const placeholderBody = document.createElement('div');
+    placeholderBody.className = 'sgpt-question-text';
+    placeholderBody.textContent = 'SYSTEM';
+    placeholderQuestion.appendChild(placeholderLabel);
+    placeholderQuestion.appendChild(placeholderBody);
+
+    const answerDiv = document.createElement('div');
+    answerDiv.className = 'sgpt-answer';
+    const answerHeader = document.createElement('div');
+    answerHeader.className = 'sgpt-answer-header';
+    const answerLabel = document.createElement('span');
+    answerLabel.textContent = 'A';
+    answerHeader.appendChild(answerLabel);
+    const answerBody = document.createElement('div');
+    answerBody.className = 'sgpt-answer-body';
+    answerDiv.appendChild(answerHeader);
+    answerDiv.appendChild(answerBody);
+
+    fallbackThread.appendChild(placeholderQuestion);
+    fallbackThread.appendChild(answerDiv);
+    messagesDiv.appendChild(fallbackThread);
+    lastAnswerBody = answerBody;
+    scrollHint.classList.add('is-visible');
+    return answerBody;
   }
 
-  function showLoading() {
-    if (!messagesDiv) return null;
-    const loading = document.createElement('div');
-    loading.id = 'webgpt-loading';
-    loading.className = 'sgpt-message bot sgpt-loading';
-    loading.textContent = 'WEBGPT が回答を作成しています...';
-    messagesDiv.appendChild(loading);
-    messagesDiv.scrollTop = messagesDiv.scrollHeight;
-    return loading;
+  function showLoading(target) {
+    if (!target) return null;
+    target.textContent = '▌ WEBGPT が回答を準備しています...';
+    return target;
   }
 
   function sendMessage() {
@@ -279,10 +299,10 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     const question = inputEl.value.trim();
     if (!question) return;
 
-    addMessage(question, true);
+    const answerContainer = addMessage(question, true);
     inputEl.value = '';
 
-    const loadingDiv = showLoading();
+    const loadingDiv = showLoading(answerContainer);
     let streamingMessageDiv = null;
     let answer = '';
     let sources = [];
@@ -303,18 +323,11 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
         throw new Error('Network response was not ok');
       }
       
-      if (loadingDiv) loadingDiv.remove();
+      // Keep placeholder text until streaming updates
       
       // ストリーミング用のメッセージ要素を作成
-      streamingMessageDiv = document.createElement('div');
-      streamingMessageDiv.className = 'sgpt-message bot';
-      if (messagesDiv) {
-        messagesDiv.appendChild(streamingMessageDiv);
-        if (autoScroll) {
-          scrollToBottom({ smooth: true });
-        }
-        updateStreamingMessage(streamingMessageDiv, '▌ WEBGPT が回答を準備しています...', []);
-      }
+      streamingMessageDiv = answerContainer || addMessage('', false);
+      scrollHint.classList.add('is-visible');
 
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -345,13 +358,13 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
             }
             try {
               const parsed = JSON.parse(payload);
-        if (parsed.data) {
-            answer += parsed.data;
-            // リアルタイムで更新
-            if (streamingMessageDiv) {
-              updateStreamingMessage(streamingMessageDiv, answer, sources);
-            }
-          }
+              if (parsed.data) {
+                answer += parsed.data;
+                // リアルタイムで更新
+                if (streamingMessageDiv) {
+                  updateStreamingMessage(streamingMessageDiv, answer, sources);
+                }
+              }
               if (parsed.sources && Array.isArray(parsed.sources)) {
                 sources = parsed.sources;
                 if (streamingMessageDiv) {
@@ -366,18 +379,15 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
           readStream();
         }).catch(error => {
           console.error('Stream read error:', error);
-          if (loadingDiv) loadingDiv.remove();
-          if (streamingMessageDiv) streamingMessageDiv.remove();
-          addMessage('エラーが発生しました。しばらくしてから再度お試しください。', false);
+          if (loadingDiv) updateStreamingMessage(loadingDiv, 'エラーが発生しました。しばらくしてから再度お試しください。', []);
         });
       }
 
       readStream();
     })
     .catch(error => {
-      if (loadingDiv) loadingDiv.remove();
+      if (loadingDiv) updateStreamingMessage(loadingDiv, 'エラーが発生しました。しばらくしてから再度お試しください。', []);
       console.error('Chat error:', error);
-      addMessage('エラーが発生しました。しばらくしてから再度お試しください。', false);
     });
   }
 
@@ -420,18 +430,33 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
       
       messageDiv.appendChild(sourcesDiv);
     }
-    if (autoScroll) {
-      scrollToBottom({ smooth: false });
-    }
     updateScrollHint();
   }
 
   if (sendBtn) {
     sendBtn.addEventListener('click', sendMessage);
   }
+  let isComposing = false;
   if (inputField) {
-    inputField.addEventListener('keypress', function(e) {
+    inputField.addEventListener('compositionstart', () => {
+      isComposing = true;
+    });
+    inputField.addEventListener('compositionend', () => {
+      isComposing = false;
+    });
+    inputField.addEventListener('keydown', function(e) {
       if (e.key === 'Enter') {
+        if (isComposing) {
+          return;
+        }
+        if (e.metaKey || e.ctrlKey) {
+          e.preventDefault();
+          sendMessage();
+          return;
+        }
+        if (e.shiftKey) {
+          return;
+        }
         e.preventDefault();
         sendMessage();
       }

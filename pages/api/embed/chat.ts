@@ -8,8 +8,8 @@ import { makeChain } from '@/utils/makechain';
 
 function sanitizeChunk(raw: string) {
   if (!raw) return '';
-  const withoutBold = raw.replace(/\*\*(.*?)\*\*/g, '$1');
-  return withoutBold
+  // マークダウン記法を保持するため、**の削除を削除
+  return raw
     .replace(/\r/g, '')
     .replace(/\t/g, ' ')
     .replace(/ +/g, ' ');

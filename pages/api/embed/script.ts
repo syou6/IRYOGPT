@@ -73,6 +73,9 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
   // 変数を安全にエスケープ
   const escapedSiteId = JSON.stringify(siteId);
   const escapedApiBaseUrl = JSON.stringify(apiBaseUrl);
+  // バッククォートを含む正規表現パターンをエスケープ
+  const backtick3 = '```';
+  const backtick1 = '`';
   
   return `(function() {
   'use strict';
@@ -392,14 +395,49 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     });
   }
 
+  // マークダウンをHTMLに変換する関数（シンプルな正規表現ベース）
+  function markdownToHtml(text) {
+    if (!text) return '';
+    let html = String(text);
+    
+    // XSS対策: まずHTMLエスケープ
+    html = html
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    
+    // コードブロック（バッククォート3つ）を先に処理
+    const codeBlockPattern = new RegExp(${JSON.stringify('```')} + '([\\s\\S]+?)' + ${JSON.stringify('```')}, 'g');
+    html = html.replace(codeBlockPattern, '<code>$1</code>');
+    
+    // インラインコード（バッククォート1つ）
+    const inlineCodePattern = new RegExp(${JSON.stringify('`')} + '([^' + ${JSON.stringify('`')} + ']+?)' + ${JSON.stringify('`')}, 'g');
+    html = html.replace(inlineCodePattern, '<code>$1</code>');
+    
+    // **太字** → <strong>太字</strong>
+    html = html.replace(/\\*\\*([^*]+?)\\*\\*/g, '<strong>$1</strong>');
+    
+    // *斜体* → <em>斜体</em>（**の後に処理、単独の*のみ）
+    html = html.replace(/(^|[^*])\\*([^*]+?)\\*([^*]|$)/g, '$1<em>$2</em>$3');
+    
+    // 改行処理（2つの改行は段落区切り、1つは改行）
+    html = html.replace(/\\n\\n/g, '<br><br>');
+    html = html.replace(/\\n/g, '<br>');
+    
+    return html;
+  }
+
   function updateStreamingMessage(messageDiv, text, sources) {
     if (!messageDiv) return;
     
     // 既存の内容をクリア
     messageDiv.innerHTML = '';
     
-    const textNode = document.createTextNode(text.split('**').join(''));
-    messageDiv.appendChild(textNode);
+    // マークダウンをHTMLに変換して表示
+    const htmlContent = markdownToHtml(text);
+    const contentDiv = document.createElement('div');
+    contentDiv.innerHTML = htmlContent;
+    messageDiv.appendChild(contentDiv);
     
     // 引用元URLを追加
     if (sources && sources.length > 0) {

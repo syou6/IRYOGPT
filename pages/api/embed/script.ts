@@ -406,13 +406,58 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;');
     
-    // コードブロック（バッククォート3つ）を先に処理
+    // コードブロック（バッククォート3つ）を先に処理（URL変換の前に処理）
     const codeBlockPattern = new RegExp(${JSON.stringify('```')} + '([\\s\\S]+?)' + ${JSON.stringify('```')}, 'g');
-    html = html.replace(codeBlockPattern, '<code>$1</code>');
+    const codeBlocks = [];
+    html = html.replace(codeBlockPattern, function(match, content) {
+      const placeholder = '___CODE_BLOCK_' + codeBlocks.length + '___';
+      codeBlocks.push({placeholder: placeholder, content: content});
+      return placeholder;
+    });
     
-    // インラインコード（バッククォート1つ）
+    // インラインコード（バッククォート1つ）も一時的にプレースホルダーに置換
     const inlineCodePattern = new RegExp(${JSON.stringify('`')} + '([^' + ${JSON.stringify('`')} + ']+?)' + ${JSON.stringify('`')}, 'g');
-    html = html.replace(inlineCodePattern, '<code>$1</code>');
+    const inlineCodes = [];
+    html = html.replace(inlineCodePattern, function(match, content) {
+      const placeholder = '___INLINE_CODE_' + inlineCodes.length + '___';
+      inlineCodes.push({placeholder: placeholder, content: content});
+      return placeholder;
+    });
+    
+    // マークダウンリンク [テキスト](URL) を処理
+    html = html.replace(/\\[([^\\]]+)\\]\\(([^)]+)\\)/g, function(match, text, url) {
+      // URLがhttp://またはhttps://で始まる場合のみリンクに変換
+      if (url.indexOf('http://') === 0 || url.indexOf('https://') === 0) {
+        const escapedUrl = url.replace(/"/g, '&quot;');
+        return '<a href="' + escapedUrl + '" target="_blank" rel="noopener noreferrer" style="color: #34d399; text-decoration: underline;">' + text + '</a>';
+      }
+      return match;
+    });
+    
+    // プレーンテキストのURLをリンクに変換（コードブロック・インラインコード以外）
+    // https://... または http://... で始まるURLを検出
+    const urlPattern = /(https?:\\/\\/[^\\s<>"']+)/g;
+    html = html.replace(urlPattern, function(match, url) {
+      // プレースホルダー内のURLは変換しない
+      if (match.indexOf('___CODE_BLOCK_') !== -1 || match.indexOf('___INLINE_CODE_') !== -1) {
+        return match;
+      }
+      // URLの末尾の句読点を除外
+      const cleanUrl = url.replace(/[.,;:!?]+$/, '');
+      const punctuation = url.slice(cleanUrl.length);
+      const escapedUrl = cleanUrl.replace(/"/g, '&quot;');
+      return '<a href="' + escapedUrl + '" target="_blank" rel="noopener noreferrer" style="color: #34d399; text-decoration: underline;">' + cleanUrl + '</a>' + punctuation;
+    });
+    
+    // インラインコードを元に戻す
+    inlineCodes.forEach(function(item) {
+      html = html.replace(item.placeholder, '<code>' + item.content + '</code>');
+    });
+    
+    // コードブロックを元に戻す
+    codeBlocks.forEach(function(item) {
+      html = html.replace(item.placeholder, '<code>' + item.content + '</code>');
+    });
     
     // **太字** → <strong>太字</strong>
     html = html.replace(/\\*\\*([^*]+?)\\*\\*/g, '<strong>$1</strong>');

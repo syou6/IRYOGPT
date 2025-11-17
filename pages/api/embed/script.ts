@@ -248,6 +248,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
       messagesDiv.appendChild(thread);
       lastAnswerBody = answerBody;
       scrollHint.classList.add('is-visible');
+      messagesDiv.scrollTop = messagesDiv.scrollHeight;
       return answerBody;
     }
 

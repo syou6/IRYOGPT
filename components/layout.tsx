@@ -82,7 +82,7 @@ export default function Layout({ children, showShellHeader = true, fullWidth = f
         )}
       </div>
       <Script
-        src="http://localhost:3000/api/embed/script?site_id=fe8aba45-7a35-41a5-9e57-9fbb88224c03"
+        src="https://webgpt-dun.vercel.app/api/embed/script?site_id=fe8aba45-7a35-41a5-9e57-9fbb88224c03"
         strategy="afterInteractive"
       />
     </div>

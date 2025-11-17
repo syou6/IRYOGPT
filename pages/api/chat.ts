@@ -286,11 +286,14 @@ export default async function handler(
                                candidateUrls.find(u => u.type === 'metadata_source') ||
                                candidateUrls[0];
             
-            bestSource = {
-              url: selectedUrl.url,
-              similarity: row.similarity,
-              title: row.metadata.title || row.metadata.fileName || undefined,
-            };
+            // selectedUrlは必ず存在する（candidateUrls.length > 0のチェック済み）
+            if (selectedUrl) {
+              bestSource = {
+                url: selectedUrl.url,
+                similarity: row.similarity,
+                title: row.metadata.title || row.metadata.fileName || undefined,
+              };
+            }
           }
         }
         

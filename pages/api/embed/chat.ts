@@ -15,6 +15,46 @@ function sanitizeChunk(raw: string) {
     .replace(/ +/g, ' ');
 }
 
+// ドキュメントのcontentからURLを抽出する関数
+function extractUrlsFromContent(content: string): string[] {
+  const urls: string[] = [];
+  
+  // マークダウン形式のリンク [テキスト](URL) を抽出
+  const markdownLinks = content.match(/\[([^\]]+)\]\(([^)]+)\)/g);
+  if (markdownLinks) {
+    markdownLinks.forEach(link => {
+      const urlMatch = link.match(/\(([^)]+)\)/);
+      if (urlMatch && urlMatch[1]) {
+        const url = urlMatch[1];
+        // HTTP/HTTPSで始まるURLのみ
+        if (url.startsWith('http://') || url.startsWith('https://')) {
+          urls.push(url);
+        }
+      }
+    });
+  }
+  
+  // プレーンテキストのURLを抽出
+  const urlPattern = /https?:\/\/[^\s\)]+/g;
+  const plainUrls = content.match(urlPattern);
+  if (plainUrls) {
+    urls.push(...plainUrls);
+  }
+  
+  return [...new Set(urls)]; // 重複を削除
+}
+
+// 除外するURLパターン
+const EXCLUDED_URL_PATTERNS = [
+  /^https?:\/\/localhost/,
+  /^https?:\/\/127\.0\.0\.1/,
+  /\.(jpg|jpeg|png|gif|pdf)$/i, // 画像やPDFファイル
+];
+
+function shouldExcludeUrl(url: string): boolean {
+  return EXCLUDED_URL_PATTERNS.some(pattern => pattern.test(url));
+}
+
 // トークン数の概算計算（文字数から概算、1トークン ≈ 4文字）
 function estimateTokens(text: string): number {
   return Math.ceil(text.length / 4);
@@ -127,8 +167,8 @@ export default async function handler(
       contextText: '',
       embeddingTokens: 0,
     };
-    // 引用元URLを収集する配列
-    const sourceUrls = new Set<string>();
+    // 最も類似度の高い引用元を保存（1つだけ）
+    let bestSource: { url: string; similarity: number; title?: string } | null = null;
 
     // site_idでフィルタしたカスタムRetrieverを作成
     const { BaseRetriever } = await import('@langchain/core/retrievers');
@@ -157,19 +197,60 @@ export default async function handler(
         }
 
         // コンテキストテキストを保存（トークン数計算用）
-        // similarityスコアが0.3以上のもののみを引用元として表示（関連性が高いもののみ）
-        // 注意: 実際の検索にはすべてのドキュメントが使用されるが、引用元表示は閾値以上のみ
-        const SIMILARITY_THRESHOLD = 0.3; // 0.7から0.3に下げて、より多くのドキュメントを引用元として表示
+        // 最も類似度の高いドキュメントを1つだけ引用元として保存
+        const SIMILARITY_THRESHOLD = 0.3;
         const documents = (data || []).map((row: any) => {
           usageTracker.contextText += row.content + '\n\n';
-          // similarityスコアが高いもののみを引用元として収集
-          if (
-            row.similarity >= SIMILARITY_THRESHOLD &&
-            row.metadata?.source &&
-            typeof row.metadata.source === 'string'
-          ) {
-            sourceUrls.add(row.metadata.source);
+          
+          // 最も類似度の高いドキュメントを1つだけ保存
+          if (row.similarity >= SIMILARITY_THRESHOLD && (!bestSource || row.similarity > bestSource.similarity)) {
+            // 候補URLのリスト（優先順位順）
+            const candidateUrls: Array<{url: string, type: 'metadata_url' | 'metadata_source' | 'content'}> = [];
+            
+            // 1. metadata.url（フロントマターのURL）を最優先
+            if (row.metadata?.url && typeof row.metadata.url === 'string' && !shouldExcludeUrl(row.metadata.url)) {
+              candidateUrls.push({
+                url: row.metadata.url,
+                type: 'metadata_url'
+              });
+            }
+            
+            // 2. metadata.source（ファイルパスまたは学習時のURL）
+            if (row.metadata?.source && typeof row.metadata.source === 'string') {
+              // ファイルパス（.mdで終わる）は除外、URLのみ
+              if (!row.metadata.source.endsWith('.md') && !shouldExcludeUrl(row.metadata.source)) {
+                candidateUrls.push({
+                  url: row.metadata.source,
+                  type: 'metadata_source'
+                });
+              }
+            }
+            
+            // 3. content内のURLを抽出して候補に追加
+            const contentUrls = extractUrlsFromContent(row.content)
+              .filter(url => !shouldExcludeUrl(url));
+            contentUrls.forEach(url => {
+              candidateUrls.push({
+                url: url,
+                type: 'content'
+              });
+            });
+            
+            // 4. 候補URLが存在する場合、優先順位に従って選択
+            if (candidateUrls.length > 0) {
+              // 優先順位: metadata_url > metadata_source > content
+              const selectedUrl = candidateUrls.find(u => u.type === 'metadata_url') ||
+                                 candidateUrls.find(u => u.type === 'metadata_source') ||
+                                 candidateUrls[0];
+              
+              bestSource = {
+                url: selectedUrl.url,
+                similarity: row.similarity,
+                title: row.metadata.title || row.metadata.fileName || undefined,
+              };
+            }
           }
+          
           return new Document({
             pageContent: row.content,
             metadata: row.metadata || {},
@@ -306,10 +387,10 @@ export default async function handler(
       console.error('[Embed Chat API] Error:', error);
       sendData(JSON.stringify({ error: String(error) }));
     } finally {
-      // 引用元URLを送信
-      if (sourceUrls.size > 0) {
+      // 最も類似度の高い引用元を1つだけ送信
+      if (bestSource && bestSource.url) {
         sendData(JSON.stringify({ 
-          sources: Array.from(sourceUrls).filter(url => url && url.trim() !== '')
+          source: bestSource
         }));
       }
       

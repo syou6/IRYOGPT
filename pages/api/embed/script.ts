@@ -101,12 +101,12 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     '.sgpt-thread{display:flex;flex-direction:column;gap:12px;padding:16px 0;border-bottom:1px solid rgba(255,255,255,.06)}',
     '.sgpt-question-box{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.05);border:1px solid rgba(148,163,184,.25);border-radius:16px;padding:12px 14px}',
     '.sgpt-question-box span{font-size:.72rem;letter-spacing:.25em;text-transform:uppercase;color:rgba(226,232,240,.65)}',
-    '.sgpt-question-text{color:#f8fafc;font-size:1rem;font-family:"IBM Plex Sans",Inter,sans-serif}',
-    '.sgpt-answer{background:rgba(2,6,23,.7);border:1px solid rgba(148,163,184,.2);border-radius:20px;padding:16px;box-shadow:0 25px 70px rgba(1,8,4,.45);display:flex;flex-direction:column;gap:10px}',
+    '.sgpt-question-text{color:#f8fafc;font-size:1rem;font-family:"IBM Plex Sans",Inter,sans-serif;overflow-wrap:break-word;word-break:break-word;max-width:100%}',
+    '.sgpt-answer{background:rgba(2,6,23,.7);border:1px solid rgba(148,163,184,.2);border-radius:20px;padding:16px;box-shadow:0 25px 70px rgba(1,8,4,.45);display:flex;flex-direction:column;gap:10px;overflow-wrap:break-word;word-break:break-word;max-width:100%}',
     '.sgpt-answer-header{display:flex;align-items:center;gap:10px;margin-bottom:8px}',
     '.sgpt-answer-header span{font-size:.72rem;letter-spacing:.25em;text-transform:uppercase;color:rgba(226,232,240,.65)}',
     '.sgpt-answer-tagline{font-size:.78rem;color:rgba(226,232,240,.7);font-family:"IBM Plex Mono",monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-    '.sgpt-answer-body{color:#e2e8f0;font-size:.95rem;line-height:1.7;padding-right:6px}',
+    '.sgpt-answer-body{color:#e2e8f0;font-size:.95rem;line-height:1.7;padding-right:6px;overflow-wrap:break-word;word-break:break-word;max-width:100%}',
     '.sgpt-input-bar{padding:16px 20px;border-top:1px solid rgba(255,255,255,.06);display:flex;gap:12px;align-items:center}',
     '.sgpt-input{flex:1;border-radius:16px;border:1px solid rgba(148,163,184,.3);background:rgba(15,23,42,.8);color:#f1f5f9;padding:12px 16px;font-size:.95rem;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}',
     '.sgpt-input::placeholder{color:#64748b}',
@@ -309,7 +309,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     const loadingDiv = showLoading(answerContainer);
     let streamingMessageDiv = null;
     let answer = '';
-    let sources = [];
+    let bestSource = null;
 
     fetch(apiBaseUrl + '/api/embed/chat', {
       method: 'POST',
@@ -342,7 +342,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
           if (done) {
             // ストリーミング完了
             if (streamingMessageDiv) {
-              updateStreamingMessage(streamingMessageDiv, answer, sources);
+              updateStreamingMessage(streamingMessageDiv, answer, bestSource);
             }
             return;
           }
@@ -356,7 +356,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
             const payload = line.substring(6);
             if (payload === '[DONE]') {
               if (streamingMessageDiv) {
-                updateStreamingMessage(streamingMessageDiv, answer, sources);
+                updateStreamingMessage(streamingMessageDiv, answer, bestSource);
               }
               return;
             }
@@ -366,13 +366,13 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
                 answer += parsed.data;
                 // リアルタイムで更新
                 if (streamingMessageDiv) {
-                  updateStreamingMessage(streamingMessageDiv, answer, sources);
+                  updateStreamingMessage(streamingMessageDiv, answer, bestSource);
                 }
               }
-              if (parsed.sources && Array.isArray(parsed.sources)) {
-                sources = parsed.sources;
+              if (parsed.source && parsed.source.url) {
+                bestSource = parsed.source;
                 if (streamingMessageDiv) {
-                  updateStreamingMessage(streamingMessageDiv, answer, sources);
+                  updateStreamingMessage(streamingMessageDiv, answer, bestSource);
                 }
               }
             } catch (err) {
@@ -383,14 +383,14 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
           readStream();
         }).catch(error => {
           console.error('Stream read error:', error);
-          if (loadingDiv) updateStreamingMessage(loadingDiv, 'エラーが発生しました。しばらくしてから再度お試しください。', []);
+          if (loadingDiv) updateStreamingMessage(loadingDiv, 'エラーが発生しました。しばらくしてから再度お試しください。', null);
         });
       }
 
       readStream();
     })
     .catch(error => {
-      if (loadingDiv) updateStreamingMessage(loadingDiv, 'エラーが発生しました。しばらくしてから再度お試しください。', []);
+      if (loadingDiv) updateStreamingMessage(loadingDiv, 'エラーが発生しました。しばらくしてから再度お試しください。', null);
       console.error('Chat error:', error);
     });
   }
@@ -427,7 +427,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     return html;
   }
 
-  function updateStreamingMessage(messageDiv, text, sources) {
+  function updateStreamingMessage(messageDiv, text, source) {
     if (!messageDiv) return;
     
     // 既存の内容をクリア
@@ -437,37 +437,65 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     const htmlContent = markdownToHtml(text);
     const contentDiv = document.createElement('div');
     contentDiv.innerHTML = htmlContent;
+    // 長いURLやテキストがはみ出ないように折り返し設定
+    contentDiv.style.overflowWrap = 'break-word';
+    contentDiv.style.wordBreak = 'break-word';
+    contentDiv.style.maxWidth = '100%';
+    // リンクやコードブロックにも折り返しを適用
+    const links = contentDiv.querySelectorAll('a, code');
+    links.forEach(function(el) {
+      el.style.overflowWrap = 'break-word';
+      el.style.wordBreak = 'break-word';
+      el.style.maxWidth = '100%';
+    });
     messageDiv.appendChild(contentDiv);
     
-    // 引用元URLを追加
-    if (sources && sources.length > 0) {
-      const sourcesDiv = document.createElement('div');
-      sourcesDiv.style.marginTop = '12px';
-      sourcesDiv.style.paddingTop = '12px';
-      sourcesDiv.style.borderTop = '1px solid rgba(255,255,255,0.1)';
-      sourcesDiv.style.fontSize = '0.75rem';
-      sourcesDiv.style.color = '#94a3b8';
+    // 最も関連性の高い引用元をカード型で表示（1つだけ）
+    if (source && source.url) {
+      const sourceCard = document.createElement('a');
+      sourceCard.href = source.url;
+      sourceCard.target = '_blank';
+      sourceCard.rel = 'noopener noreferrer';
+      sourceCard.style.display = 'block';
+      sourceCard.style.marginTop = '16px';
+      sourceCard.style.padding = '12px 16px';
+      sourceCard.style.borderRadius = '12px';
+      sourceCard.style.border = '1px solid rgba(52,211,153,0.3)';
+      sourceCard.style.background = 'rgba(52,211,153,0.1)';
+      sourceCard.style.textDecoration = 'none';
+      sourceCard.style.transition = 'all 0.2s ease';
+      sourceCard.style.cursor = 'pointer';
       
-      const sourcesLabel = document.createElement('div');
-      sourcesLabel.textContent = '引用元:';
-      sourcesLabel.style.marginBottom = '8px';
-      sourcesDiv.appendChild(sourcesLabel);
+      // ホバー効果
+      sourceCard.onmouseenter = function() {
+        sourceCard.style.borderColor = 'rgba(52,211,153,0.5)';
+        sourceCard.style.background = 'rgba(52,211,153,0.15)';
+        sourceCard.style.transform = 'translateY(-1px)';
+      };
+      sourceCard.onmouseleave = function() {
+        sourceCard.style.borderColor = 'rgba(52,211,153,0.3)';
+        sourceCard.style.background = 'rgba(52,211,153,0.1)';
+        sourceCard.style.transform = 'translateY(0)';
+      };
       
-      sources.forEach(function(url) {
-        const link = document.createElement('a');
-        link.href = url;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
-        link.textContent = url;
-        link.style.color = '#34d399';
-        link.style.textDecoration = 'underline';
-        link.style.display = 'block';
-        link.style.marginBottom = '4px';
-        link.style.wordBreak = 'break-all';
-        sourcesDiv.appendChild(link);
-      });
+      // タイトルまたはURLのドメイン名を表示
+      const cardTitle = document.createElement('div');
+      cardTitle.style.fontSize = '0.875rem';
+      cardTitle.style.fontWeight = '600';
+      cardTitle.style.color = '#34d399';
+      cardTitle.style.marginBottom = '4px';
+      cardTitle.textContent = source.title || new URL(source.url).hostname;
+      sourceCard.appendChild(cardTitle);
       
-      messageDiv.appendChild(sourcesDiv);
+      // URLを表示
+      const cardUrl = document.createElement('div');
+      cardUrl.style.fontSize = '0.75rem';
+      cardUrl.style.color = '#94a3b8';
+      cardUrl.style.wordBreak = 'break-all';
+      cardUrl.textContent = source.url;
+      sourceCard.appendChild(cardUrl);
+      
+      messageDiv.appendChild(sourceCard);
     }
     updateScrollHint();
   }

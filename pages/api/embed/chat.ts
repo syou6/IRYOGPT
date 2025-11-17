@@ -393,7 +393,7 @@ export default async function handler(
     } finally {
       // 最も類似度の高い引用元を1つだけ送信
       const sourceToSend: BestSourceType | null = bestSource;
-      if (sourceToSend !== null && sourceToSend.url) {
+      if (sourceToSend !== null) {
         sendData(JSON.stringify({ 
           source: sourceToSend
         }));
@@ -413,4 +413,3 @@ export default async function handler(
     });
   }
 }
-

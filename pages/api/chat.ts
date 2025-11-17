@@ -156,7 +156,8 @@ export default async function handler(
     embeddingTokens: 0,
   };
   // 引用元URLを収集する配列
-  let bestSource: { url: string; similarity: number; title?: string } | null = null;
+  type BestSourceType = { url: string; similarity: number; title?: string };
+  let bestSource: BestSourceType | null = null;
 
   // カスタムRetrieverを作成（URL収集のため）
   const { BaseRetriever } = await import('@langchain/core/retrievers');
@@ -431,9 +432,10 @@ export default async function handler(
     sendData(JSON.stringify({ error: String(error) }));
   } finally {
     // 最も類似度の高い引用元を1つだけ送信
-    if (bestSource && bestSource.url) {
+    const sourceToSend: BestSourceType | null = bestSource;
+    if (sourceToSend !== null && sourceToSend.url) {
       sendData(JSON.stringify({ 
-        source: bestSource
+        source: sourceToSend
       }));
     }
     

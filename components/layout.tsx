@@ -81,14 +81,14 @@ export default function Layout({ children, showShellHeader = true, fullWidth = f
           </div>
         )}
       </div>
-      <Script
+      {/* <Script
         src="https://webgpt-dun.vercel.app/api/embed/script?site_id=fe8aba45-7a35-41a5-9e57-9fbb88224c03"
         strategy="afterInteractive"
-      />
-            {/* <Script
+      /> */}
+            <Script
         src="http://localhost:3000/api/embed/script?site_id=64301a5f-50e2-4bd4-8268-b682633a0857"
         strategy="afterInteractive"
-      /> */}
+      />
     </div>
   );
 }

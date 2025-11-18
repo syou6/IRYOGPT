@@ -1,9 +1,10 @@
 import { useRef, useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/router';
 import Layout from '@/components/layout';
-import { Message } from '@/types/chat';
+import { Message, SourceLink } from '@/types/chat';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import ReactMarkdown from 'react-markdown';
+import type { Components as MarkdownComponents } from 'react-markdown';
 import LoadingDots from '@/components/ui/LoadingDots';
 import Link from 'next/link';
 import Button from '@/components/ui/Button';
@@ -47,7 +48,8 @@ export default function SiteChat() {
     messages: Message[];
     pending?: string;
     history: [string, string][];
-    sources?: string[]; // 引用元URL（ストリーミング中に一時保存）
+    sources?: string[]; // 旧仕様の引用元URL（複数）
+    bestSource?: SourceLink; // 最も関連度の高い引用元
   }>({
     messages: [],
     history: [],
@@ -59,6 +61,23 @@ export default function SiteChat() {
   const channelRef = useRef<any>(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const supabase = createSupabaseClient();
+
+  const normalizeSourceLink = (raw: unknown): SourceLink | undefined => {
+    if (!raw) return undefined;
+    if (typeof raw === 'string') {
+      return { url: raw };
+    }
+    if (typeof raw === 'object') {
+      const candidate = raw as { url?: unknown; title?: unknown };
+      if (candidate.url && typeof candidate.url === 'string') {
+        return {
+          url: candidate.url,
+          title: typeof candidate.title === 'string' ? candidate.title : undefined,
+        };
+      }
+    }
+    return undefined;
+  };
 
   // 認証チェック
   useEffect(() => {
@@ -123,7 +142,7 @@ export default function SiteChat() {
             setMessageState({
               messages: [
                 {
-                  message: `「${found.name}」について何かお聞きしたいことはありますか？`,
+                  message: `こんにちは。AIアシスタントです。お困りのことはありませんか？何でもお気軽にお聞きください。`,
                   type: 'apiMessage',
                 },
               ],
@@ -260,10 +279,12 @@ export default function SiteChat() {
         },
       ],
       pending: undefined,
+      sources: undefined,
+      bestSource: undefined,
     }));
 
     setQuery('');
-    setMessageState((state) => ({ ...state, pending: '' }));
+    setMessageState((state) => ({ ...state, pending: '', sources: undefined, bestSource: undefined }));
     setLoading(true);
 
     const ctrl = new AbortController();
@@ -309,6 +330,8 @@ export default function SiteChat() {
                 },
               ],
               pending: undefined,
+              bestSource: undefined,
+              sources: undefined,
             }));
             setLoading(false);
             ctrl.abort();
@@ -325,6 +348,8 @@ export default function SiteChat() {
                 },
               ],
               pending: undefined,
+              bestSource: undefined,
+              sources: undefined,
             }));
             setLoading(false);
             ctrl.abort();
@@ -340,6 +365,8 @@ export default function SiteChat() {
                 },
               ],
               pending: undefined,
+              bestSource: undefined,
+              sources: undefined,
             }));
             setLoading(false);
             ctrl.abort();
@@ -361,11 +388,13 @@ export default function SiteChat() {
                   {
                     type: 'apiMessage',
                     message: state.pending ?? '',
-                    sources: state.sources, // 引用元URLを保存
+                    sources: state.sources, // 旧形式の引用元URLを保存
+                    source: state.bestSource,
                   },
                 ],
                 pending: undefined,
-                sources: undefined, // クリア
+                sources: undefined,
+                bestSource: undefined,
               };
             });
             setLoading(false);
@@ -387,14 +416,28 @@ export default function SiteChat() {
                     },
                   ],
                   pending: undefined,
+                  bestSource: undefined,
+                  sources: undefined,
                 }));
                 setLoading(false);
                 ctrl.abort();
+              } else if (data.source) {
+                const normalized = normalizeSourceLink(data.source);
+                if (normalized) {
+                  setMessageState((state) => ({
+                    ...state,
+                    bestSource: normalized,
+                  }));
+                }
               } else if (data.sources) {
-                // 引用元URLを受信
+                // 旧仕様（配列）の引用元URLを受信
+                const urlList = Array.isArray(data.sources)
+                  ? data.sources.filter((url: unknown): url is string => typeof url === 'string')
+                  : [];
                 setMessageState((state) => ({
                   ...state,
-                  sources: data.sources,
+                  sources: urlList,
+                  bestSource: state.bestSource || (urlList.length > 0 ? { url: urlList[0] } : undefined),
                 }));
               } else {
                 const token = data.data || '';
@@ -429,6 +472,8 @@ export default function SiteChat() {
               },
             ],
             pending: undefined,
+            bestSource: undefined,
+            sources: undefined,
           }));
           setLoading(false);
           throw err; // 再試行を停止
@@ -455,6 +500,61 @@ export default function SiteChat() {
         : []),
     ];
   }, [messages, pending]);
+
+  const markdownComponents = useMemo<MarkdownComponents>(() => ({
+    a({ children, ...props }) {
+      return (
+        <a
+          {...props}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-emerald-300 underline decoration-emerald-500/50 underline-offset-2 transition hover:text-emerald-200"
+        >
+          {children}
+        </a>
+      );
+    },
+    code({ inline, className, children, ...props }) {
+      if (inline) {
+        return (
+          <code
+            {...props}
+            className={`rounded-md bg-white/10 px-1.5 py-0.5 text-[0.85em] text-emerald-100 ${className || ''}`.trim()}
+          >
+            {children}
+          </code>
+        );
+      }
+      return (
+        <pre className="mt-3 overflow-x-auto rounded-2xl border border-white/10 bg-black/30 p-3">
+          <code {...props} className={`text-[0.9em] leading-relaxed text-emerald-50 ${className || ''}`.trim()}>
+            {children}
+          </code>
+        </pre>
+      );
+    },
+    ul({ children, ...props }) {
+      return (
+        <ul {...props} className="ml-4 list-disc space-y-1 text-slate-100">
+          {children}
+        </ul>
+      );
+    },
+    ol({ children, ...props }) {
+      return (
+        <ol {...props} className="ml-4 list-decimal space-y-1 text-slate-100">
+          {children}
+        </ol>
+      );
+    },
+    p({ children, ...props }) {
+      return (
+        <p {...props} className="mb-3 text-slate-100 last:mb-0">
+          {children}
+        </p>
+      );
+    },
+  }), []);
 
   if (authLoading || !site) {
     return (
@@ -586,51 +686,83 @@ export default function SiteChat() {
                   <div className="mt-8 text-center text-slate-400">メッセージがありません</div>
                 ) : (
                   <div className="space-y-4">
-                    {chatMessages.map((message, index) => (
-                      <div
-                        key={index}
-                        ref={index === chatMessages.length - 1 ? messageListRef : undefined}
-                        className={`flex ${
-                          message.type === 'userMessage' ? 'justify-end' : 'justify-start'
-                        }`}
-                      >
+                    {chatMessages.map((message, index) => {
+                      const bestSource =
+                        message.source ??
+                        (message.sources && message.sources.length > 0
+                          ? { url: message.sources[0] }
+                          : undefined);
+
+                      return (
                         <div
-                          className={`max-w-[85%] rounded-3xl px-4 py-3 text-sm leading-relaxed shadow-lg sm:max-w-[80%] ${
-                            message.type === 'userMessage'
-                              ? 'bg-gradient-to-r from-emerald-400 via-green-300 to-cyan-300 text-slate-900 shadow-[0_15px_30px_rgba(16,185,129,0.35)]'
-                              : 'border border-white/10 bg-white/10 text-slate-100'
+                          key={index}
+                          ref={index === chatMessages.length - 1 ? messageListRef : undefined}
+                          className={`flex ${
+                            message.type === 'userMessage' ? 'justify-end' : 'justify-start'
                           }`}
                         >
-                          {message.type === 'apiMessage' ? (
-                            <>
-                              <ReactMarkdown className="prose prose-sm prose-invert max-w-none break-words">
-                                {message.message}
-                              </ReactMarkdown>
-                              {message.sources && message.sources.length > 0 && (
-                                <div className="mt-3 pt-3 border-t border-white/10">
-                                  <p className="text-xs text-slate-400 mb-2">引用元:</p>
-                                  <div className="flex flex-wrap gap-2">
-                                    {message.sources.map((url, idx) => (
-                                      <a
-                                        key={idx}
-                                        href={url}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="text-xs text-emerald-400 hover:text-emerald-300 underline break-all"
-                                      >
-                                        {url}
-                                      </a>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <p className="whitespace-pre-wrap break-words">{message.message}</p>
-                          )}
+                          <div
+                            className={`max-w-[85%] rounded-3xl px-4 py-3 text-sm leading-relaxed shadow-lg sm:max-w-[80%] ${
+                              message.type === 'userMessage'
+                                ? 'bg-gradient-to-r from-emerald-400 via-green-300 to-cyan-300 text-slate-900 shadow-[0_15px_30px_rgba(16,185,129,0.35)]'
+                                : 'border border-white/10 bg-white/10 text-slate-100'
+                            }`}
+                          >
+                            {message.type === 'apiMessage' ? (
+                              <>
+                                <ReactMarkdown
+                                  className="prose prose-sm prose-invert max-w-none break-words"
+                                  components={markdownComponents}
+                                >
+                                  {message.message}
+                                </ReactMarkdown>
+                                {bestSource && (
+                                  <a
+                                    href={bestSource.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="mt-4 block rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-xs text-slate-200 transition hover:border-emerald-400/60 hover:bg-emerald-500/5"
+                                  >
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.3em] text-emerald-200/70">
+                                      引用元
+                                    </p>
+                                    {bestSource.title && (
+                                      <p className="mt-2 text-base font-semibold text-white">
+                                        {bestSource.title}
+                                      </p>
+                                    )}
+                                    <p className="mt-1 break-words text-[11px] text-emerald-200">
+                                      {bestSource.url}
+                                    </p>
+                                    <span className="mt-3 inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-300">
+                                      詳しく見る
+                                      <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none">
+                                        <path
+                                          d="M7.5 5h7.5v7.5"
+                                          stroke="currentColor"
+                                          strokeWidth={1.3}
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        />
+                                        <path
+                                          d="M7.5 12.5 15 5"
+                                          stroke="currentColor"
+                                          strokeWidth={1.3}
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        />
+                                      </svg>
+                                    </span>
+                                  </a>
+                                )}
+                              </>
+                            ) : (
+                              <p className="whitespace-pre-wrap break-words">{message.message}</p>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                     {loading && !pending && (
                       <div className="flex justify-start">
                         <div className="rounded-3xl border border-white/10 bg-white/10 px-4 py-2">

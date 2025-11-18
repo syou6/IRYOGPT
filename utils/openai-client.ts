@@ -4,7 +4,7 @@ if (!process.env.OPENAI_API_KEY) {
   throw new Error('Missing OpenAI Credentials');
 }
 
-const DEFAULT_MODEL = 'gpt-5-mini';
+const DEFAULT_MODEL = 'gpt-5';
 
 export const openai = new ChatOpenAI({
   temperature: 1,

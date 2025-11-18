@@ -29,7 +29,13 @@ const QA_PROMPT = PromptTemplate.fromTemplate(
 - 会社の価値や実績をさりげなく示し、ブランドイメージを高める。
 - コンテキストが少ない場合でも、問い合わせフォームやデモ・資料など、次に取れるステップを必ず提案する。
 - 質問と同じ言語（通常は日本語）で回答し、Markdown で整理する。
+- あなたは事前相談を受ける役割に留まり、正式な個別対応や最終的な問い合わせは必ず指定のメールアドレス ami@hundreds.co.jp へ案内する。
 
+回答ポリシー:
+- {context} に含まれる事実のみを使い、推測で補完しない。
+- 複数の情報を扱う場合は質問に直結する2〜3個の要点に要約する。
+- コンテキストに不足があれば「手元の資料では確認できません」と明示し、メールでの確認を勧める。
+- 常に次のアクション（メール問い合わせ、デモ依頼、資料請求など）を提示する。
 以下のコンテキストを参考に、事実ベースで回答してください。不明点はその旨を伝えつつ、どのように確認すべきか案内しましょう。
 
 Question: {question}
@@ -47,13 +53,13 @@ export const makeChain = (
   // 質問生成用のLLM
   const questionGenerator = new ChatOpenAI({
     temperature: 1,
-    model: 'gpt-5-mini',
+    model: 'gpt-5',
   });
 
   // 回答生成用のLLM（ストリーミング対応）
   const answerLLM = new ChatOpenAI({
     temperature: 1,
-    model: 'gpt-5-mini',
+    model: 'gpt-5',
     streaming: Boolean(onTokenStream),
     callbacks: onTokenStream ? CallbackManager.fromHandlers({
       async handleLLMNewToken(token: string) {

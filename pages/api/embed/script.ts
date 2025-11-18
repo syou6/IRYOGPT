@@ -215,6 +215,8 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     scrollToBottom({ smooth: true });
   });
 
+  let hasShownInitialMessage = false;
+  
   function toggleChat(open) {
     if (!widget || !chatContainer) return;
     const shouldOpen = typeof open === 'boolean' ? open : !widget.classList.contains('is-open');
@@ -222,6 +224,14 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     const inputEl = getInputElement();
     if (shouldOpen && inputEl) {
       setTimeout(() => inputEl.focus(), 150);
+      // 初回のみ初期メッセージを表示
+      if (!hasShownInitialMessage && messagesDiv && messagesDiv.children.length === 0) {
+        hasShownInitialMessage = true;
+        const initialMessage = addMessage('こんにちは。何かお困りのことはありませんか？', false);
+        if (initialMessage) {
+          scrollToBottom({ smooth: false });
+        }
+      }
     }
     updateScrollHint();
   }
@@ -277,36 +287,22 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
       return lastAnswerBody;
     }
 
-    const fallbackThread = document.createElement('div');
-    fallbackThread.className = 'sgpt-thread';
-    const placeholderQuestion = document.createElement('div');
-    placeholderQuestion.className = 'sgpt-question-box';
-    const placeholderLabel = document.createElement('span');
-    placeholderLabel.textContent = 'Q';
-    const placeholderBody = document.createElement('div');
-    placeholderBody.className = 'sgpt-question-text';
-    placeholderBody.textContent = 'SYSTEM';
-    placeholderQuestion.appendChild(placeholderLabel);
-    placeholderQuestion.appendChild(placeholderBody);
+    // 初期メッセージ用のスレッドを作成（Aラベルなし）
+    const thread = document.createElement('div');
+    thread.className = 'sgpt-thread';
 
-    const answerDiv = document.createElement('div');
-    answerDiv.className = 'sgpt-answer';
-    const answerHeader = document.createElement('div');
-    answerHeader.className = 'sgpt-answer-header';
-    const answerLabel = document.createElement('span');
-    answerLabel.textContent = 'A';
-    answerHeader.appendChild(answerLabel);
-    const answerBody = document.createElement('div');
-    answerBody.className = 'sgpt-answer-body';
-    answerDiv.appendChild(answerHeader);
-    answerDiv.appendChild(answerBody);
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'sgpt-answer';
+    const messageBody = document.createElement('div');
+    messageBody.className = 'sgpt-answer-body';
+    messageBody.textContent = text; // テキストを設定
+    messageDiv.appendChild(messageBody);
 
-    fallbackThread.appendChild(placeholderQuestion);
-    fallbackThread.appendChild(answerDiv);
-    messagesDiv.appendChild(fallbackThread);
-    lastAnswerBody = answerBody;
+    thread.appendChild(messageDiv);
+    messagesDiv.appendChild(thread);
+    lastAnswerBody = messageBody;
     scrollHint.classList.add('is-visible');
-    return answerBody;
+    return messageBody;
   }
 
   function showLoading(target) {
@@ -482,6 +478,9 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     
     // *斜体* → <em>斜体</em>（**の後に処理、単独の*のみ）
     html = html.replace(/(^|[^*])\\*([^*]+?)\\*([^*]|$)/g, '$1<em>$2</em>$3');
+    
+    // ## 見出し記法を削除（行頭の##を削除）
+    html = html.replace(/^##+\\s*/gm, '');
     
     // 改行処理（2つの改行は段落区切り、1つは改行）
     html = html.replace(/\\n\\n/g, '<br><br>');

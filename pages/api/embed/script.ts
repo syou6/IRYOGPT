@@ -73,6 +73,8 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
   // 変数を安全にエスケープ
   const escapedSiteId = JSON.stringify(siteId);
   const escapedApiBaseUrl = JSON.stringify(apiBaseUrl);
+  const iconUrl = `${apiBaseUrl}/icons/chat-icon.png`;
+  const escapedIconUrl = JSON.stringify(iconUrl);
   // バッククォートを含む正規表現パターンをエスケープ
   const backtick3 = '```';
   const backtick1 = '`';
@@ -86,6 +88,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
 
   const siteId = ${escapedSiteId};
   const apiBaseUrl = ${escapedApiBaseUrl};
+  const iconUrl = ${escapedIconUrl};
 
   const styles = [
     '.sgpt-widget{position:fixed;right:24px;bottom:24px;z-index:9999;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;color:#e2e8f0}',
@@ -141,7 +144,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     '    </div>',
     '    <div class="sgpt-footer">Powered by WEBGPT</div>',
     '  </div>',
-    '  <button class="sgpt-fab" id="webgpt-toggle-btn">💬</button>',
+    '  <button class="sgpt-fab" id="webgpt-toggle-btn"></button>',
     '</div>'
   ].join('');
 
@@ -152,6 +155,21 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
   const widget = document.getElementById('webgpt-widget');
   const chatContainer = document.getElementById('webgpt-chat-container');
   const toggleBtn = document.getElementById('webgpt-toggle-btn');
+  
+  // アイコンを設定（chat-icon.pngを使用）
+  if (toggleBtn) {
+    const iconImg = document.createElement('img');
+    iconImg.src = iconUrl;
+    iconImg.alt = 'WEBGPT';
+    iconImg.style.width = '32px';
+    iconImg.style.height = '32px';
+    iconImg.style.objectFit = 'contain';
+    iconImg.onerror = function() {
+      toggleBtn.innerHTML = '💬';
+    };
+    toggleBtn.appendChild(iconImg);
+  }
+  
   const closeBtn = document.getElementById('webgpt-close-btn');
   const messagesDiv = document.getElementById('webgpt-messages');
   // sticky UI removed; messages appear only in list

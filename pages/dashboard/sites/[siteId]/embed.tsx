@@ -13,6 +13,17 @@ interface Site {
   embed_script_id: string | null;
 }
 
+const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || process.env.ADMIN_EMAILS || '')
+  .split(',')
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
+
+const isAdminEmail = (email?: string | null) => {
+  if (!email) return false;
+  if (ADMIN_EMAILS.length === 0) return true;
+  return ADMIN_EMAILS.includes(email.toLowerCase());
+};
+
 export default function EmbedSettingsPage() {
   const router = useRouter();
   const { siteId } = router.query;
@@ -57,45 +68,73 @@ export default function EmbedSettingsPage() {
       try {
         setLoading(true);
 
-        // サイト情報を取得
-        const { data: siteData, error: siteError } = await supabase
-          .from('sites')
-          .select('id, name, base_url, status, is_embed_enabled, embed_script_id')
-          .eq('id', siteId)
-          .single();
+        // 管理者チェック（先に実行）
+        const userEmail = session.user.email?.toLowerCase() ?? '';
+        const isAdmin = isAdminEmail(userEmail);
 
+        // サイト情報を取得
         let normalizedSite: Site | null = null;
 
-        if (siteError) {
-          // カラムが存在しない（未マイグレーション）の場合はフォールバック
-          if ((siteError as any)?.code === '42703') {
-            console.warn('[EmbedSettings] Missing embed columns on sites table, falling back to defaults.');
-            const { data: fallbackSite, error: fallbackError } = await supabase
-              .from('sites')
-              .select('id, name, base_url, status')
-              .eq('id', siteId)
-              .single();
+        // 管理者の場合はAPI経由で取得（RLSをバイパス）
+        if (isAdmin) {
+          try {
+            const response = await fetch('/api/sites', {
+              headers: {
+                Authorization: `Bearer ${session.access_token}`,
+              },
+            });
 
-            if (fallbackError || !fallbackSite) {
-              console.error('Site not found (fallback):', fallbackError);
-              setError(`サイトが見つかりません: ${fallbackError?.message || '不明なエラー'}`);
+            if (response.ok) {
+              const sites: Site[] = await response.json();
+              const found = sites.find((s) => s.id === siteId);
+              if (found) {
+                normalizedSite = found;
+              }
+            }
+          } catch (apiError) {
+            console.error('[EmbedSettings] API fetch error:', apiError);
+          }
+        }
+
+        // API経由で取得できなかった場合、または管理者でない場合は直接取得
+        if (!normalizedSite) {
+          const { data: siteData, error: siteError } = await supabase
+            .from('sites')
+            .select('id, name, base_url, status, is_embed_enabled, embed_script_id')
+            .eq('id', siteId)
+            .single();
+
+          if (siteError) {
+            // カラムが存在しない（未マイグレーション）の場合はフォールバック
+            if ((siteError as any)?.code === '42703') {
+              console.warn('[EmbedSettings] Missing embed columns on sites table, falling back to defaults.');
+              const { data: fallbackSite, error: fallbackError } = await supabase
+                .from('sites')
+                .select('id, name, base_url, status')
+                .eq('id', siteId)
+                .single();
+
+              if (fallbackError || !fallbackSite) {
+                console.error('Site not found (fallback):', fallbackError);
+                setError(`サイトが見つかりません: ${fallbackError?.message || '不明なエラー'}`);
+                setLoading(false);
+                return;
+              }
+
+              normalizedSite = {
+                ...fallbackSite,
+                is_embed_enabled: false,
+                embed_script_id: null,
+              } as Site;
+            } else {
+              console.error('Site not found:', siteError);
+              setError(`サイトが見つかりません: ${siteError?.message || '不明なエラー'}`);
               setLoading(false);
               return;
             }
-
-            normalizedSite = {
-              ...fallbackSite,
-              is_embed_enabled: false,
-              embed_script_id: null,
-            } as Site;
-          } else {
-            console.error('Site not found:', siteError);
-            setError(`サイトが見つかりません: ${siteError?.message || '不明なエラー'}`);
-            setLoading(false);
-            return;
+          } else if (siteData) {
+            normalizedSite = siteData as Site;
           }
-        } else if (siteData) {
-          normalizedSite = siteData as Site;
         }
 
         if (!normalizedSite) {
@@ -104,24 +143,28 @@ export default function EmbedSettingsPage() {
           return;
         }
 
-        // 所有者チェック
-        const { data: siteOwner, error: ownerError } = await supabase
-          .from('sites')
-          .select('user_id')
-          .eq('id', siteId)
-          .single();
+        // 管理者の場合は所有者チェックをスキップ
+        if (!isAdmin) {
+          // 所有者チェック
+          const { data: siteOwner, error: ownerError } = await supabase
+            .from('sites')
+            .select('user_id')
+            .eq('id', siteId)
+            .single();
 
-        if (ownerError || !siteOwner) {
-          console.error('Site owner check failed:', ownerError);
-          setError('このサイトの所有者を確認できませんでした');
-          setLoading(false);
-          return;
-        }
+          if (ownerError || !siteOwner) {
+            console.error('Site owner check failed:', ownerError);
+            setError('このサイトの所有者を確認できませんでした');
+            setLoading(false);
+            return;
+          }
 
-        if (siteOwner.user_id !== session.user.id) {
-          setError('このサイトへのアクセス権限がありません');
-          setLoading(false);
-          return;
+          // 所有者でない場合はアクセス拒否
+          if (siteOwner.user_id !== session.user.id) {
+            setError('このサイトへのアクセス権限がありません');
+            setLoading(false);
+            return;
+          }
         }
 
         setSite(normalizedSite);

@@ -57,7 +57,7 @@ async load(): Promise<Document[]>{
 
 The `pageContent` and `metadata` will later be stored in your supabase database table.
 
-6. Copy and run `schema.sql` in your supabase sql editor
+6. Copy and run `sql/schema.sql` in your supabase sql editor
 
 - cross check the `documents` table exists in the database as well as the `match_documents` function.
 

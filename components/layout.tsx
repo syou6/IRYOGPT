@@ -2,6 +2,7 @@ import clsx from 'clsx';
 import Link from 'next/link';
 import Script from 'next/script';
 import { useRouter } from 'next/router';
+import WebgptIcon from '@/components/WebgptIcon';
 
 interface LayoutProps {
   children?: React.ReactNode;
@@ -35,9 +36,7 @@ export default function Layout({ children, showShellHeader = true, fullWidth = f
           <header className="sticky top-0 z-40 border-b border-premium-stroke/60 bg-premium-base/95 backdrop-blur">
             <div className="mx-auto flex w-full max-w-6xl items-center justify-between px-4 py-4 text-sm text-premium-muted sm:px-6 lg:px-8">
               <Link href="/" className="flex items-center gap-3 text-premium-text">
-                <span className="flex h-8 w-8 items-center justify-center rounded-full border border-premium-stroke/80 text-xs font-semibold tracking-[0.3em]">
-                  W
-                </span>
+                <WebgptIcon size={32} className="border-premium-stroke/80" />
                 <div>
                   <p className="text-xs uppercase tracking-[0.4em] text-premium-muted">WEBGPT</p>
                   <p className="-mt-1 text-base font-semibold text-premium-text">Control Hub</p>
@@ -81,14 +80,14 @@ export default function Layout({ children, showShellHeader = true, fullWidth = f
           </div>
         )}
       </div>
-      {/* <Script
+      <Script
         src="https://webgpt-dun.vercel.app/api/embed/script?site_id=fe8aba45-7a35-41a5-9e57-9fbb88224c03"
         strategy="afterInteractive"
-      /> */}
-            <Script
+      />
+            {/* <Script
         src="http://localhost:3000/api/embed/script?site_id=64301a5f-50e2-4bd4-8268-b682633a0857"
         strategy="afterInteractive"
-      />
+      /> */}
     </div>
   );
 }

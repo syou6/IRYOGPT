@@ -101,6 +101,9 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     '.sgpt-title{font-size:1.1rem;font-weight:600;margin:0;color:#f8fafc}',
     '.sgpt-close-btn{border:none;background:none;color:#94a3b8;font-size:1.4rem;cursor:pointer}',
     '.sgpt-messages{flex:1;padding:20px;overflow-y:auto;display:flex;flex-direction:column;gap:0}',
+    '.sgpt-quick-buttons{display:flex;flex-wrap:wrap;gap:8px;padding:12px 0}',
+    '.sgpt-quick-btn{border:1px solid rgba(52,211,153,.4);background:rgba(52,211,153,.1);color:#a7f3d0;padding:8px 14px;border-radius:16px;font-size:.85rem;cursor:pointer;transition:all .2s ease}',
+    '.sgpt-quick-btn:hover{background:rgba(52,211,153,.2);border-color:rgba(52,211,153,.6);transform:translateY(-1px)}',
     '.sgpt-thread{display:flex;flex-direction:column;gap:12px;padding:16px 0;border-bottom:1px solid rgba(255,255,255,.06)}',
     '.sgpt-question-box{display:flex;align-items:center;gap:10px;background:rgba(255,255,255,.05);border:1px solid rgba(148,163,184,.25);border-radius:16px;padding:12px 14px}',
     '.sgpt-question-box span{font-size:.72rem;letter-spacing:.25em;text-transform:uppercase;color:rgba(226,232,240,.65)}',
@@ -216,7 +219,63 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
   });
 
   let hasShownInitialMessage = false;
-  
+
+  // クイック選択ボタンの定義
+  const quickReplies = [
+    { label: '予約したい', type: 'static', response: 'ご予約を承ります。ご希望の日時はございますか？（例：明日の午前中、来週の月曜日など）' },
+    { label: '空き状況を確認', type: 'api', message: '空き状況を教えてください' },
+    { label: '診療時間', type: 'api', message: '診療時間を教えてください' },
+    { label: 'キャンセル', type: 'static', response: 'ご予約のキャンセルにつきましては、お手数ですがお電話にてご連絡をお願いいたします。' }
+  ];
+
+  // クイックボタンを作成
+  function createQuickButtons() {
+    const container = document.createElement('div');
+    container.className = 'sgpt-quick-buttons';
+    container.id = 'webgpt-quick-buttons';
+
+    quickReplies.forEach(function(item) {
+      const btn = document.createElement('button');
+      btn.className = 'sgpt-quick-btn';
+      btn.textContent = item.label;
+      btn.addEventListener('click', function() {
+        handleQuickReply(item);
+      });
+      container.appendChild(btn);
+    });
+
+    return container;
+  }
+
+  // クイックボタンを非表示にする
+  function hideQuickButtons() {
+    const quickBtns = document.getElementById('webgpt-quick-buttons');
+    if (quickBtns) {
+      quickBtns.style.display = 'none';
+    }
+  }
+
+  // クイックボタンの処理
+  function handleQuickReply(item) {
+    hideQuickButtons();
+
+    if (item.type === 'static') {
+      // 固定応答：ユーザーの質問として表示し、即座に回答
+      const answerContainer = addMessage(item.label, true);
+      if (answerContainer) {
+        updateStreamingMessage(answerContainer, item.response, null);
+      }
+      lastAnswerBody = null;
+    } else {
+      // API呼び出し：通常の送信処理
+      const inputEl = getInputElement();
+      if (inputEl) {
+        inputEl.value = item.message;
+        sendMessage();
+      }
+    }
+  }
+
   function toggleChat(open) {
     if (!widget || !chatContainer) return;
     const shouldOpen = typeof open === 'boolean' ? open : !widget.classList.contains('is-open');
@@ -224,11 +283,16 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     const inputEl = getInputElement();
     if (shouldOpen && inputEl) {
       setTimeout(() => inputEl.focus(), 150);
-      // 初回のみ初期メッセージを表示
+      // 初回のみ初期メッセージとクイックボタンを表示
       if (!hasShownInitialMessage && messagesDiv && messagesDiv.children.length === 0) {
         hasShownInitialMessage = true;
-        const initialMessage = addMessage('こんにちは。何かお困りのことはありませんか？', false);
+        const initialMessage = addMessage('こんにちは！ご予約やお問い合わせを承ります。', false);
         if (initialMessage) {
+          // クイックボタンを追加
+          const quickBtns = createQuickButtons();
+          if (initialMessage.parentElement) {
+            initialMessage.parentElement.appendChild(quickBtns);
+          }
           scrollToBottom({ smooth: false });
         }
       }

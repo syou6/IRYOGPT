@@ -68,6 +68,41 @@ export default async function handler(
       return res.status(200).json({ message: 'Site deleted successfully' });
     }
 
+    if (req.method === 'PATCH') {
+      // 部分更新（chat_mode など）
+      const { chat_mode, spreadsheet_id } = req.body;
+
+      const updateData: any = {};
+      if (chat_mode !== undefined) {
+        // chat_modeのバリデーション
+        const validModes = ['rag_only', 'appointment_only', 'hybrid'];
+        if (!validModes.includes(chat_mode)) {
+          return res.status(400).json({ message: 'Invalid chat_mode' });
+        }
+        updateData.chat_mode = chat_mode;
+      }
+      if (spreadsheet_id !== undefined) {
+        updateData.spreadsheet_id = spreadsheet_id || null;
+      }
+
+      if (Object.keys(updateData).length === 0) {
+        return res.status(400).json({ message: 'No valid fields to update' });
+      }
+
+      const { data, error } = await supabaseClient
+        .from('sites')
+        .update(updateData)
+        .eq('id', siteId)
+        .select()
+        .single();
+
+      if (error) {
+        throw error;
+      }
+
+      return res.status(200).json(data);
+    }
+
     return res.status(405).json({ message: 'Method not allowed' });
   } catch (error: any) {
     if (error.message === 'Unauthorized') {

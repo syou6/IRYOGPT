@@ -16,7 +16,32 @@ interface Site {
   name: string;
   base_url: string;
   status: 'idle' | 'training' | 'ready' | 'error';
+  spreadsheet_id?: string | null;
+  chat_mode?: 'rag_only' | 'appointment_only' | 'hybrid' | null;
 }
+
+type ChatMode = 'rag_only' | 'appointment_only' | 'hybrid';
+
+const CHAT_MODE_OPTIONS: { value: ChatMode; label: string }[] = [
+  { value: 'rag_only', label: 'RAG' },
+  { value: 'appointment_only', label: '予約' },
+  { value: 'hybrid', label: 'ハイブリッド' },
+];
+
+// クイックリプライの定義
+interface QuickReply {
+  label: string;
+  type: 'static' | 'api';
+  response?: string;  // staticの場合の応答
+  message?: string;   // apiの場合の送信メッセージ
+}
+
+const APPOINTMENT_QUICK_REPLIES: QuickReply[] = [
+  { label: '予約したい', type: 'static', response: 'ご予約を承ります。ご希望の日時はございますか？' },
+  { label: '空き状況を確認', type: 'api', message: '空き状況を教えてください' },
+  { label: '診療時間', type: 'api', message: '診療時間を教えてください' },
+  { label: 'キャンセル', type: 'static', response: 'ご予約のキャンセルにつきましては、お手数ですがお電話にてご連絡をお願いいたします。' },
+];
 
 interface TrainingJob {
   id: string;
@@ -60,6 +85,8 @@ export default function SiteChat() {
   // textAreaRefは削除（ChatInputコンポーネント内で管理されるため）
   const channelRef = useRef<any>(null);
   const [showSidebar, setShowSidebar] = useState(false);
+  const [chatMode, setChatMode] = useState<ChatMode>('rag_only');
+  const [savingChatMode, setSavingChatMode] = useState(false);
   const supabase = createSupabaseClient();
 
   const normalizeSourceLink = (raw: unknown): SourceLink | undefined => {
@@ -128,6 +155,7 @@ export default function SiteChat() {
         
         if (found) {
           setSite(found);
+          setChatMode(found.chat_mode || 'rag_only');
           if (found.status !== 'ready') {
             setMessageState({
               messages: [
@@ -139,10 +167,18 @@ export default function SiteChat() {
               history: [],
             });
           } else {
+            // チャットモードで初期メッセージを変える
+            const mode = found.chat_mode || 'rag_only';
+            let welcomeMessage = 'こんにちは。AIアシスタントです。お困りのことはありませんか？何でもお気軽にお聞きください。';
+            if (mode === 'appointment_only' && found.spreadsheet_id) {
+              welcomeMessage = 'こんにちは。ご予約のお手伝いをいたします。ご希望の日時や空き状況についてお気軽にお聞きください。';
+            } else if (mode === 'hybrid' && found.spreadsheet_id) {
+              welcomeMessage = 'こんにちは。ご予約やお問い合わせのお手伝いをいたします。ご質問やご予約希望など、お気軽にどうぞ。';
+            }
             setMessageState({
               messages: [
                 {
-                  message: `こんにちは。AIアシスタントです。お困りのことはありませんか？何でもお気軽にお聞きください。`,
+                  message: welcomeMessage,
                   type: 'apiMessage',
                 },
               ],
@@ -487,6 +523,67 @@ export default function SiteChat() {
 
   // handleEnter関数は削除（use-chat-submitで処理されるため）
 
+  // クイックリプライのクリックハンドラー
+  const handleQuickReply = (reply: QuickReply) => {
+    if (loading || site?.status !== 'ready') return;
+
+    if (reply.type === 'static' && reply.response) {
+      // staticの場合はAPI呼び出しなしで即座に応答
+      setMessageState((state) => ({
+        ...state,
+        messages: [
+          ...state.messages,
+          { type: 'userMessage', message: reply.label },
+          { type: 'apiMessage', message: reply.response! },
+        ],
+        history: [...state.history, [reply.label, reply.response!]],
+      }));
+    } else if (reply.type === 'api' && reply.message) {
+      // apiの場合は通常のチャット送信
+      handleSubmit(reply.message);
+    }
+  };
+
+  // チャットモード保存
+  const handleSaveChatMode = async (newMode: ChatMode) => {
+    if (!site || savingChatMode) return;
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) return;
+
+    try {
+      setSavingChatMode(true);
+
+      const response = await fetch(`/api/sites/${site.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ chat_mode: newMode }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update chat mode');
+      }
+
+      setChatMode(newMode);
+      setSite({ ...site, chat_mode: newMode });
+    } catch (error) {
+      console.error('Error saving chat mode:', error);
+      alert('チャットモードの保存に失敗しました');
+      setChatMode(site.chat_mode || 'rag_only');
+    } finally {
+      setSavingChatMode(false);
+    }
+  };
+
+  // 予約モードかどうか（予約機能を使用するモード）
+  const isAppointmentMode = chatMode === 'appointment_only' || chatMode === 'hybrid';
+
   const chatMessages = useMemo(() => {
     return [
       ...messages,
@@ -636,6 +733,26 @@ export default function SiteChat() {
                 <p className="mt-1 break-all text-xs text-slate-400">{site.base_url}</p>
               </div>
               <div className="flex flex-col gap-2 sm:items-end">
+                {/* チャットモード切替 */}
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-slate-400">モード:</span>
+                  <div className="flex rounded-full border border-white/10 bg-white/5 p-0.5">
+                    {CHAT_MODE_OPTIONS.map((option) => (
+                      <button
+                        key={option.value}
+                        onClick={() => handleSaveChatMode(option.value)}
+                        disabled={savingChatMode}
+                        className={`rounded-full px-3 py-1 text-xs font-medium transition ${
+                          chatMode === option.value
+                            ? 'bg-emerald-400/20 text-emerald-100'
+                            : 'text-slate-400 hover:text-slate-200'
+                        } ${savingChatMode ? 'cursor-not-allowed opacity-50' : ''}`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <div className="flex flex-wrap items-center gap-2">
                   <span className={`rounded-full border px-3 py-1 text-xs font-medium ${
                     site.status === 'ready'
@@ -776,6 +893,27 @@ export default function SiteChat() {
               </div>
             </div>
 
+            {/* クイックリプライボタン（予約モードでスプレッドシート設定済みの場合のみ表示） */}
+            {isAppointmentMode && site.spreadsheet_id && site.status === 'ready' && (
+              <div className="border-t border-white/10 px-4 pt-4 sm:px-6">
+                <div className="mx-auto max-w-3xl">
+                  <div className="mb-2 text-xs text-slate-400">よくある質問</div>
+                  <div className="flex flex-wrap gap-2">
+                    {APPOINTMENT_QUICK_REPLIES.map((reply, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleQuickReply(reply)}
+                        disabled={loading}
+                        className="rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-sm font-medium text-emerald-100 transition hover:border-emerald-400/50 hover:bg-emerald-400/20 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {reply.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* 入力フォーム */}
             <div className="border-t border-white/10 px-4 py-5 sm:px-6">
               <div className="mx-auto max-w-3xl">
@@ -784,7 +922,7 @@ export default function SiteChat() {
                   disabled={loading || site.status !== 'ready'}
                   placeholder={
                     site.status === 'ready'
-                      ? '質問を入力してください...'
+                      ? (isAppointmentMode ? 'ご予約・ご質問をどうぞ...' : '質問を入力してください...')
                       : 'サイトの学習が完了していません'
                   }
                   value={query}

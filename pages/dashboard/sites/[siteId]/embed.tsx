@@ -11,7 +11,17 @@ interface Site {
   status: 'idle' | 'training' | 'ready' | 'error';
   is_embed_enabled: boolean;
   embed_script_id: string | null;
+  spreadsheet_id: string | null;
+  chat_mode: 'rag_only' | 'appointment_only' | 'hybrid' | null;
 }
+
+type ChatMode = 'rag_only' | 'appointment_only' | 'hybrid';
+
+const CHAT_MODE_OPTIONS: { value: ChatMode; label: string; description: string }[] = [
+  { value: 'rag_only', label: 'RAGのみ', description: 'WEBサイト情報で回答' },
+  { value: 'appointment_only', label: '予約のみ', description: 'スプレッドシートで予約対応' },
+  { value: 'hybrid', label: 'ハイブリッド ★推奨', description: '両方を使用（予約 + WEB情報）' },
+];
 
 const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || process.env.ADMIN_EMAILS || '')
   .split(',')
@@ -34,6 +44,11 @@ export default function EmbedSettingsPage() {
   const [isEmbedEnabled, setIsEmbedEnabled] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [spreadsheetId, setSpreadsheetId] = useState('');
+  const [savingSpreadsheet, setSavingSpreadsheet] = useState(false);
+  const [spreadsheetSaved, setSpreadsheetSaved] = useState(false);
+  const [chatMode, setChatMode] = useState<ChatMode>('rag_only');
+  const [savingChatMode, setSavingChatMode] = useState(false);
   const supabase = createSupabaseClient();
 
   // 認証チェック
@@ -100,7 +115,7 @@ export default function EmbedSettingsPage() {
         if (!normalizedSite) {
           const { data: siteData, error: siteError } = await supabase
             .from('sites')
-            .select('id, name, base_url, status, is_embed_enabled, embed_script_id')
+            .select('id, name, base_url, status, is_embed_enabled, embed_script_id, spreadsheet_id, chat_mode')
             .eq('id', siteId)
             .single();
 
@@ -125,6 +140,8 @@ export default function EmbedSettingsPage() {
                 ...fallbackSite,
                 is_embed_enabled: false,
                 embed_script_id: null,
+                spreadsheet_id: null,
+                chat_mode: 'rag_only',
               } as Site;
             } else {
               console.error('Site not found:', siteError);
@@ -169,6 +186,8 @@ export default function EmbedSettingsPage() {
 
         setSite(normalizedSite);
         setIsEmbedEnabled(Boolean(normalizedSite.is_embed_enabled));
+        setSpreadsheetId(normalizedSite.spreadsheet_id || '');
+        setChatMode(normalizedSite.chat_mode || 'rag_only');
         setLoading(false);
       } catch (error) {
         console.error('Error fetching site:', error);
@@ -244,6 +263,86 @@ export default function EmbedSettingsPage() {
     } catch (error) {
       console.error('Failed to copy:', error);
       alert('コピーに失敗しました');
+    }
+  };
+
+  // スプレッドシートIDからIDを抽出
+  const extractSpreadsheetId = (input: string): string => {
+    // URLの場合はIDを抽出
+    const urlMatch = input.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if (urlMatch) {
+      return urlMatch[1];
+    }
+    // IDのみの場合はそのまま返す
+    return input.trim();
+  };
+
+  // スプレッドシートID設定を保存
+  const handleSaveSpreadsheet = async () => {
+    if (!site || savingSpreadsheet) return;
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) return;
+
+    try {
+      setSavingSpreadsheet(true);
+      const extractedId = extractSpreadsheetId(spreadsheetId);
+
+      const { error } = await supabase
+        .from('sites')
+        .update({ spreadsheet_id: extractedId || null })
+        .eq('id', site.id);
+
+      if (error) {
+        throw error;
+      }
+
+      setSpreadsheetId(extractedId);
+      setSite({ ...site, spreadsheet_id: extractedId || null });
+      setSpreadsheetSaved(true);
+      setTimeout(() => setSpreadsheetSaved(false), 2000);
+    } catch (error) {
+      console.error('Error saving spreadsheet:', error);
+      alert('設定の保存に失敗しました');
+    } finally {
+      setSavingSpreadsheet(false);
+    }
+  };
+
+  // チャットモード設定を保存
+  const handleSaveChatMode = async (newMode: ChatMode) => {
+    if (!site || savingChatMode) return;
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) return;
+
+    try {
+      setSavingChatMode(true);
+
+      const { error } = await supabase
+        .from('sites')
+        .update({ chat_mode: newMode })
+        .eq('id', site.id);
+
+      if (error) {
+        throw error;
+      }
+
+      setChatMode(newMode);
+      setSite({ ...site, chat_mode: newMode });
+    } catch (error) {
+      console.error('Error saving chat mode:', error);
+      alert('チャットモードの保存に失敗しました');
+      // 元の値に戻す
+      setChatMode(site.chat_mode || 'rag_only');
+    } finally {
+      setSavingChatMode(false);
     }
   };
 
@@ -386,6 +485,153 @@ export default function EmbedSettingsPage() {
                   }`}
                 />
               </button>
+            </div>
+          </div>
+
+          {/* チャットモード設定 */}
+          <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+            <div className="mb-4">
+              <h2 className="text-lg font-semibold text-white">チャットモード設定</h2>
+              <p className="mt-1 text-sm text-slate-300">
+                チャットボットの動作モードを選択します。
+              </p>
+            </div>
+
+            <div className="space-y-6">
+              {/* チャットモード選択 */}
+              <div>
+                <label className="block text-sm font-medium text-slate-200 mb-3">
+                  モード選択
+                </label>
+                <div className="grid gap-3 sm:grid-cols-3">
+                  {CHAT_MODE_OPTIONS.map((option) => (
+                    <button
+                      key={option.value}
+                      onClick={() => handleSaveChatMode(option.value)}
+                      disabled={savingChatMode}
+                      className={`relative rounded-xl border p-4 text-left transition ${
+                        chatMode === option.value
+                          ? 'border-emerald-400/50 bg-emerald-500/20'
+                          : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10'
+                      } ${savingChatMode ? 'cursor-not-allowed opacity-50' : ''}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={`h-4 w-4 rounded-full border-2 flex items-center justify-center ${
+                            chatMode === option.value
+                              ? 'border-emerald-400 bg-emerald-400'
+                              : 'border-white/30'
+                          }`}
+                        >
+                          {chatMode === option.value && (
+                            <div className="h-1.5 w-1.5 rounded-full bg-white" />
+                          )}
+                        </div>
+                        <span className={`text-sm font-medium ${
+                          chatMode === option.value ? 'text-emerald-100' : 'text-slate-200'
+                        }`}>
+                          {option.label}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-xs text-slate-400">{option.description}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* スプレッドシートID設定（予約モードの場合のみ表示） */}
+              {(chatMode === 'appointment_only' || chatMode === 'hybrid') && (
+                <div className="border-t border-white/10 pt-6">
+                  <label className="block text-sm font-medium text-slate-200 mb-2">
+                    スプレッドシートID または URL
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={spreadsheetId}
+                      onChange={(e) => setSpreadsheetId(e.target.value)}
+                      placeholder="例: 136Iu0vdefE7h-UibePv0wyk_WIN-XGm1PCoES1u32lc"
+                      className="flex-1 rounded-xl border border-white/10 bg-black/30 px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-emerald-400/50 focus:outline-none focus:ring-1 focus:ring-emerald-400/50"
+                    />
+                    <button
+                      onClick={handleSaveSpreadsheet}
+                      disabled={savingSpreadsheet}
+                      className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
+                        spreadsheetSaved
+                          ? 'bg-emerald-500 text-white'
+                          : 'bg-gradient-to-r from-emerald-400 via-green-300 to-cyan-300 text-slate-900 shadow-[0_10px_20px_rgba(16,185,129,0.25)]'
+                      } ${savingSpreadsheet ? 'cursor-not-allowed opacity-50' : 'hover:opacity-90'}`}
+                    >
+                      {spreadsheetSaved ? '保存済み' : savingSpreadsheet ? '保存中...' : '保存'}
+                    </button>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-400">
+                    Google スプレッドシートのURL全体を貼り付けても、IDだけを貼り付けても大丈夫です。
+                  </p>
+
+                  {site.spreadsheet_id && (
+                    <div className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-4">
+                      <div className="flex items-center gap-2 text-sm text-emerald-100">
+                        <svg className="h-5 w-5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span className="font-medium">スプレッドシート連携済み</span>
+                      </div>
+                      <a
+                        href={`https://docs.google.com/spreadsheets/d/${site.spreadsheet_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-emerald-300 hover:text-emerald-200"
+                      >
+                        スプレッドシートを開く
+                        <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none">
+                          <path d="M7.5 5h7.5v7.5" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
+                          <path d="M7.5 12.5 15 5" stroke="currentColor" strokeWidth={1.3} strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      </a>
+                    </div>
+                  )}
+
+                  {!site.spreadsheet_id && (
+                    <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4">
+                      <div className="flex items-center gap-2 text-sm text-amber-100">
+                        <svg className="h-5 w-5 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                        <span className="font-medium">スプレッドシートIDを設定してください</span>
+                      </div>
+                      <p className="mt-2 text-xs text-amber-200/80">
+                        予約機能を使用するには、スプレッドシートIDの設定が必要です。
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 現在のモード状態表示 */}
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+                <h3 className="text-sm font-medium text-slate-200 mb-2">現在の設定</h3>
+                <div className="flex flex-wrap gap-2">
+                  <span className="inline-flex items-center rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-medium text-emerald-200">
+                    {CHAT_MODE_OPTIONS.find(o => o.value === chatMode)?.label || 'RAGのみ'}
+                  </span>
+                  {(chatMode === 'appointment_only' || chatMode === 'hybrid') && site.spreadsheet_id && (
+                    <span className="inline-flex items-center rounded-full bg-cyan-500/20 px-3 py-1 text-xs font-medium text-cyan-200">
+                      スプレッドシート連携済み
+                    </span>
+                  )}
+                  {chatMode === 'hybrid' && (
+                    <span className="inline-flex items-center rounded-full bg-purple-500/20 px-3 py-1 text-xs font-medium text-purple-200">
+                      WEB情報 + 予約対応
+                    </span>
+                  )}
+                </div>
+                <p className="mt-2 text-xs text-slate-400">
+                  {chatMode === 'rag_only' && 'WEBサイトの情報を元に質問に回答します。'}
+                  {chatMode === 'appointment_only' && 'スプレッドシートを使って予約対応のみを行います。'}
+                  {chatMode === 'hybrid' && 'WEBサイト情報を参照しながら、予約対応も行います。（推奨）'}
+                </p>
+              </div>
             </div>
           </div>
 

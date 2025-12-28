@@ -5,6 +5,8 @@ import { SupabaseVectorStore } from '@langchain/community/vectorstores/supabase'
 import { openai } from '@/utils/openai-client';
 import { supabaseClient } from '@/utils/supabase-client';
 import { makeChain } from '@/utils/makechain';
+import { runAppointmentChat, AppointmentChatMessage } from '@/utils/makechain-appointment';
+import { runHybridChat, HybridChatMessage } from '@/utils/makechain-hybrid';
 
 function sanitizeChunk(raw: string) {
   if (!raw) return '';
@@ -132,6 +134,29 @@ export default async function handler(
   }
   // OpenAI recommends replacing newlines with spaces for best results
   const sanitizedQuestion = question.trim().replaceAll('\n', ' ');
+
+  // サイト情報を取得してchat_modeに応じて処理を分岐
+  if (site_id) {
+    const { data: site } = await supabaseClient
+      .from('sites')
+      .select('spreadsheet_id, chat_mode')
+      .eq('id', site_id)
+      .single();
+
+    const chatMode = site?.chat_mode || 'rag_only';
+
+    // ハイブリッドモード
+    if (chatMode === 'hybrid' && site?.spreadsheet_id) {
+      return handleHybridChat(req, res, userId, site_id, site.spreadsheet_id, sanitizedQuestion, history);
+    }
+
+    // 予約のみモード
+    if (chatMode === 'appointment_only' && site?.spreadsheet_id) {
+      return handleAppointmentChat(req, res, userId, site_id, site.spreadsheet_id, sanitizedQuestion, history);
+    }
+
+    // RAGのみモード（デフォルト）は下に続く
+  }
 
   /* create vectorstore*/
   const embeddings = new OpenAIEmbeddings({ 
@@ -442,6 +467,207 @@ export default async function handler(
     if (process.env.NODE_ENV === 'development') {
       console.log('[Chat API] Sending [DONE]');
     }
+    sendData('[DONE]');
+    res.end();
+  }
+}
+
+/**
+ * 予約対応チャット処理
+ */
+async function handleAppointmentChat(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  userId: string,
+  siteId: string,
+  spreadsheetId: string,
+  question: string,
+  history: [string, string][] | undefined
+) {
+  // ストリーミングレスポンスの開始
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+  });
+
+  const sendData = (data: string) => {
+    res.write(`data: ${data}\n\n`);
+  };
+
+  sendData(JSON.stringify({ data: '' }));
+
+  try {
+    // 履歴をAppointmentChatMessage形式に変換
+    const messages: AppointmentChatMessage[] = [];
+    if (history && Array.isArray(history)) {
+      for (const [userMsg, assistantMsg] of history) {
+        messages.push({ role: 'user', content: userMsg });
+        messages.push({ role: 'assistant', content: assistantMsg });
+      }
+    }
+    messages.push({ role: 'user', content: question });
+
+    let outputText = '';
+
+    // 予約チャットを実行
+    const result = await runAppointmentChat(spreadsheetId, messages, (token: string) => {
+      outputText += token;
+      sendData(JSON.stringify({ data: token }));
+    });
+
+    // usage_logsに記録
+    try {
+      const inputTokens = estimateTokens(question);
+      const outputTokens = estimateTokens(outputText);
+      const costUsd = calculateCost(inputTokens, outputTokens);
+
+      await supabaseClient.from('usage_logs').insert({
+        user_id: userId,
+        site_id: siteId,
+        action: 'chat',
+        model_name: 'gpt-4o',
+        tokens_consumed: inputTokens + outputTokens,
+        cost_usd: costUsd,
+        metadata: {
+          input_tokens: inputTokens,
+          output_tokens: outputTokens,
+          question_length: question.length,
+          mode: 'appointment',
+        },
+      });
+    } catch (logError) {
+      console.error('[Chat API] Failed to log usage:', logError);
+    }
+
+    // chat_logsに記録
+    try {
+      const sessionId =
+        req.body.session_id ||
+        `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      await supabaseClient.from('chat_logs').insert({
+        user_id: userId,
+        site_id: siteId,
+        question: question,
+        answer: outputText,
+        session_id: sessionId,
+        source: 'dashboard',
+        user_agent: req.headers['user-agent'] || null,
+        referrer: req.headers['referer'] || null,
+      });
+    } catch (logError) {
+      console.error('[Chat API] Failed to save chat log:', logError);
+    }
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Chat API] Appointment chat completed');
+    }
+  } catch (error) {
+    console.error('[Chat API] Appointment chat error:', error);
+    sendData(JSON.stringify({ error: String(error) }));
+  } finally {
+    sendData('[DONE]');
+    res.end();
+  }
+}
+
+/**
+ * ハイブリッドチャット処理（RAG + 予約機能）
+ */
+async function handleHybridChat(
+  req: NextApiRequest,
+  res: NextApiResponse,
+  userId: string,
+  siteId: string,
+  spreadsheetId: string,
+  question: string,
+  history: [string, string][] | undefined
+) {
+  // ストリーミングレスポンスの開始
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache, no-transform',
+    Connection: 'keep-alive',
+  });
+
+  const sendData = (data: string) => {
+    res.write(`data: ${data}\n\n`);
+  };
+
+  sendData(JSON.stringify({ data: '' }));
+
+  try {
+    // 履歴をHybridChatMessage形式に変換
+    const messages: HybridChatMessage[] = [];
+    if (history && Array.isArray(history)) {
+      for (const [userMsg, assistantMsg] of history) {
+        messages.push({ role: 'user', content: userMsg });
+        messages.push({ role: 'assistant', content: assistantMsg });
+      }
+    }
+    messages.push({ role: 'user', content: question });
+
+    let outputText = '';
+
+    // ハイブリッドチャットを実行
+    const result = await runHybridChat(siteId, spreadsheetId, messages, (token: string) => {
+      outputText += token;
+      sendData(JSON.stringify({ data: token }));
+    });
+
+    // usage_logsに記録
+    try {
+      const inputTokens = estimateTokens(question);
+      const outputTokens = estimateTokens(outputText);
+      const costUsd = calculateCost(inputTokens, outputTokens);
+
+      await supabaseClient.from('usage_logs').insert({
+        user_id: userId,
+        site_id: siteId,
+        action: 'chat',
+        model_name: 'gpt-4o',
+        tokens_consumed: inputTokens + outputTokens,
+        cost_usd: costUsd,
+        metadata: {
+          input_tokens: inputTokens,
+          output_tokens: outputTokens,
+          question_length: question.length,
+          mode: 'hybrid',
+          rag_context_found: result.ragContext !== 'WEBサイト情報は見つかりませんでした',
+        },
+      });
+    } catch (logError) {
+      console.error('[Chat API] Failed to log usage:', logError);
+    }
+
+    // chat_logsに記録
+    try {
+      const sessionId =
+        req.body.session_id ||
+        `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      await supabaseClient.from('chat_logs').insert({
+        user_id: userId,
+        site_id: siteId,
+        question: question,
+        answer: outputText,
+        session_id: sessionId,
+        source: 'dashboard',
+        user_agent: req.headers['user-agent'] || null,
+        referrer: req.headers['referer'] || null,
+      });
+    } catch (logError) {
+      console.error('[Chat API] Failed to save chat log:', logError);
+    }
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[Chat API] Hybrid chat completed');
+    }
+  } catch (error) {
+    console.error('[Chat API] Hybrid chat error:', error);
+    sendData(JSON.stringify({ error: String(error) }));
+  } finally {
     sendData('[DONE]');
     res.end();
   }

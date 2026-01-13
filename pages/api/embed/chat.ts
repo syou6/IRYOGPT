@@ -507,14 +507,14 @@ async function handleAppointmentChat(
     try {
       const inputTokens = Math.ceil(question.length / 4);
       const outputTokens = Math.ceil(outputText.length / 4);
-      // gpt-4o: $2.50 per 1M input, $10.00 per 1M output
-      const costUsd = (inputTokens / 1_000_000) * 2.5 + (outputTokens / 1_000_000) * 10.0;
+      // gpt-4o-mini: $0.15 per 1M input, $0.60 per 1M output
+      const costUsd = (inputTokens / 1_000_000) * 0.15 + (outputTokens / 1_000_000) * 0.60;
 
       await supabaseClient.from('usage_logs').insert({
         user_id: userId,
         site_id: site.id,
         action: 'chat',
-        model_name: 'gpt-4o',
+        model_name: 'gpt-4o-mini',
         tokens_consumed: inputTokens + outputTokens,
         cost_usd: costUsd,
         metadata: {
@@ -636,14 +636,14 @@ async function handleHybridChat(
     try {
       const inputTokens = Math.ceil(question.length / 4);
       const outputTokens = Math.ceil(outputText.length / 4);
-      // gpt-4o: $2.50 per 1M input, $10.00 per 1M output
-      const costUsd = (inputTokens / 1_000_000) * 2.5 + (outputTokens / 1_000_000) * 10.0;
+      // gpt-4o-mini: $0.15 per 1M input, $0.60 per 1M output
+      const costUsd = (inputTokens / 1_000_000) * 0.15 + (outputTokens / 1_000_000) * 0.60;
 
       await supabaseClient.from('usage_logs').insert({
         user_id: userId,
         site_id: site.id,
         action: 'chat',
-        model_name: 'gpt-4o',
+        model_name: 'gpt-4o-mini',
         tokens_consumed: inputTokens + outputTokens,
         cost_usd: costUsd,
         metadata: {

@@ -202,7 +202,7 @@ export async function runHybridChat(
 
   // ③ 最初の呼び出し（ツール判定用、ストリーミングなし）
   const model = new ChatOpenAI({
-    model: 'gpt-4o',
+    model: 'gpt-4o-mini',
     temperature: 0.7,
     streaming: false,
   });
@@ -255,7 +255,7 @@ export async function runHybridChat(
     ];
 
     const streamingModel = new ChatOpenAI({
-      model: 'gpt-4o',
+      model: 'gpt-4o-mini',
       temperature: 0.7,
       streaming: Boolean(onToken),
     });
@@ -283,7 +283,7 @@ export async function runHybridChat(
   // ⑤ ツール呼び出しがない場合（通常の応答）
   if (onToken) {
     const streamingModel = new ChatOpenAI({
-      model: 'gpt-4o',
+      model: 'gpt-4o-mini',
       temperature: 0.7,
       streaming: true,
     });

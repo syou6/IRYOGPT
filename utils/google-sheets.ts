@@ -4,10 +4,23 @@ import { google } from 'googleapis';
  * Google Sheets API クライアントを取得
  */
 export function getGoogleSheetsClient() {
+  const clientEmail = process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL;
+  const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+  // 環境変数のバリデーション
+  if (!clientEmail) {
+    console.error('[Google Sheets] GOOGLE_SERVICE_ACCOUNT_EMAIL is not set');
+    throw new Error('Google Sheets API: GOOGLE_SERVICE_ACCOUNT_EMAIL 環境変数が設定されていません。.env.local を確認し、サーバーを再起動してください。');
+  }
+  if (!privateKey) {
+    console.error('[Google Sheets] GOOGLE_PRIVATE_KEY is not set');
+    throw new Error('Google Sheets API: GOOGLE_PRIVATE_KEY 環境変数が設定されていません。.env.local を確認し、サーバーを再起動してください。');
+  }
+
   const auth = new google.auth.GoogleAuth({
     credentials: {
-      client_email: process.env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
-      private_key: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+      client_email: clientEmail,
+      private_key: privateKey,
     },
     scopes: ['https://www.googleapis.com/auth/spreadsheets'],
   });

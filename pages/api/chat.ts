@@ -526,7 +526,7 @@ async function handleAppointmentChat(
         user_id: userId,
         site_id: siteId,
         action: 'chat',
-        model_name: 'gpt-4o',
+        model_name: 'gpt-4o-mini',
         tokens_consumed: inputTokens + outputTokens,
         cost_usd: costUsd,
         metadata: {
@@ -626,7 +626,7 @@ async function handleHybridChat(
         user_id: userId,
         site_id: siteId,
         action: 'chat',
-        model_name: 'gpt-4o',
+        model_name: 'gpt-4o-mini',
         tokens_consumed: inputTokens + outputTokens,
         cost_usd: costUsd,
         metadata: {

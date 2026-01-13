@@ -45,7 +45,7 @@ export async function runAppointmentChat(
 
   // 最初の呼び出し（ツール判定用、ストリーミングなし）
   const model = new ChatOpenAI({
-    model: 'gpt-4o',
+    model: 'gpt-4o-mini',
     temperature: 0.7,
     streaming: false,
   });
@@ -86,7 +86,7 @@ export async function runAppointmentChat(
     ];
 
     const streamingModel = new ChatOpenAI({
-      model: 'gpt-4o',
+      model: 'gpt-4o-mini',
       temperature: 0.7,
       streaming: Boolean(onToken),
     });
@@ -114,7 +114,7 @@ export async function runAppointmentChat(
   // ストリーミングで再実行
   if (onToken) {
     const streamingModel = new ChatOpenAI({
-      model: 'gpt-4o',
+      model: 'gpt-4o-mini',
       temperature: 0.7,
       streaming: true,
     });

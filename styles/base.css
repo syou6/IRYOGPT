@@ -21,6 +21,22 @@
     --shadow-glow: 0 20px 70px rgba(25, 195, 125, 0.25);
   }
 
+  /* ダッシュボード用ダークテーマ */
+  .theme-dark {
+    --color-base: #040607;
+    --color-surface: #0b1410;
+    --color-elevated: #131f1a;
+    --color-card: #0d1713;
+    --color-text: #f5f7f4;
+    --color-text-muted: #8ba39b;
+    --color-accent: #19c37d;
+    --color-accent-deep: #0f8a5f;
+    --color-accent-glow: #7af4c1;
+    --color-stroke: rgba(255, 255, 255, 0.1);
+    --shadow-panel: 0 25px 80px rgba(0, 0, 0, 0.5);
+    --shadow-glow: 0 20px 70px rgba(25, 195, 125, 0.25);
+  }
+
   body {
     background-color: var(--color-base);
     color: var(--color-text);

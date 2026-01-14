@@ -305,7 +305,7 @@ export default function Home() {
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(null);
 
   return (
-    <Layout showShellHeader={false} fullWidth>
+    <Layout showShellHeader={false} fullWidth darkMode={false}>
       <div className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6 lg:px-8">
         {/* Header */}
         <header className="sticky top-0 z-40 -mx-4 bg-white/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">

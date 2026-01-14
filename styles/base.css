@@ -6,18 +6,19 @@
 
 @layer base {
   :root {
-    --color-base: #040607;
-    --color-surface: #0b1410;
-    --color-elevated: #131f1a;
-    --color-card: rgba(11, 20, 16, 0.82);
-    --color-text: #f5f7f4;
-    --color-text-muted: #8ba39b;
+    /* ライトテーマ */
+    --color-base: #ffffff;
+    --color-surface: #f8fafb;
+    --color-elevated: #f1f5f4;
+    --color-card: #ffffff;
+    --color-text: #111827;
+    --color-text-muted: #6b7280;
     --color-accent: #19c37d;
     --color-accent-deep: #0f8a5f;
     --color-accent-glow: #7af4c1;
-    --color-stroke: #1f2a23;
-    --shadow-panel: 0 35px 120px rgba(1, 8, 4, 0.65);
-    --shadow-glow: 0 20px 70px rgba(25, 195, 125, 0.35);
+    --color-stroke: #e5e7eb;
+    --shadow-panel: 0 25px 80px rgba(0, 0, 0, 0.08);
+    --shadow-glow: 0 20px 70px rgba(25, 195, 125, 0.25);
   }
 
   body {

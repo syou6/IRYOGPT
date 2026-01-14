@@ -5,7 +5,7 @@
 
 import { ChatOpenAI } from '@langchain/openai';
 import {
-  getMedicalSystemPrompt,
+  getMedicalSystemPromptWithSettings,
   APPOINTMENT_TOOLS,
 } from './prompts/medical-appointment';
 import {
@@ -37,9 +37,12 @@ export async function runAppointmentChat(
   messages: AppointmentChatMessage[],
   onToken?: (token: string) => void
 ): Promise<AppointmentChatResult> {
-  // システムプロンプトを追加（今日の日付情報を含む）
+  // 最初に設定を取得してプロンプトに埋め込む（AIがget_clinic_infoを呼ばなくても設定を知れるように）
+  const settings = await getClinicSettings(spreadsheetId);
+
+  // システムプロンプトを追加（今日の日付情報 + 医院設定を含む）
   const fullMessages = [
-    { role: 'system' as const, content: getMedicalSystemPrompt() },
+    { role: 'system' as const, content: getMedicalSystemPromptWithSettings(settings) },
     ...messages,
   ];
 
@@ -163,12 +166,27 @@ async function executeToolCall(
     }
 
     case 'create_appointment': {
+      // 設定を取得してバリデーション
+      const settings = await getClinicSettings(spreadsheetId);
+
+      // 担当医選択が有効なのに doctor が未入力ならエラー
+      if (settings.useDoctorSelection && settings.doctorList.length > 0 && !args.doctor) {
+        return `担当医の確認が必要です。「${settings.doctorList.join('、')}」の中からご希望を確認するか、特にご希望がなければ「なし」と入力してください。`;
+      }
+
+      // 診察券番号が有効なのに未入力ならエラー
+      if (settings.usePatientCardNumber && !args.patient_card_number) {
+        return `診察券番号の確認が必要です。「診察券番号をお持ちでしたらお伝えください。初診の方や番号がわからない場合は『なし』で大丈夫です」と確認してください。`;
+      }
+
       const result = await createAppointment(spreadsheetId, {
         date: args.date,
         time: args.time,
         patientName: args.patient_name,
         patientPhone: args.patient_phone,
         patientEmail: args.patient_email || '',
+        patientCardNumber: args.patient_card_number || '',
+        doctor: args.doctor || '',
         symptom: args.symptom || '',
         bookedVia: 'ChatBot',
       });
@@ -176,7 +194,6 @@ async function executeToolCall(
       if (result.success) {
         // メール送信（患者にメールアドレスがある場合）
         if (args.patient_email) {
-          const settings = await getClinicSettings(spreadsheetId);
           sendAppointmentConfirmationEmail({
             patientName: args.patient_name,
             patientEmail: args.patient_email,
@@ -188,7 +205,12 @@ async function executeToolCall(
             console.error('[Appointment] Email send error:', err);
           });
         }
-        return `予約が完了しました。日時: ${args.date} ${args.time}、患者名: ${args.patient_name}`;
+        // 結果メッセージを組み立て
+        let confirmMsg = `予約が完了しました。日時: ${args.date} ${args.time}、患者名: ${args.patient_name}`;
+        if (args.doctor) {
+          confirmMsg += `、担当医: ${args.doctor}`;
+        }
+        return confirmMsg;
       } else {
         return `予約に失敗しました: ${result.message}`;
       }
@@ -196,11 +218,21 @@ async function executeToolCall(
 
     case 'get_clinic_info': {
       const settings = await getClinicSettings(spreadsheetId);
-      return `医院名: ${settings.clinicName}
+      let info = `医院名: ${settings.clinicName}
 診療時間: ${settings.startTime}〜${settings.endTime}
 昼休み: ${settings.breakStart}〜${settings.breakEnd}
 1枠: ${settings.slotDuration}分
 休診曜日: ${settings.closedDays.join('、')}`;
+
+      // 担当医リストがある場合は追加
+      if (settings.useDoctorSelection && settings.doctorList.length > 0) {
+        info += `\n担当医: ${settings.doctorList.join('、')}`;
+      }
+      // 診察券番号使用の案内
+      if (settings.usePatientCardNumber) {
+        info += `\n※再診の方は診察券番号をお伝えください`;
+      }
+      return info;
     }
 
     default:

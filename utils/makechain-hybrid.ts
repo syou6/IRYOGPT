@@ -12,6 +12,7 @@ import {
   createAppointment,
   getClinicSettings,
   TimeSlot,
+  ClinicSettings,
 } from './appointment';
 import { sendAppointmentConfirmationEmail } from './email';
 
@@ -119,9 +120,9 @@ async function searchRAG(siteId: string, query: string): Promise<string> {
 }
 
 /**
- * ハイブリッド用システムプロンプトを生成
+ * ハイブリッド用システムプロンプトを生成（設定情報を埋め込み）
  */
-function getHybridSystemPrompt(ragContext: string): string {
+function getHybridSystemPrompt(ragContext: string, settings: ClinicSettings): string {
   const today = new Date();
   const year = today.getFullYear();
   const month = today.getMonth() + 1;
@@ -136,8 +137,35 @@ function getHybridSystemPrompt(ragContext: string): string {
   // RAG情報があるかどうかを判定
   const hasRagInfo = ragContext && !ragContext.includes('WEBサイト情報は見つかりませんでした');
 
-  return `あなたは医療機関のAIアシスタントです。
+  // 担当医セクション
+  const doctorSection = settings.useDoctorSelection && settings.doctorList.length > 0
+    ? `\n## 担当医情報（必須確認）
+- 担当医選択: **有効**
+- 担当医リスト: ${settings.doctorList.join('、')}
+- **必ず確認すること**: 「担当医のご希望はございますか？${settings.doctorList.join('、')}がおります。特にご希望がなければ『なし』でも大丈夫です」と聞く
+- 患者が「誰でもいい」「特にない」「お任せ」と言った場合 → doctor に「なし」と入力する
+- 患者が特定の先生を指名した場合 → その先生名を入力する`
+    : '';
+
+  // 診察券番号セクション
+  const cardNumberSection = settings.usePatientCardNumber
+    ? `\n## 診察券番号（必須確認）
+- 診察券番号: **使用する**
+- **必ず確認すること**: 「診察券番号をお持ちでしたらお伝えください。初診の方や番号がわからない場合は『なし』で大丈夫です」と聞く
+- 患者が番号を言った場合 → その番号を入力
+- 患者が「初診」「持ってない」「わからない」と言った場合 → 「なし」と入力`
+    : '';
+
+  return `あなたは${settings.clinicName || '医療機関'}のAIアシスタントです。
 患者さんからの質問や予約リクエストに丁寧に対応します。
+
+## 医院情報（スプレッドシートより）
+- 医院名: ${settings.clinicName}
+- 診療時間: ${settings.startTime}〜${settings.endTime}
+- 昼休み: ${settings.breakStart}〜${settings.breakEnd}
+- 1枠: ${settings.slotDuration}分
+- 休診曜日: ${settings.closedDays.join('、')}
+${doctorSection}${cardNumberSection}
 
 ## 医院のWEBサイト情報
 ${hasRagInfo ? `以下の情報を**必ず参照して**回答してください。この情報に含まれる内容は正確に伝えてください。
@@ -153,8 +181,9 @@ ${ragContext}
 ## 重要なルール
 1. **WEBサイト情報に記載がある内容は、その情報を使って回答する**（料金、診療時間、アクセス、診療内容など）
 2. **医療アドバイスは絶対にしない** - 症状の診断や治療法の提案はしない
-3. 敬語で丁寧に対応する
-4. 回答は簡潔に
+3. **お名前は必ずカタカナで入力してもらう**（漢字の表記揺れ防止のため）
+4. 敬語で丁寧に対応する
+5. 回答は簡潔に
 
 ## 対応の使い分け
 - **医院情報の質問**（料金、診療時間、アクセス、診療内容など） → **WEBサイト情報を参照して回答**
@@ -165,11 +194,12 @@ ${ragContext}
 1. 予約希望を確認
 2. 希望日時を確認 → 空き枠を検索（get_available_slots を使用）
 3. 空き枠から選んでもらう
-4. お名前を確認
-5. 電話番号を確認
-6. （任意）症状・相談内容を確認
-7. 予約を確定（create_appointment を使用）
-8. 確認内容を表示`;
+${settings.useDoctorSelection && settings.doctorList.length > 0 ? `4. 担当医のご希望を確認 → 「${settings.doctorList.join('、')}がおります。特にご希望がなければ『なし』でも大丈夫です」
+5. ` : '4. '}お名前を確認（**カタカナで**と伝える）
+${settings.useDoctorSelection && settings.doctorList.length > 0 ? '6' : '5'}. 電話番号を確認
+${settings.usePatientCardNumber ? (settings.useDoctorSelection && settings.doctorList.length > 0 ? '7' : '6') + '. 診察券番号を確認（任意）\n' : ''}${settings.useDoctorSelection && settings.doctorList.length > 0 ? (settings.usePatientCardNumber ? '8' : '7') : (settings.usePatientCardNumber ? '7' : '6')}. （任意）症状・相談内容を確認
+${settings.useDoctorSelection && settings.doctorList.length > 0 ? (settings.usePatientCardNumber ? '9' : '8') : (settings.usePatientCardNumber ? '8' : '7')}. 予約を確定（create_appointment を使用）
+${settings.useDoctorSelection && settings.doctorList.length > 0 ? (settings.usePatientCardNumber ? '10' : '9') : (settings.usePatientCardNumber ? '9' : '8')}. 確認内容を表示`;
 }
 
 /**
@@ -181,7 +211,10 @@ export async function runHybridChat(
   messages: HybridChatMessage[],
   onToken?: (token: string) => void
 ): Promise<HybridChatResult> {
-  // ① RAG検索を実行（最新のユーザーメッセージで検索）
+  // ① 設定を取得（AIがget_clinic_infoを呼ばなくても設定を知れるように）
+  const settings = await getClinicSettings(spreadsheetId);
+
+  // ② RAG検索を実行（最新のユーザーメッセージで検索）
   const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
   const query = lastUserMessage?.content || '';
 
@@ -192,8 +225,8 @@ export async function runHybridChat(
     console.error('[Hybrid] RAG search failed, continuing with appointment only:', error);
   }
 
-  // ② システムプロンプトを生成（RAG情報を含む）
-  const systemPrompt = getHybridSystemPrompt(ragContext);
+  // ③ システムプロンプトを生成（RAG情報 + 医院設定を含む）
+  const systemPrompt = getHybridSystemPrompt(ragContext, settings);
 
   const fullMessages = [
     { role: 'system' as const, content: systemPrompt },
@@ -334,12 +367,27 @@ async function executeToolCall(
     }
 
     case 'create_appointment': {
+      // 設定を取得してバリデーション
+      const settings = await getClinicSettings(spreadsheetId);
+
+      // 担当医選択が有効なのに doctor が未入力ならエラー
+      if (settings.useDoctorSelection && settings.doctorList.length > 0 && !args.doctor) {
+        return `担当医の確認が必要です。「${settings.doctorList.join('、')}」の中からご希望を確認するか、特にご希望がなければ「なし」と入力してください。`;
+      }
+
+      // 診察券番号が有効なのに未入力ならエラー
+      if (settings.usePatientCardNumber && !args.patient_card_number) {
+        return `診察券番号の確認が必要です。「診察券番号をお持ちでしたらお伝えください。初診の方や番号がわからない場合は『なし』で大丈夫です」と確認してください。`;
+      }
+
       const result = await createAppointment(spreadsheetId, {
         date: args.date,
         time: args.time,
         patientName: args.patient_name,
         patientPhone: args.patient_phone,
         patientEmail: args.patient_email || '',
+        patientCardNumber: args.patient_card_number || '',
+        doctor: args.doctor || '',
         symptom: args.symptom || '',
         bookedVia: 'ChatBot',
       });
@@ -347,7 +395,6 @@ async function executeToolCall(
       if (result.success) {
         // メール送信（患者にメールアドレスがある場合）
         if (args.patient_email) {
-          const settings = await getClinicSettings(spreadsheetId);
           sendAppointmentConfirmationEmail({
             patientName: args.patient_name,
             patientEmail: args.patient_email,
@@ -359,7 +406,12 @@ async function executeToolCall(
             console.error('[Hybrid] Email send error:', err);
           });
         }
-        return `予約が完了しました。日時: ${args.date} ${args.time}、患者名: ${args.patient_name}`;
+        // 結果メッセージを組み立て
+        let confirmMsg = `予約が完了しました。日時: ${args.date} ${args.time}、患者名: ${args.patient_name}`;
+        if (args.doctor) {
+          confirmMsg += `、担当医: ${args.doctor}`;
+        }
+        return confirmMsg;
       } else {
         return `予約に失敗しました: ${result.message}`;
       }
@@ -367,11 +419,21 @@ async function executeToolCall(
 
     case 'get_clinic_info': {
       const settings = await getClinicSettings(spreadsheetId);
-      return `医院名: ${settings.clinicName}
+      let info = `医院名: ${settings.clinicName}
 診療時間: ${settings.startTime}〜${settings.endTime}
 昼休み: ${settings.breakStart}〜${settings.breakEnd}
 1枠: ${settings.slotDuration}分
 休診曜日: ${settings.closedDays.join('、')}`;
+
+      // 担当医リストがある場合は追加
+      if (settings.useDoctorSelection && settings.doctorList.length > 0) {
+        info += `\n担当医: ${settings.doctorList.join('、')}`;
+      }
+      // 診察券番号使用の案内
+      if (settings.usePatientCardNumber) {
+        info += `\n※再診の方は診察券番号をお伝えください`;
+      }
+      return info;
     }
 
     default:

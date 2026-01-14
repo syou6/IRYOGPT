@@ -14,6 +14,10 @@ export interface ClinicSettings {
   slotDuration: number;   // 30 (分)
   maxAdvanceDays: number; // 30 (日)
   closedDays: string[];   // ["日", "祝"]
+  // オプション項目
+  usePatientCardNumber: boolean;  // 診察券番号を使用するか
+  useDoctorSelection: boolean;    // 担当医選択を使用するか
+  doctorList: string[];           // 担当医リスト ["田中先生", "山田先生"]
 }
 
 export interface TimeSlot {
@@ -28,6 +32,8 @@ export interface Appointment {
   patientName: string;
   patientPhone: string;
   patientEmail?: string;
+  patientCardNumber?: string;  // 診察券番号（任意）
+  doctor?: string;             // 担当医（任意）
   symptom?: string;
   status: string;         // "確定" | "キャンセル"
   bookedVia: string;      // "Bot" | "電話" | "Web"
@@ -37,14 +43,22 @@ export interface Appointment {
  * 設定シートから医院設定を取得
  */
 export async function getClinicSettings(spreadsheetId: string): Promise<ClinicSettings> {
-  const data = await readSheet(spreadsheetId, '設定!A2:B10');
+  const data = await readSheet(spreadsheetId, '設定!A2:B15');
 
   const settings: Record<string, string> = {};
   for (const row of data) {
     if (row[0] && row[1]) {
-      settings[row[0]] = row[1];
+      // キーと値の両方から余分な空白を除去
+      const key = row[0].toString().trim();
+      const value = row[1].toString().trim();
+      settings[key] = value;
     }
   }
+
+  // デバッグログ
+  console.log('[ClinicSettings] Raw settings:', JSON.stringify(settings, null, 2));
+  console.log('[ClinicSettings] useDoctorSelection:', settings['担当医選択を使用']);
+  console.log('[ClinicSettings] doctorList:', settings['担当医リスト']);
 
   return {
     clinicName: settings['医院名'] || '',
@@ -55,6 +69,12 @@ export async function getClinicSettings(spreadsheetId: string): Promise<ClinicSe
     slotDuration: parseInt(settings['1枠の時間（分）'] || '30', 10),
     maxAdvanceDays: parseInt(settings['予約可能日数（何日先まで）'] || '30', 10),
     closedDays: (settings['休診曜日'] || '日,祝').split(',').map(s => s.trim()),
+    // オプション項目
+    usePatientCardNumber: settings['診察券番号を使用'] === 'はい',
+    useDoctorSelection: settings['担当医選択を使用'] === 'はい',
+    doctorList: settings['担当医リスト']
+      ? settings['担当医リスト'].split(',').map(s => s.trim())
+      : [],
   };
 }
 
@@ -81,25 +101,28 @@ export async function getHolidays(spreadsheetId: string): Promise<Date[]> {
 
 /**
  * 予約表から指定日の予約を取得
+ * カラム順: 日付, 時間, 患者名, 電話番号, メール, 診察券番号, 担当医, 症状, ステータス, 予約経由
  */
 export async function getAppointmentsByDate(
   spreadsheetId: string,
   targetDate: string
 ): Promise<Appointment[]> {
-  const data = await readSheet(spreadsheetId, '予約表!A2:H1000');
+  const data = await readSheet(spreadsheetId, '予約表!A2:J1000');
   const appointments: Appointment[] = [];
 
   for (const row of data) {
-    if (row[0] === targetDate && row[6] !== 'キャンセル') {
+    if (row[0] === targetDate && row[8] !== 'キャンセル') {
       appointments.push({
         date: row[0],
         time: row[1],
         patientName: row[2] || '',
         patientPhone: row[3] || '',
         patientEmail: row[4] || '',
-        symptom: row[5] || '',
-        status: row[6] || '確定',
-        bookedVia: row[7] || '',
+        patientCardNumber: row[5] || '',
+        doctor: row[6] || '',
+        symptom: row[7] || '',
+        status: row[8] || '確定',
+        bookedVia: row[9] || '',
       });
     }
   }
@@ -109,6 +132,7 @@ export async function getAppointmentsByDate(
 
 /**
  * 予約表から全予約を取得（日付範囲でフィルタ可能）
+ * カラム順: 日付, 時間, 患者名, 電話番号, メール, 診察券番号, 担当医, 症状, ステータス, 予約経由
  */
 export async function getAllAppointments(
   spreadsheetId: string,
@@ -118,7 +142,7 @@ export async function getAllAppointments(
     includeCancel?: boolean;
   }
 ): Promise<Appointment[]> {
-  const data = await readSheet(spreadsheetId, '予約表!A2:H1000');
+  const data = await readSheet(spreadsheetId, '予約表!A2:J1000');
   const appointments: Appointment[] = [];
 
   for (const row of data) {
@@ -130,9 +154,11 @@ export async function getAllAppointments(
       patientName: row[2] || '',
       patientPhone: row[3] || '',
       patientEmail: row[4] || '',
-      symptom: row[5] || '',
-      status: row[6] || '確定',
-      bookedVia: row[7] || '',
+      patientCardNumber: row[5] || '',
+      doctor: row[6] || '',
+      symptom: row[7] || '',
+      status: row[8] || '確定',
+      bookedVia: row[9] || '',
     };
 
     // キャンセル済みをフィルタ
@@ -255,14 +281,16 @@ export async function createAppointment(
     return { success: false, message: 'この枠は既に予約されています' };
   }
 
-  // 予約を追加
-  await appendToSheet(spreadsheetId, '予約表!A:H', [
+  // 予約を追加（カラム: 日付, 時間, 患者名, 電話番号, メール, 診察券番号, 担当医, 症状, ステータス, 予約経由）
+  await appendToSheet(spreadsheetId, '予約表!A:J', [
     [
       appointment.date,
       appointment.time,
       appointment.patientName,
       appointment.patientPhone,
       appointment.patientEmail || '',
+      appointment.patientCardNumber || '',
+      appointment.doctor || '',
       appointment.symptom || '',
       '確定',
       appointment.bookedVia || 'Bot',
@@ -274,6 +302,7 @@ export async function createAppointment(
 
 /**
  * 予約をキャンセル（ステータスを「キャンセル」に更新）
+ * カラム順: 日付, 時間, 患者名, 電話番号, メール, 診察券番号, 担当医, 症状, ステータス, 予約経由
  */
 export async function cancelAppointment(
   spreadsheetId: string,
@@ -281,11 +310,11 @@ export async function cancelAppointment(
   targetTime: string
 ): Promise<{ success: boolean; message: string; rowIndex?: number }> {
   // 予約表を全件取得して該当行を探す
-  const data = await readSheet(spreadsheetId, '予約表!A2:H1000');
+  const data = await readSheet(spreadsheetId, '予約表!A2:J1000');
 
   let rowIndex = -1;
   for (let i = 0; i < data.length; i++) {
-    if (data[i][0] === targetDate && data[i][1] === targetTime && data[i][6] !== 'キャンセル') {
+    if (data[i][0] === targetDate && data[i][1] === targetTime && data[i][8] !== 'キャンセル') {
       rowIndex = i + 2; // ヘッダー行を考慮
       break;
     }
@@ -295,8 +324,8 @@ export async function cancelAppointment(
     return { success: false, message: '該当する予約が見つかりません' };
   }
 
-  // ステータスを「キャンセル」に更新
-  await updateSheet(spreadsheetId, `予約表!G${rowIndex}`, [['キャンセル']]);
+  // ステータスを「キャンセル」に更新（I列 = index 8）
+  await updateSheet(spreadsheetId, `予約表!I${rowIndex}`, [['キャンセル']]);
 
   return { success: true, message: '予約をキャンセルしました', rowIndex };
 }

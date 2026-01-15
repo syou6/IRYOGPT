@@ -93,7 +93,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
   const styles = [
     '.sgpt-widget{position:fixed;right:24px;bottom:24px;z-index:9999;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;color:#e2e8f0}',
     '.sgpt-widget *{box-sizing:border-box;font-family:inherit}',
-    '.sgpt-fab{width:60px;height:60px;border-radius:999px;background:transparent;color:#0f172a;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .3s ease}',
+    '.sgpt-fab{width:60px;height:60px;border-radius:999px;background:linear-gradient(135deg,#34d399,#6ee7b7,#22d3ee);color:#0f172a;border:none;box-shadow:0 20px 40px rgba(15,23,42,.3);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .3s ease}',
     '.sgpt-fab:hover{transform:translateY(-4px)}',
     '.sgpt-chat-panel{position:absolute;right:0;bottom:80px;width:min(360px,90vw);height:520px;border-radius:28px;border:1px solid rgba(255,255,255,.08);background:rgba(3,7,18,.92);box-shadow:0 45px 120px rgba(1,3,6,.75);backdrop-filter:blur(30px);display:flex;flex-direction:column;opacity:0;pointer-events:none;transform:translateY(20px);transition:all .35s cubic-bezier(.21,1.02,.73,1)}',
     '.sgpt-widget.is-open .sgpt-chat-panel{opacity:1;pointer-events:auto;transform:translateY(0)}',
@@ -164,8 +164,8 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     const iconImg = document.createElement('img');
     iconImg.src = iconUrl;
     iconImg.alt = 'WEBGPT';
-    iconImg.style.width = '56px';
-    iconImg.style.height = '56px';
+    iconImg.style.width = '36px';
+    iconImg.style.height = '36px';
     iconImg.style.objectFit = 'contain';
     iconImg.onerror = function() {
       toggleBtn.innerHTML = '💬';

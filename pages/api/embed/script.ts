@@ -73,7 +73,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
   // 変数を安全にエスケープ
   const escapedSiteId = JSON.stringify(siteId);
   const escapedApiBaseUrl = JSON.stringify(apiBaseUrl);
-  const iconUrl = `${apiBaseUrl}/icons/bee-icon.png`;
+  const iconUrl = `${apiBaseUrl}/icons/bee-icon.png?v=2`;
   const escapedIconUrl = JSON.stringify(iconUrl);
   // バッククォートを含む正規表現パターンをエスケープ
   const backtick3 = '```';

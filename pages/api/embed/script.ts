@@ -73,7 +73,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
   // 変数を安全にエスケープ
   const escapedSiteId = JSON.stringify(siteId);
   const escapedApiBaseUrl = JSON.stringify(apiBaseUrl);
-  const iconUrl = `${apiBaseUrl}/icons/chat-icon.png`;
+  const iconUrl = `${apiBaseUrl}/icons/bee-icon.png`;
   const escapedIconUrl = JSON.stringify(iconUrl);
   // バッククォートを含む正規表現パターンをエスケープ
   const backtick3 = '```';
@@ -159,7 +159,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
   const chatContainer = document.getElementById('webgpt-chat-container');
   const toggleBtn = document.getElementById('webgpt-toggle-btn');
   
-  // アイコンを設定（chat-icon.pngを使用）
+  // アイコンを設定（bee-icon.pngを使用）
   if (toggleBtn) {
     const iconImg = document.createElement('img');
     iconImg.src = iconUrl;

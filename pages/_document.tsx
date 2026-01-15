@@ -4,9 +4,9 @@ export default function Document() {
   return (
     <Html lang="en">
       <Head>
-        <link rel="icon" href="/icons/chat-icon.png" type="image/png" />
-        <link rel="shortcut icon" href="/icons/chat-icon.png" type="image/png" />
-        <link rel="apple-touch-icon" href="/icons/chat-icon.png" />
+        <link rel="icon" href="/icons/bee-icon.png" type="image/png" />
+        <link rel="shortcut icon" href="/icons/bee-icon.png" type="image/png" />
+        <link rel="apple-touch-icon" href="/icons/bee-icon.png" />
       </Head>
       <body>
         <Main />

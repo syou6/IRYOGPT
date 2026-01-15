@@ -9,17 +9,17 @@ module.exports = {
     extend: {
       colors: {
         premium: {
-          /* ライトテーマ */
-          base: '#FFFFFF',
-          surface: '#F8FAFB',
-          elevated: '#F1F5F4',
-          card: '#FFFFFF',
-          stroke: '#E5E7EB',
-          accent: '#19C37D',
-          accentDeep: '#0F8A5F',
-          accentGlow: '#7AF4C1',
-          text: '#111827',
-          muted: '#6B7280',
+          /* CSS変数でテーマ切り替え対応 */
+          base: 'var(--color-base)',
+          surface: 'var(--color-surface)',
+          elevated: 'var(--color-elevated)',
+          card: 'var(--color-card)',
+          stroke: 'var(--color-stroke)',
+          accent: 'var(--color-accent)',
+          accentDeep: 'var(--color-accent-deep)',
+          accentGlow: 'var(--color-accent-glow)',
+          text: 'var(--color-text)',
+          muted: 'var(--color-text-muted)',
           danger: '#EF4444',
           warning: '#F59E0B',
         },

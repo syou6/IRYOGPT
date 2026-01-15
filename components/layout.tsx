@@ -17,12 +17,8 @@ const navLinks = [
   { label: 'プラン', href: '/dashboard/plans' },
 ];
 
-export default function Layout({ children, showShellHeader = true, fullWidth = false, darkMode }: LayoutProps) {
+export default function Layout({ children, showShellHeader = true, fullWidth = false, darkMode = false }: LayoutProps) {
   const router = useRouter();
-
-  // ダッシュボードページは自動的にダークモードを適用
-  const isDashboard = router.pathname.startsWith('/dashboard');
-  const useDarkMode = darkMode ?? isDashboard;
 
   const mainContent = (
     <main className={clsx('flex flex-1 flex-col', fullWidth ? '' : 'gap-6 pb-16')}>
@@ -31,7 +27,7 @@ export default function Layout({ children, showShellHeader = true, fullWidth = f
   );
 
   return (
-    <div className={clsx('relative min-h-screen bg-premium-base text-premium-text', useDarkMode && 'theme-dark')}>
+    <div className={clsx('relative min-h-screen bg-premium-base text-premium-text', darkMode && 'theme-dark')}>
       <div className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute -top-40 right-[-10%] h-72 w-72 rounded-full bg-[radial-gradient(circle_at_top,_rgba(122,244,193,0.25),_transparent_60%)] blur-3xl" />
         <div className="absolute -bottom-32 left-[-10%] h-80 w-80 rounded-full bg-[radial-gradient(circle_at_top,_rgba(25,195,125,0.25),_transparent_60%)] blur-3xl" />

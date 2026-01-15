@@ -647,7 +647,7 @@ export default function Dashboard() {
       idle: 'border-premium-stroke/40 bg-premium-surface/70 text-premium-muted',
       training: 'border-emerald-400/30 bg-emerald-400/15 text-premium-accent animate-pulse',
       ready: 'border-emerald-400/40 bg-emerald-500/20 text-premium-accent',
-      error: 'border-rose-400/40 bg-rose-500/20 text-rose-100',
+      error: 'border-rose-400/40 bg-rose-500/20 text-rose-600',
     } as const;
     return (
       <span
@@ -850,7 +850,7 @@ export default function Dashboard() {
           )}
 
         {sites.length > 0 && !planLoading && (!userPlan || userPlan === 'pending') && (
-          <div className="mb-6 rounded-3xl border border-emerald-400/40 bg-emerald-400/10 p-4 text-sm text-emerald-50 shadow-[0_25px_80px_rgba(16,185,129,0.15)] sm:p-5">
+          <div className="mb-6 rounded-3xl border border-emerald-400/40 bg-emerald-400/10 p-4 text-sm text-emerald-700 shadow-[0_25px_80px_rgba(16,185,129,0.15)] sm:p-5">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-base font-semibold text-premium-text">サイト登録ありがとうございます！</p>
@@ -1035,7 +1035,7 @@ export default function Dashboard() {
                       )}
                       <button
                         onClick={() => handleDeleteSite(site.id)}
-                        className="w-full rounded-full border border-rose-500/40 bg-rose-500/10 px-4 py-2.5 text-sm font-medium text-rose-100 transition hover:bg-rose-500/20 sm:w-auto"
+                        className="w-full rounded-full border border-rose-500/40 bg-rose-500/10 px-4 py-2.5 text-sm font-medium text-rose-600 transition hover:bg-rose-500/20 sm:w-auto"
                       >
                         削除
                       </button>
@@ -1177,7 +1177,7 @@ export default function Dashboard() {
                                 const newInputs = urlInputs.filter((_, i) => i !== index);
                                 setUrlInputs(newInputs.length > 0 ? newInputs : ['']);
                               }}
-                              className="rounded-2xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm font-medium text-rose-100 transition hover:bg-rose-500/20"
+                              className="rounded-2xl border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-sm font-medium text-rose-600 transition hover:bg-rose-500/20"
                               aria-label="この入力フィールドを削除"
                             >
                               ✕
@@ -1203,7 +1203,7 @@ export default function Dashboard() {
                                     urlList: formData.urlList.filter((_, i) => i !== index),
                                   });
                                 }}
-                                className="ml-2 text-xs text-rose-200 hover:text-rose-100"
+                                className="ml-2 text-xs text-rose-500 hover:text-rose-600"
                                 aria-label="削除"
                               >
                                 ✕

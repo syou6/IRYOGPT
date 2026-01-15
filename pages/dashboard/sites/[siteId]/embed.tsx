@@ -350,7 +350,7 @@ export default function EmbedSettingsPage() {
     return (
       <Layout>
         <div className="flex min-h-screen items-center justify-center">
-          <div className="rounded-full border border-white/10 bg-white/5 px-6 py-3 text-xs uppercase tracking-[0.25em] text-slate-200">
+          <div className="rounded-full border border-premium-stroke bg-premium-surface px-6 py-3 text-xs uppercase tracking-[0.25em] text-premium-text">
             読み込み中...
           </div>
         </div>
@@ -361,30 +361,30 @@ export default function EmbedSettingsPage() {
   if (!site && !loading) {
     return (
       <Layout>
-        <div className="relative mx-auto max-w-4xl px-4 py-8 text-slate-100">
+        <div className="relative mx-auto max-w-4xl px-4 py-8 text-premium-text">
           <div className="pointer-events-none absolute inset-0">
             <div className="absolute right-0 top-0 h-48 w-48 rounded-full bg-emerald-500/20 blur-3xl" />
           </div>
-          <div className="relative rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_35px_120px_rgba(1,6,3,0.6)] backdrop-blur-2xl">
+          <div className="relative rounded-[32px] border border-premium-stroke bg-premium-surface p-6 shadow-[0_25px_60px_rgba(0,0,0,0.08)] backdrop-blur-2xl">
             <div className="mb-6">
               <Link
                 href="/dashboard"
-                className="mb-2 inline-flex items-center text-[11px] uppercase tracking-[0.35em] text-emerald-200/80"
+                className="mb-2 inline-flex items-center text-[11px] uppercase tracking-[0.35em] text-emerald-600/80"
               >
                 ← ダッシュボード
               </Link>
-              <h1 className="text-2xl font-semibold text-white">埋め込み設定</h1>
+              <h1 className="text-2xl font-semibold text-premium-text">埋め込み設定</h1>
             </div>
             {error ? (
               <div className="rounded-2xl border border-rose-400/30 bg-rose-500/10 p-4">
-                <h3 className="text-sm font-semibold text-rose-100 mb-2">エラー</h3>
-                <p className="text-sm text-rose-50">{error}</p>
-                <p className="text-xs text-rose-200 mt-2">siteId: {siteId || '未取得'}</p>
+                <h3 className="text-sm font-semibold text-rose-700 mb-2">エラー</h3>
+                <p className="text-sm text-rose-600">{error}</p>
+                <p className="text-xs text-rose-600 mt-2">siteId: {siteId || '未取得'}</p>
               </div>
             ) : (
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-center text-slate-200">
+              <div className="rounded-2xl border border-premium-stroke bg-premium-surface p-4 text-center text-premium-text">
                 <p>サイトが見つかりません</p>
-                <p className="mt-2 text-xs text-slate-400">siteId: {siteId || '未取得'}</p>
+                <p className="mt-2 text-xs text-premium-muted">siteId: {siteId || '未取得'}</p>
               </div>
             )}
           </div>
@@ -397,7 +397,7 @@ export default function EmbedSettingsPage() {
     return (
       <Layout>
         <div className="flex min-h-screen items-center justify-center">
-          <div className="rounded-full border border-white/10 bg-white/5 px-6 py-3 text-xs uppercase tracking-[0.25em] text-slate-200">
+          <div className="rounded-full border border-premium-stroke bg-premium-surface px-6 py-3 text-xs uppercase tracking-[0.25em] text-premium-text">
             サイト情報を取得できませんでした
           </div>
         </div>
@@ -410,29 +410,29 @@ export default function EmbedSettingsPage() {
 
   return (
     <Layout>
-      <div className="relative mx-auto max-w-4xl px-4 py-8 text-slate-100">
+      <div className="relative mx-auto max-w-4xl px-4 py-8 text-premium-text">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-emerald-500/20 to-transparent blur-3xl" />
         </div>
 
-        <div className="relative space-y-6 rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_35px_120px_rgba(1,6,3,0.6)] backdrop-blur-2xl">
+        <div className="relative space-y-6 rounded-[32px] border border-premium-stroke bg-premium-surface p-6 shadow-[0_25px_60px_rgba(0,0,0,0.08)] backdrop-blur-2xl">
           {/* ヘッダー */}
-          <div className="border-b border-white/10 pb-6">
+          <div className="border-b border-premium-stroke pb-6">
             <Link
               href={`/dashboard/${site.id}`}
-              className="mb-2 inline-flex items-center text-[11px] uppercase tracking-[0.35em] text-emerald-200/80"
+              className="mb-2 inline-flex items-center text-[11px] uppercase tracking-[0.35em] text-emerald-600/80"
             >
               ← サイトに戻る
             </Link>
-            <h1 className="text-3xl font-semibold text-white">埋め込み設定</h1>
-            <p className="mt-1 text-slate-300">{site.name}</p>
+            <h1 className="text-3xl font-semibold text-premium-text">埋め込み設定</h1>
+            <p className="mt-1 text-premium-muted">{site.name}</p>
           </div>
 
           {/* ステータス警告 */}
           {site.status !== 'ready' && (
             <div className="rounded-3xl border border-amber-400/30 bg-amber-500/10 p-4">
               <div className="flex items-start gap-3">
-                <div className="rounded-full bg-amber-400/30 p-2 text-amber-200">
+                <div className="rounded-full bg-amber-400/30 p-2 text-amber-600">
                   <svg className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                     <path
                       fillRule="evenodd"
@@ -442,15 +442,15 @@ export default function EmbedSettingsPage() {
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-sm font-semibold text-amber-50">学習が完了していません</h3>
-                  <p className="mt-1 text-sm text-amber-100">
+                  <h3 className="text-sm font-semibold text-amber-700">学習が完了していません</h3>
+                  <p className="mt-1 text-sm text-amber-700">
                     埋め込み機能を使用するには、サイトのステータスが「ready」である必要があります。
                     現在のステータス: <span className="font-semibold">{site.status}</span>
                   </p>
                   {site.status === 'idle' && (
                     <Link
                       href={`/dashboard/${site.id}`}
-                      className="mt-2 inline-flex text-xs font-medium text-amber-50 underline-offset-4 hover:underline"
+                      className="mt-2 inline-flex text-xs font-medium text-amber-700 underline-offset-4 hover:underline"
                     >
                       学習を開始する →
                     </Link>
@@ -461,22 +461,22 @@ export default function EmbedSettingsPage() {
           )}
 
           {/* 埋め込み有効化スイッチ */}
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+          <div className="rounded-3xl border border-premium-stroke bg-premium-surface p-6">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <h2 className="text-lg font-semibold text-white">埋め込み機能を有効にする</h2>
-                <p className="mt-1 text-sm text-slate-300">
+                <h2 className="text-lg font-semibold text-premium-text">埋め込み機能を有効にする</h2>
+                <p className="mt-1 text-sm text-premium-muted">
                   このサイトにチャットボットウィジェットを埋め込むことができます。
                   {site.status !== 'ready' && (
-                    <span className="font-medium text-amber-200"> （学習完了後に有効化できます）</span>
+                    <span className="font-medium text-amber-600"> （学習完了後に有効化できます）</span>
                   )}
                 </p>
               </div>
               <button
                 onClick={handleToggleEmbed}
                 disabled={saving || site.status !== 'ready'}
-                className={`relative inline-flex h-7 w-14 flex-shrink-0 cursor-pointer items-center rounded-full border border-white/10 transition ${
-                  isEmbedEnabled ? 'bg-gradient-to-r from-emerald-400 to-cyan-300' : 'bg-white/10'
+                className={`relative inline-flex h-7 w-14 flex-shrink-0 cursor-pointer items-center rounded-full border border-premium-stroke transition ${
+                  isEmbedEnabled ? 'bg-gradient-to-r from-emerald-400 to-cyan-300' : 'bg-premium-elevated'
                 } ${saving || site.status !== 'ready' ? 'cursor-not-allowed opacity-40' : ''}`}
               >
                 <span
@@ -489,10 +489,10 @@ export default function EmbedSettingsPage() {
           </div>
 
           {/* チャットモード設定 */}
-          <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
+          <div className="rounded-3xl border border-premium-stroke bg-premium-surface p-6">
             <div className="mb-4">
-              <h2 className="text-lg font-semibold text-white">チャットモード設定</h2>
-              <p className="mt-1 text-sm text-slate-300">
+              <h2 className="text-lg font-semibold text-premium-text">チャットモード設定</h2>
+              <p className="mt-1 text-sm text-premium-muted">
                 チャットボットの動作モードを選択します。
               </p>
             </div>
@@ -500,7 +500,7 @@ export default function EmbedSettingsPage() {
             <div className="space-y-6">
               {/* チャットモード選択 */}
               <div>
-                <label className="block text-sm font-medium text-slate-200 mb-3">
+                <label className="block text-sm font-medium text-premium-text mb-3">
                   モード選択
                 </label>
                 <div className="grid gap-3 sm:grid-cols-3">
@@ -512,7 +512,7 @@ export default function EmbedSettingsPage() {
                       className={`relative rounded-xl border p-4 text-left transition ${
                         chatMode === option.value
                           ? 'border-emerald-400/50 bg-emerald-500/20'
-                          : 'border-white/10 bg-white/5 hover:border-white/20 hover:bg-white/10'
+                          : 'border-premium-stroke bg-premium-surface hover:border-premium-stroke hover:bg-premium-elevated'
                       } ${savingChatMode ? 'cursor-not-allowed opacity-50' : ''}`}
                     >
                       <div className="flex items-center gap-2">
@@ -528,12 +528,12 @@ export default function EmbedSettingsPage() {
                           )}
                         </div>
                         <span className={`text-sm font-medium ${
-                          chatMode === option.value ? 'text-emerald-100' : 'text-slate-200'
+                          chatMode === option.value ? 'text-emerald-700' : 'text-premium-text'
                         }`}>
                           {option.label}
                         </span>
                       </div>
-                      <p className="mt-2 text-xs text-slate-400">{option.description}</p>
+                      <p className="mt-2 text-xs text-premium-muted">{option.description}</p>
                     </button>
                   ))}
                 </div>
@@ -541,8 +541,8 @@ export default function EmbedSettingsPage() {
 
               {/* スプレッドシートID設定（予約モードの場合のみ表示） */}
               {(chatMode === 'appointment_only' || chatMode === 'hybrid') && (
-                <div className="border-t border-white/10 pt-6">
-                  <label className="block text-sm font-medium text-slate-200 mb-2">
+                <div className="border-t border-premium-stroke pt-6">
+                  <label className="block text-sm font-medium text-premium-text mb-2">
                     スプレッドシートID または URL
                   </label>
                   <div className="flex gap-2">
@@ -551,28 +551,28 @@ export default function EmbedSettingsPage() {
                       value={spreadsheetId}
                       onChange={(e) => setSpreadsheetId(e.target.value)}
                       placeholder="例: 136Iu0vdefE7h-UibePv0wyk_WIN-XGm1PCoES1u32lc"
-                      className="flex-1 rounded-xl border border-white/10 bg-black/30 px-4 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-emerald-400/50 focus:outline-none focus:ring-1 focus:ring-emerald-400/50"
+                      className="flex-1 rounded-xl border border-premium-stroke bg-slate-100 px-4 py-2.5 text-sm text-premium-text placeholder-slate-400 focus:border-emerald-400/50 focus:outline-none focus:ring-1 focus:ring-emerald-400/50"
                     />
                     <button
                       onClick={handleSaveSpreadsheet}
                       disabled={savingSpreadsheet}
                       className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition ${
                         spreadsheetSaved
-                          ? 'bg-emerald-500 text-white'
+                          ? 'bg-emerald-500 text-premium-text'
                           : 'bg-gradient-to-r from-emerald-400 via-green-300 to-cyan-300 text-slate-900 shadow-[0_10px_20px_rgba(16,185,129,0.25)]'
                       } ${savingSpreadsheet ? 'cursor-not-allowed opacity-50' : 'hover:opacity-90'}`}
                     >
                       {spreadsheetSaved ? '保存済み' : savingSpreadsheet ? '保存中...' : '保存'}
                     </button>
                   </div>
-                  <p className="mt-2 text-xs text-slate-400">
+                  <p className="mt-2 text-xs text-premium-muted">
                     Google スプレッドシートのURL全体を貼り付けても、IDだけを貼り付けても大丈夫です。
                   </p>
 
                   {site.spreadsheet_id && (
                     <div className="mt-4 rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-4">
-                      <div className="flex items-center gap-2 text-sm text-emerald-100">
-                        <svg className="h-5 w-5 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <div className="flex items-center gap-2 text-sm text-emerald-700">
+                        <svg className="h-5 w-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <span className="font-medium">スプレッドシート連携済み</span>
@@ -581,7 +581,7 @@ export default function EmbedSettingsPage() {
                         href={`https://docs.google.com/spreadsheets/d/${site.spreadsheet_id}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-emerald-300 hover:text-emerald-200"
+                        className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-emerald-600 hover:text-emerald-600"
                       >
                         スプレッドシートを開く
                         <svg className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="none">
@@ -594,13 +594,13 @@ export default function EmbedSettingsPage() {
 
                   {!site.spreadsheet_id && (
                     <div className="mt-4 rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4">
-                      <div className="flex items-center gap-2 text-sm text-amber-100">
+                      <div className="flex items-center gap-2 text-sm text-amber-700">
                         <svg className="h-5 w-5 text-amber-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                         </svg>
                         <span className="font-medium">スプレッドシートIDを設定してください</span>
                       </div>
-                      <p className="mt-2 text-xs text-amber-200/80">
+                      <p className="mt-2 text-xs text-amber-600/80">
                         予約機能を使用するには、スプレッドシートIDの設定が必要です。
                       </p>
                     </div>
@@ -609,24 +609,24 @@ export default function EmbedSettingsPage() {
               )}
 
               {/* 現在のモード状態表示 */}
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
-                <h3 className="text-sm font-medium text-slate-200 mb-2">現在の設定</h3>
+              <div className="rounded-2xl border border-premium-stroke bg-premium-surface p-4">
+                <h3 className="text-sm font-medium text-premium-text mb-2">現在の設定</h3>
                 <div className="flex flex-wrap gap-2">
-                  <span className="inline-flex items-center rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-medium text-emerald-200">
+                  <span className="inline-flex items-center rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-medium text-emerald-600">
                     {CHAT_MODE_OPTIONS.find(o => o.value === chatMode)?.label || 'RAGのみ'}
                   </span>
                   {(chatMode === 'appointment_only' || chatMode === 'hybrid') && site.spreadsheet_id && (
-                    <span className="inline-flex items-center rounded-full bg-cyan-500/20 px-3 py-1 text-xs font-medium text-cyan-200">
+                    <span className="inline-flex items-center rounded-full bg-cyan-500/20 px-3 py-1 text-xs font-medium text-cyan-700">
                       スプレッドシート連携済み
                     </span>
                   )}
                   {chatMode === 'hybrid' && (
-                    <span className="inline-flex items-center rounded-full bg-purple-500/20 px-3 py-1 text-xs font-medium text-purple-200">
+                    <span className="inline-flex items-center rounded-full bg-purple-500/20 px-3 py-1 text-xs font-medium text-purple-700">
                       WEB情報 + 予約対応
                     </span>
                   )}
                 </div>
-                <p className="mt-2 text-xs text-slate-400">
+                <p className="mt-2 text-xs text-premium-muted">
                   {chatMode === 'rag_only' && 'WEBサイトの情報を元に質問に回答します。'}
                   {chatMode === 'appointment_only' && 'スプレッドシートを使って予約対応のみを行います。'}
                   {chatMode === 'hybrid' && 'WEBサイト情報を参照しながら、予約対応も行います。（推奨）'}
@@ -637,18 +637,18 @@ export default function EmbedSettingsPage() {
 
           {/* 埋め込みスクリプト */}
           {isEmbedEnabled && site.status === 'ready' && (
-            <div className="space-y-4 rounded-3xl border border-white/10 bg-white/5 p-6">
+            <div className="space-y-4 rounded-3xl border border-premium-stroke bg-premium-surface p-6">
               <div>
-                <h2 className="text-lg font-semibold text-white">埋め込みスクリプト</h2>
-                <p className="mt-1 text-sm text-slate-300">
+                <h2 className="text-lg font-semibold text-premium-text">埋め込みスクリプト</h2>
+                <p className="mt-1 text-sm text-premium-muted">
                   以下のスクリプトタグを、埋め込みたいページの
-                  <code className="rounded bg-white/10 px-1 text-xs">&lt;/body&gt;</code>
+                  <code className="rounded bg-premium-elevated px-1 text-xs">&lt;/body&gt;</code>
                   タグの直前に追加してください。
                 </p>
               </div>
 
-              <div className="relative rounded-2xl border border-white/10 bg-black/30 p-4">
-                <code className="block break-all text-sm text-emerald-100">{scriptTag}</code>
+              <div className="relative rounded-2xl border border-premium-stroke bg-slate-100 p-4">
+                <code className="block break-all text-sm text-emerald-700">{scriptTag}</code>
                 <button
                   onClick={handleCopyScript}
                   className="absolute right-3 top-3 rounded-full bg-gradient-to-r from-emerald-400 via-green-300 to-cyan-300 px-4 py-1.5 text-xs font-semibold text-slate-900 shadow-[0_15px_25px_rgba(16,185,129,0.35)]"
@@ -657,7 +657,7 @@ export default function EmbedSettingsPage() {
                 </button>
               </div>
 
-              <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-4 text-sm text-emerald-50">
+              <div className="rounded-2xl border border-emerald-400/20 bg-emerald-500/10 p-4 text-sm text-emerald-700">
                 <h3 className="mb-2 text-sm font-semibold">📝 使用方法</h3>
                 <ol className="list-decimal space-y-1 pl-5">
                   <li>上記のスクリプトタグをコピーします</li>
@@ -670,26 +670,26 @@ export default function EmbedSettingsPage() {
 
           {/* スクリプトURL（デバッグ用） */}
           {isEmbedEnabled && site.status === 'ready' && (
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-              <h2 className="text-lg font-semibold text-white">スクリプトURL（参考）</h2>
-              <div className="mt-3 rounded-2xl border border-white/10 bg-black/30 p-4">
-                <code className="block break-all text-sm text-emerald-100">{embedScriptUrl}</code>
+            <div className="rounded-3xl border border-premium-stroke bg-premium-surface p-6">
+              <h2 className="text-lg font-semibold text-premium-text">スクリプトURL（参考）</h2>
+              <div className="mt-3 rounded-2xl border border-premium-stroke bg-slate-100 p-4">
+                <code className="block break-all text-sm text-emerald-700">{embedScriptUrl}</code>
               </div>
-              <p className="mt-2 text-xs text-slate-400">このURLに直接アクセスすると、埋め込みスクリプトが表示されます。</p>
+              <p className="mt-2 text-xs text-premium-muted">このURLに直接アクセスすると、埋め込みスクリプトが表示されます。</p>
             </div>
           )}
 
           {/* 無効化時のメッセージ */}
           {!isEmbedEnabled && (
-            <div className="rounded-3xl border border-dashed border-white/20 bg-white/5 p-6 text-center text-slate-200">
+            <div className="rounded-3xl border border-dashed border-premium-stroke bg-premium-surface p-6 text-center text-premium-text">
               <p>
                 埋め込み機能が無効になっています。
                 {site.status === 'ready' ? (
-                  <span className="block pt-2 text-sm text-slate-300">
+                  <span className="block pt-2 text-sm text-premium-muted">
                     上記のスイッチを有効にすると、埋め込みスクリプトが表示されます。
                   </span>
                 ) : (
-                  <span className="block pt-2 text-sm text-slate-300">
+                  <span className="block pt-2 text-sm text-premium-muted">
                     まず学習を完了して、ステータスを「ready」にしてください。
                   </span>
                 )}

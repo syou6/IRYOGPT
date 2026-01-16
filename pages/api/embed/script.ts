@@ -191,6 +191,9 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
 
   let autoScroll = false;
 
+  // 会話履歴を保存（[question, answer] のタプル形式）
+  let chatHistory = [];
+
   function updateScrollHint() {
     if (!messagesDiv) return;
     const nearBottom = messagesDiv.scrollHeight - (messagesDiv.scrollTop + messagesDiv.clientHeight) < 40;
@@ -389,6 +392,9 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     let answer = '';
     let bestSource = null;
 
+    // 現在の質問を保存（履歴追加用）
+    const currentQuestion = question;
+
     fetch(apiBaseUrl + '/api/embed/chat', {
       method: 'POST',
       headers: {
@@ -397,7 +403,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
       body: JSON.stringify({
         question: question,
         site_id: siteId,
-        history: [],
+        history: chatHistory,
       }),
     })
     .then(response => {
@@ -422,6 +428,10 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
             if (streamingMessageDiv) {
               updateStreamingMessage(streamingMessageDiv, answer, bestSource);
             }
+            // 会話履歴に追加
+            if (answer) {
+              chatHistory.push([currentQuestion, answer]);
+            }
             return;
           }
 
@@ -435,6 +445,10 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
             if (payload === '[DONE]') {
               if (streamingMessageDiv) {
                 updateStreamingMessage(streamingMessageDiv, answer, bestSource);
+              }
+              // 会話履歴に追加
+              if (answer) {
+                chatHistory.push([currentQuestion, answer]);
               }
               return;
             }

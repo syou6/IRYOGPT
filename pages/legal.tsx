@@ -2,7 +2,7 @@ import Link from 'next/link';
 import Layout from '@/components/layout';
 
 const legalRows = [
-  { label: '販売事業者名', value: 'WEBGPT' },
+  { label: '販売事業者名', value: 'よやくらく' },
   { label: '代表責任者', value: '川本 翔' },
   { label: '所在地', value: '東京都新宿区新宿1-36-2 新宿第七葉山ビル3F' },
   { label: '電話番号', value: '+81 852 52 7323' },
@@ -42,7 +42,7 @@ export default function LegalPage() {
           <p className="text-xs uppercase tracking-[0.35em] text-emerald-200">Legal</p>
           <h1 className="mt-2 text-4xl font-semibold text-white">特定商取引法に基づく表記</h1>
           <p className="mt-3 text-sm text-slate-300">
-            WEBGPT（運営会社：Tech Samurai合同会社）が提供するサービスに関する法定表記です。
+            よやくらく（運営会社：Tech Samurai合同会社）が提供するサービスに関する法定表記です。
           </p>
           <div className="mt-4 flex justify-center">
             <Link href="/" className="rounded-full border border-white/20 px-6 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10">

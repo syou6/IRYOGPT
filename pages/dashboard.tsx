@@ -669,7 +669,7 @@ export default function Dashboard() {
     const isTraining = site.status === 'training';
     const timeline = [
       { label: 'URL登録完了', done: true },
-      { label: 'WEBGPTが学習', done: isTraining || isReady },
+      { label: 'よやくらくが学習', done: isTraining || isReady },
       { label: 'チャットを埋め込んで公開', done: isReady },
     ];
 
@@ -677,7 +677,7 @@ export default function Dashboard() {
       ? '学習が完了しました。埋め込みコードを貼るとそのままチャットを稼働できます。'
       : isTraining
       ? '運営がURLをもとに学習を進めています。完了するとメールとダッシュボードでお知らせします。'
-      : 'WEBGPTチームが順次学習を開始します。追加URLがあればサポートまでお知らせください。';
+      : 'よやくらくチームが順次学習を開始します。追加URLがあればサポートまでお知らせください。';
 
     return (
       <div className="mt-6 space-y-3">
@@ -875,7 +875,7 @@ export default function Dashboard() {
             <div className="mb-6 rounded-3xl border border-premium-stroke/50 bg-premium-surface/70 p-4 text-sm text-premium-text shadow-[0_25px_80px_rgba(15,23,42,0.45)] sm:p-5">
             <p className="text-base font-semibold text-premium-text">ご契約ありがとうございます！</p>
             <p className="mt-1 text-xs text-premium-muted sm:text-sm">
-              WEBGPT チームが登録済み URL をもとにチャットボットの学習を開始します。対応完了までは管理者からのご連絡をお待ちください。
+              よやくらく チームが登録済み URL をもとにチャットボットの学習を開始します。対応完了までは管理者からのご連絡をお待ちください。
             </p>
             <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-premium-muted">
               <li>登録内容に不足がある場合はメールで確認させていただきます</li>

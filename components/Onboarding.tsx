@@ -12,7 +12,7 @@ interface OnboardingStep {
 const ONBOARDING_STEPS: OnboardingStep[] = [
   {
     id: 'welcome',
-    title: 'ようこそ WEBGPT へ',
+    title: 'ようこそ よやくらく へ',
     description: 'ここでは、学習させたいURLを登録しておくだけでOKです。学習と埋め込み設定はチームが代行します。',
     position: 'bottom',
   },

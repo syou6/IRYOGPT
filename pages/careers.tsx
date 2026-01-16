@@ -34,7 +34,7 @@ export default function CareersPage() {
             <p className="text-xs uppercase tracking-[0.35em] text-emerald-200">Careers</p>
             <h1 className="mt-2 text-4xl font-semibold text-white">採用情報</h1>
             <p className="mt-3 text-sm text-slate-300">
-              WEBGPTはサポート業務に寄り添える仲間を募集しています。フルリモート・副業可。
+              よやくらくはサポート業務に寄り添える仲間を募集しています。フルリモート・副業可。
             </p>
           </div>
           <div className="space-y-4">

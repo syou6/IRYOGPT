@@ -15,7 +15,7 @@ export default function Login() {
   const supabase = createSupabaseClient();
   const onboardingSteps = [
     { label: 'アカウント登録', helper: 'URLを登録するだけで準備完了' },
-    { label: 'WEBGPTが学習', helper: '運営が内容を確認しオペレーション' },
+    { label: 'よやくらくが学習', helper: '運営が内容を確認しオペレーション' },
     { label: '埋め込み & 公開', helper: 'コードを貼るだけでチャット稼働' },
   ];
 
@@ -87,7 +87,7 @@ export default function Login() {
 
         <div className="relative z-10 w-full max-w-lg rounded-[32px] border border-premium-stroke/40 bg-premium-surface/70 p-6 text-premium-text shadow-[0_45px_120px_rgba(1,8,4,0.65)] backdrop-blur-2xl sm:p-8">
           <div className="text-center">
-            <p className="text-xs uppercase tracking-[0.4em] text-premium-muted/80">WEBGPT Access</p>
+            <p className="text-xs uppercase tracking-[0.4em] text-premium-muted/80">よやくらく Access</p>
             <h1 className="mt-2 text-2xl font-semibold text-premium-text">
               {isSignUp ? '新規登録' : 'ログイン'}
             </h1>
@@ -186,7 +186,7 @@ export default function Login() {
               ))}
             </ol>
             <p className="mt-3 text-xs">
-              URL登録 → WEBGPTが学習 → 埋め込みコードを貼るだけでチャットが稼働します。
+              URL登録 → よやくらくが学習 → 埋め込みコードを貼るだけでチャットが稼働します。
             </p>
           </div>
         </div>

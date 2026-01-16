@@ -15,9 +15,9 @@ export default function AboutPage() {
           </Link>
           <div className="rounded-[32px] border border-white/10 bg-white/5 p-6">
             <p className="text-xs uppercase tracking-[0.35em] text-emerald-200">About</p>
-            <h1 className="mt-2 text-4xl font-semibold text-white">WEBGPTについて</h1>
+            <h1 className="mt-2 text-4xl font-semibold text-white">よやくらくについて</h1>
             <p className="mt-3 text-sm text-slate-300">
-              WEBGPT は、企業のカスタマーサポートを強化するために生まれた AI チャットボットプラットフォームです。
+              よやくらく は、医療・美容業界の予約対応を自動化するために生まれた AI チャットボットプラットフォームです。
               サポート現場の声をもとに、ブランドトーンを保ちながら 24/365 で応対できる体制づくりを支援しています。
             </p>
           </div>

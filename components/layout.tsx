@@ -40,7 +40,7 @@ export default function Layout({ children, showShellHeader = true, fullWidth = f
               <Link href="/" className="flex items-center gap-3 text-premium-text">
                 <WebgptIcon size={32} className="border-premium-stroke/80" />
                 <div>
-                  <p className="text-xs uppercase tracking-[0.4em] text-premium-muted">WEBGPT</p>
+                  <p className="text-xs uppercase tracking-[0.4em] text-premium-muted">よやくらく</p>
                   <p className="-mt-1 text-base font-semibold text-premium-text">Control Hub</p>
                 </div>
               </Link>
@@ -83,11 +83,11 @@ export default function Layout({ children, showShellHeader = true, fullWidth = f
         )}
       </div>
       <Script
-        src="https://webgpt-dun.vercel.app/api/embed/script?site_id=fe8aba45-7a35-41a5-9e57-9fbb88224c03"
+        src="https://iryogpt-gamma.vercel.app/api/embed/script?site_id=fe8aba45-7a35-41a5-9e57-9fbb88224c03"
         strategy="afterInteractive"
       />
             {/* <Script
-        src="http://localhost:3000/api/embed/script?site_id=64301a5f-50e2-4bd4-8268-b682633a0857"
+        src="http://localhost:3000/api/embed/script?site_id=fe8aba45-7a35-41a5-9e57-9fbb88224c03"
         strategy="afterInteractive"
       /> */}
     </div>

@@ -242,7 +242,7 @@ const COST_COMPARISON = {
     total: '年間 ¥400万円以上',
   },
   iryoGpt: {
-    title: 'IRYO GPTを導入する場合',
+    title: 'よやくらくを導入する場合',
     items: [
       { label: '月額費用', value: '¥100,000' },
       { label: '初期費用', value: '¥300,000（初回のみ）' },
@@ -314,7 +314,7 @@ export default function Home() {
               <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-premium-accent text-white font-bold text-lg">
                 IR
               </div>
-              <span className="text-xl font-bold text-premium-text">IRYO GPT</span>
+              <span className="text-xl font-bold text-premium-text">よやくらく</span>
             </Link>
             <nav className="hidden items-center gap-6 md:flex">
               {NAV_LINKS.map((link) => (
@@ -484,7 +484,7 @@ export default function Home() {
                   <p className="text-2xl font-bold text-red-700">{COST_COMPARISON.staff.total}</p>
                 </div>
               </div>
-              {/* IRYO GPT Cost */}
+              {/* よやくらく Cost */}
               <div className="rounded-2xl border-2 border-premium-accent bg-premium-accent/5 p-8">
                 <div className="flex items-center gap-3">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-premium-accent/20 to-premium-accent/30 text-premium-accent">
@@ -557,7 +557,7 @@ export default function Home() {
             <div className="text-center">
               <p className="text-premium-accent font-semibold">SOLUTION</p>
               <h2 className="mt-2 text-3xl font-bold text-premium-text sm:text-4xl">
-                IRYO GPTが解決します
+                よやくらくが解決します
               </h2>
               <p className="mt-4 text-lg text-premium-muted">
                 AI予約システムで業務効率を劇的に改善
@@ -693,7 +693,7 @@ export default function Home() {
             <div className="mx-auto mt-12 max-w-lg">
               <div className="overflow-hidden rounded-3xl border-2 border-premium-accent bg-white shadow-lg">
                 <div className="bg-premium-accent px-8 py-6 text-center text-white">
-                  <p className="text-sm font-medium opacity-90">IRYO GPT スタンダード</p>
+                  <p className="text-sm font-medium opacity-90">よやくらく スタンダード</p>
                   <p className="mt-2 text-4xl font-bold">¥100,000<span className="text-lg font-normal">/月</span></p>
                   <p className="mt-2 text-sm opacity-90">初期導入費用: ¥300,000（税別）</p>
                 </div>
@@ -792,10 +792,10 @@ export default function Home() {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-premium-accent text-white font-bold text-sm">
                 IR
               </div>
-              <span className="font-bold text-premium-text">IRYO GPT</span>
+              <span className="font-bold text-premium-text">よやくらく</span>
             </div>
             <p className="text-sm text-premium-muted">
-              © {new Date().getFullYear()} IRYO GPT. All rights reserved.
+              © {new Date().getFullYear()} よやくらく. All rights reserved.
             </p>
           </div>
         </footer>

@@ -16,7 +16,7 @@ export default function CommunityPage() {
             <p className="text-xs uppercase tracking-[0.35em] text-emerald-200">Community</p>
             <h1 className="mt-2 text-4xl font-semibold text-white">コミュニティ</h1>
             <p className="mt-3 text-sm text-slate-300">
-              WEBGPTの活用アイデアや運用ノウハウを共有するコミュニティを準備中です。公開までお待ちください。
+              よやくらくの活用アイデアや運用ノウハウを共有するコミュニティを準備中です。公開までお待ちください。
             </p>
           </div>
           <div className="rounded-[24px] border border-white/10 bg-white/5 p-5 text-sm text-slate-300">

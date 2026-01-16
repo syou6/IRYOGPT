@@ -15,7 +15,7 @@ export default function WebgptIcon({ size = 32, className }: WebgptIconProps) {
       )}
       style={{ width: size, height: size }}
     >
-      <Image src="/icons/bee-icon.png" alt="WEBGPT アイコン" fill sizes={`${size}px`} className="object-contain" />
+      <Image src="/icons/bee-icon.png" alt="よやくらく アイコン" fill sizes={`${size}px`} className="object-contain" />
     </span>
   );
 }

@@ -319,7 +319,7 @@ export default function PlansPage() {
   const currentPlanConfig = user ? getPlanConfigByInternalPlan(user.plan) : null;
   const planTimeline = [
     { label: 'URL登録', done: Boolean(user) },
-    { label: 'WEBGPTが学習', done: Boolean(user?.stripe_subscription_id) },
+    { label: 'よやくらくが学習', done: Boolean(user?.stripe_subscription_id) },
     { label: 'チャット埋め込み & 公開', done: ['starter', 'pro', 'enterprise'].includes(user?.plan ?? '') },
   ];
   const heroHighlights = [
@@ -395,7 +395,7 @@ export default function PlansPage() {
                 <div className="flex-1 rounded-2xl border border-premium-stroke/40 bg-premium-elevated/70 px-4 py-3 text-xs">
                   <p className="font-semibold text-premium-text">チャット公開までの動き</p>
                   <p className="mt-1 text-premium-muted">
-                    URLを登録するとWEBGPTが学習し、準備が整えば埋め込みコードを貼るだけでデモの会話をそのまま本番化できます。
+                    URLを登録するとよやくらくが学習し、準備が整えば埋め込みコードを貼るだけでデモの会話をそのまま本番化できます。
                   </p>
                   <div className="mt-2 flex flex-col gap-2 sm:flex-row">
                     <Button size="md" onClick={() => router.push('/dashboard')}>
@@ -424,7 +424,7 @@ export default function PlansPage() {
                 <div>
                   <p className="text-base font-semibold text-premium-text">ご契約ありがとうございます</p>
                   <p className="mt-1 text-premium-muted">
-                    WEBGPT チームが登録済み URL をもとに学習を開始します。内容確認のうえ、稼働準備が整い次第メールとダッシュボードでお知らせします。
+                    よやくらく チームが登録済み URL をもとに学習を開始します。内容確認のうえ、稼働準備が整い次第メールとダッシュボードでお知らせします。
                   </p>
                   <ul className="mt-3 list-disc space-y-1 pl-5 text-xs text-premium-muted">
                     <li>追加URLや修正依頼があればダッシュボードのサポートチャットへ</li>

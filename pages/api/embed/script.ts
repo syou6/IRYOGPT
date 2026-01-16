@@ -135,8 +135,8 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     '  <div class="sgpt-chat-panel" id="webgpt-chat-container">',
     '    <div class="sgpt-chat-header">',
     '      <div>',
-    '        <p class="sgpt-chip">WEBGPT</p>',
-    '        <p class="sgpt-title">💬 WEBGPT サポート</p>',
+    '        <p class="sgpt-chip">よやくらく</p>',
+    '        <p class="sgpt-title">💬 よやくらく サポート</p>',
     '      </div>',
     '      <button class="sgpt-close-btn" id="webgpt-close-btn">×</button>',
     '    </div>',
@@ -145,7 +145,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
     '      <input type="text" id="webgpt-input" class="sgpt-input" placeholder="質問を入力..." />',
     '      <button id="webgpt-send-btn" class="sgpt-send-btn">送信</button>',
     '    </div>',
-    '    <div class="sgpt-footer">Powered by WEBGPT</div>',
+    '    <div class="sgpt-footer">Powered by よやくらく</div>',
     '  </div>',
     '  <button class="sgpt-fab" id="webgpt-toggle-btn"></button>',
     '</div>'
@@ -163,7 +163,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
   if (toggleBtn) {
     const iconImg = document.createElement('img');
     iconImg.src = iconUrl;
-    iconImg.alt = 'WEBGPT';
+    iconImg.alt = 'よやくらく';
     iconImg.style.width = '36px';
     iconImg.style.height = '36px';
     iconImg.style.objectFit = 'contain';
@@ -371,7 +371,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
 
   function showLoading(target) {
     if (!target) return null;
-    target.textContent = '▌ WEBGPT が回答を準備しています...';
+    target.textContent = '▌ よやくらく が回答を準備しています...';
     return target;
   }
 

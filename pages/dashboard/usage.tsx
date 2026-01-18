@@ -197,7 +197,7 @@ export default function UsagePage() {
     return (
       <Layout>
         <div className="flex min-h-screen items-center justify-center">
-          <div className="rounded-full border border-white/10 bg-white/5 px-6 py-3 text-xs uppercase tracking-[0.25em] text-slate-200">
+          <div className="rounded-full border border-premium-stroke bg-premium-surface px-6 py-3 text-xs uppercase tracking-[0.25em] text-premium-text">
             読み込み中...
           </div>
         </div>
@@ -207,7 +207,7 @@ export default function UsagePage() {
 
   return (
     <Layout>
-      <div className="relative mx-auto max-w-6xl px-4 py-6 text-slate-100 sm:py-8">
+      <div className="relative mx-auto max-w-6xl px-4 py-6 text-premium-text sm:py-8">
         <div className="pointer-events-none absolute inset-0">
           <div className="absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-emerald-500/20 to-transparent blur-3xl" />
           <div className="absolute bottom-[-20%] right-[-10%] h-72 w-72 rounded-full bg-teal-400/15 blur-[140px]" />
@@ -215,26 +215,26 @@ export default function UsagePage() {
 
         <div className="relative space-y-8">
           {/* ヘッダー */}
-          <div className="rounded-[32px] border border-white/10 bg-white/5 p-6 shadow-[0_35px_120px_rgba(1,6,3,0.55)] backdrop-blur-2xl">
+          <div className="rounded-[32px] border border-premium-stroke bg-premium-surface p-6 shadow-[0_25px_60px_rgba(0,0,0,0.08)] backdrop-blur-2xl">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <Link
                   href="/dashboard"
-                  className="text-[11px] uppercase tracking-[0.35em] text-emerald-200/80"
+                  className="text-[11px] uppercase tracking-[0.35em] text-emerald-600/80"
                 >
                   ← ダッシュボード
                 </Link>
-                <h1 className="mt-2 text-3xl font-semibold text-white">使用状況</h1>
-                <p className="mt-1 text-sm text-slate-300">今月の利用回数とトークン消費量を確認できます</p>
+                <h1 className="mt-2 text-3xl font-semibold text-premium-text">使用状況</h1>
+                <p className="mt-1 text-sm text-premium-muted">今月の利用回数とトークン消費量を確認できます</p>
               </div>
-              <label className="flex flex-col text-xs font-medium uppercase tracking-[0.25em] text-slate-400">
+              <label className="flex flex-col text-xs font-medium uppercase tracking-[0.25em] text-premium-muted">
                 表示月
                 <input
                   id="month-select"
                   type="month"
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="mt-2 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-base tracking-normal text-white shadow-inner shadow-white/5 focus:outline-none focus:ring-2 focus:ring-emerald-400/60"
+                  className="mt-2 rounded-full border border-premium-stroke bg-premium-surface px-4 py-2 text-base tracking-normal text-premium-text shadow-inner focus:outline-none focus:ring-2 focus:ring-emerald-400/60"
                 />
               </label>
             </div>
@@ -242,12 +242,12 @@ export default function UsagePage() {
 
           {/* プラン情報 */}
           {user && (
-            <div className="rounded-[32px] border border-white/10 bg-gradient-to-r from-emerald-500/10 via-green-400/5 to-cyan-300/10 p-6 shadow-[0_35px_120px_rgba(1,6,3,0.45)]">
+            <div className="rounded-[32px] border border-premium-stroke bg-gradient-to-r from-emerald-500/10 via-green-400/5 to-cyan-300/10 p-6 shadow-[0_25px_60px_rgba(0,0,0,0.08)]">
               <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-emerald-200">Current Plan</p>
-                  <h2 className="text-2xl font-semibold text-white capitalize">{user.plan}</h2>
-                  <p className="text-sm text-slate-300">チャット {user.chat_quota.toLocaleString()} 回 / トークン {user.embedding_quota.toLocaleString()}</p>
+                  <p className="text-xs uppercase tracking-[0.3em] text-emerald-600">Current Plan</p>
+                  <h2 className="text-2xl font-semibold text-premium-text capitalize">{user.plan}</h2>
+                  <p className="text-sm text-premium-muted">チャット {user.chat_quota.toLocaleString()} 回 / トークン {user.embedding_quota.toLocaleString()}</p>
                 </div>
                 <Link
                   href="/dashboard/plans"
@@ -263,16 +263,16 @@ export default function UsagePage() {
           {monthlyUsage && user && (
             <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             {/* チャット回数 */}
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-              <h3 className="text-xs uppercase tracking-[0.3em] text-slate-400">チャット回数</h3>
+            <div className="rounded-3xl border border-premium-stroke bg-premium-surface p-6">
+              <h3 className="text-xs uppercase tracking-[0.3em] text-premium-muted">チャット回数</h3>
               <div className="mt-3 flex items-center justify-between">
                 <div>
-                  <p className="text-3xl font-semibold text-white">{monthlyUsage.chat_count.toLocaleString()}</p>
-                  <p className="text-sm text-slate-400">/ {user.chat_quota.toLocaleString()} 回</p>
+                  <p className="text-3xl font-semibold text-premium-text">{monthlyUsage.chat_count.toLocaleString()}</p>
+                  <p className="text-sm text-premium-muted">/ {user.chat_quota.toLocaleString()} 回</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-semibold text-emerald-200">{chatUsagePercent.toFixed(1)}%</p>
-                  <div className="mt-2 h-2 w-28 rounded-full bg-white/10">
+                  <p className="text-2xl font-semibold text-emerald-600">{chatUsagePercent.toFixed(1)}%</p>
+                  <div className="mt-2 h-2 w-28 rounded-full bg-premium-elevated">
                     <div
                       className="h-2 rounded-full bg-gradient-to-r from-emerald-400 via-green-300 to-cyan-300"
                       style={{ width: `${chatUsagePercent}%` }}
@@ -283,16 +283,16 @@ export default function UsagePage() {
             </div>
 
             {/* 埋め込みトークン数 */}
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-              <h3 className="text-xs uppercase tracking-[0.3em] text-slate-400">埋め込みトークン数</h3>
+            <div className="rounded-3xl border border-premium-stroke bg-premium-surface p-6">
+              <h3 className="text-xs uppercase tracking-[0.3em] text-premium-muted">埋め込みトークン数</h3>
               <div className="mt-3 flex items-center justify-between">
                 <div>
-                  <p className="text-3xl font-semibold text-white">{monthlyUsage.embedding_tokens.toLocaleString()}</p>
-                  <p className="text-sm text-slate-400">/ {user.embedding_quota.toLocaleString()} トークン</p>
+                  <p className="text-3xl font-semibold text-premium-text">{monthlyUsage.embedding_tokens.toLocaleString()}</p>
+                  <p className="text-sm text-premium-muted">/ {user.embedding_quota.toLocaleString()} トークン</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-2xl font-semibold text-emerald-200">{embeddingUsagePercent.toFixed(1)}%</p>
-                  <div className="mt-2 h-2 w-28 rounded-full bg-white/10">
+                  <p className="text-2xl font-semibold text-emerald-600">{embeddingUsagePercent.toFixed(1)}%</p>
+                  <div className="mt-2 h-2 w-28 rounded-full bg-premium-elevated">
                     <div
                       className="h-2 rounded-full bg-gradient-to-r from-emerald-400 via-green-300 to-cyan-300"
                       style={{ width: `${embeddingUsagePercent}%` }}
@@ -309,8 +309,8 @@ export default function UsagePage() {
         {dailyUsage.length > 0 && (
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {/* チャット回数グラフ */}
-            <div className="rounded-[28px] border border-white/10 bg-white/5 p-6">
-              <h3 className="text-lg font-semibold text-white">日別チャット回数</h3>
+            <div className="rounded-[28px] border border-premium-stroke bg-premium-surface p-6">
+              <h3 className="text-lg font-semibold text-premium-text">日別チャット回数</h3>
               <div className="mt-4 space-y-2">
                 {dailyUsage.map((day) => {
                   const height = maxChatCount > 0
@@ -318,10 +318,10 @@ export default function UsagePage() {
                     : 0;
                   return (
                     <div key={day.date} className="flex items-end gap-2">
-                      <div className="w-20 text-right text-xs text-slate-400">
+                      <div className="w-20 text-right text-xs text-premium-muted">
                         {new Date(day.date).getDate()}日
                       </div>
-                      <div className="relative h-8 flex-1 rounded-full bg-white/5">
+                      <div className="relative h-8 flex-1 rounded-full bg-premium-elevated">
                         <div
                           className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-green-300 to-cyan-300 transition-all"
                           style={{ width: `${height}%` }}
@@ -339,8 +339,8 @@ export default function UsagePage() {
             </div>
 
             {/* 埋め込みトークン数グラフ */}
-            <div className="rounded-[28px] border border-white/10 bg-white/5 p-6">
-              <h3 className="text-lg font-semibold text-white">日別埋め込みトークン数</h3>
+            <div className="rounded-[28px] border border-premium-stroke bg-premium-surface p-6">
+              <h3 className="text-lg font-semibold text-premium-text">日別埋め込みトークン数</h3>
               <div className="mt-4 space-y-2">
                 {dailyUsage.map((day) => {
                   const height = maxEmbeddingTokens > 0
@@ -348,10 +348,10 @@ export default function UsagePage() {
                     : 0;
                   return (
                     <div key={day.date} className="flex items-end gap-2">
-                      <div className="w-20 text-right text-xs text-slate-400">
+                      <div className="w-20 text-right text-xs text-premium-muted">
                         {new Date(day.date).getDate()}日
                       </div>
-                      <div className="relative h-8 flex-1 rounded-full bg-white/5">
+                      <div className="relative h-8 flex-1 rounded-full bg-premium-elevated">
                         <div
                           className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-teal-300 to-cyan-300 transition-all"
                           style={{ width: `${height}%` }}
@@ -372,7 +372,7 @@ export default function UsagePage() {
 
         {/* 使用量が0の場合 */}
         {dailyUsage.length === 0 && !loading && (
-          <div className="rounded-3xl border border-dashed border-white/20 bg-white/5 p-12 text-center text-slate-200">
+          <div className="rounded-3xl border border-dashed border-premium-stroke bg-premium-surface p-12 text-center text-premium-text">
             <p className="text-lg">
               {selectedMonth === new Date().toISOString().slice(0, 7)
                 ? '今月はまだ使用量がありません'

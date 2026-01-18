@@ -152,17 +152,58 @@ async function executeToolCall(
   const { name, args } = toolCall;
 
   switch (name) {
+    case 'get_date_info': {
+      // 日付をパースして曜日を返す
+      const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+      try {
+        const [year, month, day] = args.date.split('/').map(Number);
+        const date = new Date(year, month - 1, day);
+        const dayOfWeek = dayNames[date.getDay()];
+
+        // 今日との差分も計算
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        date.setHours(0, 0, 0, 0);
+        const diffDays = Math.round((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+        let relativeInfo = '';
+        if (diffDays === 0) relativeInfo = '（今日）';
+        else if (diffDays === 1) relativeInfo = '（明日）';
+        else if (diffDays === 2) relativeInfo = '（明後日）';
+        else if (diffDays > 0) relativeInfo = `（${diffDays}日後）`;
+        else relativeInfo = '（過去の日付）';
+
+        return `${args.date}は${dayOfWeek}曜日です${relativeInfo}`;
+      } catch (e) {
+        return `日付の形式が正しくありません。YYYY/M/D形式で指定してください（例: 2026/1/27）`;
+      }
+    }
+
     case 'get_available_slots': {
       const slots = await getAvailableSlots(spreadsheetId, args.date);
+      console.log(`[Tool] get_available_slots for ${args.date}:`, JSON.stringify(slots, null, 2));
+
       if (slots.length === 0) {
-        return `${args.date}は休診日のため、予約枠がありません。別の日をお選びください。`;
+        return `【${args.date}】休診日のため予約枠がありません。別の日をお選びください。`;
       }
       const availableSlots = slots.filter((s: TimeSlot) => s.available);
+      const bookedSlots = slots.filter((s: TimeSlot) => !s.available);
+
       if (availableSlots.length === 0) {
-        return `${args.date}は予約が埋まっています。別の日をお選びください。`;
+        return `【${args.date}】全ての枠が予約済みです。別の日をお選びください。`;
       }
-      const timeList = availableSlots.map((s: TimeSlot) => s.time).join(', ');
-      return `${args.date}の空き枠: ${timeList}`;
+
+      // 残り枠数を含めた情報を返す（例: "9:00(残2)", "10:00(残1)"）
+      const timeListWithSlots = availableSlots.map((s: TimeSlot) =>
+        s.remainingSlots > 1 ? `${s.time}(残${s.remainingSlots})` : s.time
+      ).join(', ');
+
+      // 予約済みの枠がある場合は明示
+      if (bookedSlots.length > 0) {
+        const bookedTimeList = bookedSlots.map((s: TimeSlot) => s.time).join(', ');
+        return `【${args.date}の予約状況】\n空き枠: ${timeListWithSlots}\n予約済み: ${bookedTimeList}`;
+      }
+      return `【${args.date}の予約状況】\n空き枠: ${timeListWithSlots}\n予約済み: なし`;
     }
 
     case 'create_appointment': {

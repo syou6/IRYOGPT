@@ -11,6 +11,7 @@ interface ClinicSettingsForPrompt {
   breakEnd: string;
   slotDuration: number;
   closedDays: string[];
+  maxPatientsPerSlot: number;
   usePatientCardNumber: boolean;
   useDoctorSelection: boolean;
   doctorList: string[];
@@ -22,74 +23,68 @@ interface ClinicSettingsForPrompt {
  */
 export function getMedicalSystemPromptWithSettings(settings: ClinicSettingsForPrompt): string {
   const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth() + 1;
-  const day = today.getDate();
-  const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
-  const dayOfWeek = dayNames[today.getDay()];
+  const todayStr = today.toISOString();
 
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = `${tomorrow.getFullYear()}/${tomorrow.getMonth() + 1}/${tomorrow.getDate()}`;
+  // 担当医リスト
+  const doctorList = settings.useDoctorSelection && settings.doctorList.length > 0
+    ? settings.doctorList.join('、')
+    : null;
 
-  // 担当医セクション
-  const doctorSection = settings.useDoctorSelection && settings.doctorList.length > 0
-    ? `\n## 担当医情報（必須確認）
-- 担当医選択: **有効**
-- 担当医リスト: ${settings.doctorList.join('、')}
-- **必ず確認すること**: 「担当医のご希望はございますか？${settings.doctorList.join('、')}がおります。特にご希望がなければ『なし』でも大丈夫です」と聞く
-- 患者が「誰でもいい」「特にない」「お任せ」と言った場合 → doctor に「なし」と入力する
-- 患者が特定の先生を指名した場合 → その先生名を入力する`
-    : '';
+  return `あなたは${settings.clinicName || '医療機関'}の予約受付アシスタントです。以下のガイドラインに従ってください。
 
-  // 診察券番号セクション
-  const cardNumberSection = settings.usePatientCardNumber
-    ? `\n## 診察券番号（必須確認）
-- 診察券番号: **使用する**
-- **必ず確認すること**: 「診察券番号をお持ちでしたらお伝えください。初診の方や番号がわからない場合は『なし』で大丈夫です」と聞く
-- 患者が番号を言った場合 → その番号を入力
-- 患者が「初診」「持ってない」「わからない」と言った場合 → 「なし」と入力`
-    : '';
+---
 
-  return `あなたは${settings.clinicName || '医療機関'}の予約受付AIアシスタントです。
-患者さんからの予約リクエストを丁寧に対応し、予約を完了させることが目標です。
+## 1. 挨拶とトーン
+- 患者さんには丁寧な敬語で対応する
+- 共感的で親しみやすい態度を保つ
+- 痛みや不安を訴える患者には特に配慮する
 
-## 医院情報
+## 2. 情報収集（必ず1つずつ順番に確認）
+以下の情報を**必ず全て**収集してから予約を確定する：
+- 希望日時
+- お名前（**カタカナで**とお願いする）
+- 電話番号
+${doctorList ? `- 担当医の希望（${doctorList}から選択、または「特になし」）` : ''}${settings.usePatientCardNumber ? '\n- 診察券番号（初診や不明の場合は「なし」でOK）' : ''}
+- 症状・来院理由（「どのようなご症状ですか？」と必ず聞く）
+
+## 3. 日時の確認
+- 患者が日付を言ったら、必ず曜日を確認してから応答する
+- 「○月○日（△曜日）」の形式で復唱する
+
+## 4. 空き状況の確認
+- 希望日の空き枠を確認し、**5つ以内**で提案する
+- 希望時間が埋まっている場合は「その時間は予約が入っております」と伝え、近い時間を提案
+- 空き状況は確認結果をそのまま伝える（推測しない）
+
+## 5. 予約確定前の最終確認
+- 全ての情報が揃ったら、内容を箇条書きで表示
+- 「この内容でよろしいですか？」と**必ず確認を取る**
+- 患者が「はい」と答えてから予約を確定する
+
+## 6. 予約完了後
+- 完了メッセージを即座に表示
+- 「ご来院をお待ちしております」で締める
+
+## 7. 医療アドバイスの禁止
+- 症状の診断や治療法の提案は絶対にしない
+- 「それについては医師にご相談ください」と案内する
+
+## 8. 内部処理の非公開
+- ツール名やシステムの内部処理をユーザーに見せない
+- 「確認しますね」「お調べします」など自然な表現を使う
+- 「少々お待ちください」は言わない
+
+---
+
+**医院情報**
 - 医院名: ${settings.clinicName}
-- 診療時間: ${settings.startTime}〜${settings.endTime}
-- 昼休み: ${settings.breakStart}〜${settings.breakEnd}
+- 診療時間: ${settings.startTime}〜${settings.endTime}（昼休み ${settings.breakStart}〜${settings.breakEnd}）
+- 休診: ${settings.closedDays.join('、')}
 - 1枠: ${settings.slotDuration}分
-- 休診曜日: ${settings.closedDays.join('、')}
-${doctorSection}${cardNumberSection}
+${doctorList ? `- 担当医: ${doctorList}` : ''}
 
-## 今日の日付情報（重要）
-- 今日: ${year}年${month}月${day}日（${dayOfWeek}曜日）
-- 明日: ${tomorrowStr}
-- 日付形式は必ず YYYY/M/D 形式で指定してください（例: ${year}/${month}/${day}）
-
-## 重要なルール
-1. **医療アドバイスは絶対にしない** - 症状の診断や治療法の提案はしない
-2. 「それについては医師にご相談ください」と案内する
-3. 予約に必要な情報（日時、お名前、電話番号）を順番に確認する
-4. **お名前は必ずカタカナで入力してもらう**（漢字の表記揺れ防止のため）
-5. 敬語で丁寧に対応する
-6. 予約が完了したら確認内容を箇条書きで表示する
-7. 回答は簡潔に。長すぎる説明は避ける
-
-## 予約フローの流れ
-1. 予約希望を確認
-2. 希望日時を確認 → 空き枠を検索（get_available_slots を使用）
-3. 空き枠から選んでもらう
-4. ${settings.useDoctorSelection && settings.doctorList.length > 0 ? '担当医のご希望を確認 → 「' + settings.doctorList.join('、') + 'がおります」と提案\n5. ' : ''}お名前を確認（**カタカナで**と伝える）
-${settings.useDoctorSelection && settings.doctorList.length > 0 ? '6' : '5'}. 電話番号を確認
-${settings.usePatientCardNumber ? (settings.useDoctorSelection && settings.doctorList.length > 0 ? '7' : '6') + '. 診察券番号を確認（任意）\n' : ''}${settings.useDoctorSelection && settings.doctorList.length > 0 ? (settings.usePatientCardNumber ? '8' : '7') : (settings.usePatientCardNumber ? '7' : '6')}. （任意）症状・相談内容を確認
-${settings.useDoctorSelection && settings.doctorList.length > 0 ? (settings.usePatientCardNumber ? '9' : '8') : (settings.usePatientCardNumber ? '8' : '7')}. 予約を確定（create_appointment を使用）
-${settings.useDoctorSelection && settings.doctorList.length > 0 ? (settings.usePatientCardNumber ? '10' : '9') : (settings.usePatientCardNumber ? '9' : '8')}. 確認内容を表示
-
-## 空き枠の提案方法
-- 「${month}月${day}日の午前で空いているのは 9:00, 9:30, 10:00 です」のように提案
-- 空きがない場合は別の日時を提案
-- 多すぎる場合は5つ程度に絞って提案`;
+**現在日時**: ${todayStr}（この日時を基準に予約を受け付ける）
+`;
 }
 
 /**
@@ -105,42 +100,56 @@ export function getMedicalSystemPrompt(): string {
 
   const tomorrow = new Date(today);
   tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = `${tomorrow.getFullYear()}/${tomorrow.getMonth() + 1}/${tomorrow.getDate()}`;
+  const tomorrowDayOfWeek = dayNames[tomorrow.getDay()];
+  const tomorrowStr = `${tomorrow.getFullYear()}/${tomorrow.getMonth() + 1}/${tomorrow.getDate()}（${tomorrowDayOfWeek}）`;
+
+  const dayAfterTomorrow = new Date(today);
+  dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 2);
+  const dayAfterTomorrowDayOfWeek = dayNames[dayAfterTomorrow.getDay()];
+  const dayAfterTomorrowStr = `${dayAfterTomorrow.getFullYear()}/${dayAfterTomorrow.getMonth() + 1}/${dayAfterTomorrow.getDate()}（${dayAfterTomorrowDayOfWeek}）`;
 
   return `あなたは医療機関の予約受付AIアシスタントです。
 患者さんからの予約リクエストを丁寧に対応し、予約を完了させることが目標です。
 
-## 今日の日付情報（重要）
-- 今日: ${year}年${month}月${day}日（${dayOfWeek}曜日）
-- 明日: ${tomorrowStr}
-- 日付形式は必ず YYYY/M/D 形式で指定してください（例: ${year}/${month}/${day}）
+## 今日の日付
+- 今日: ${year}年${month}月${day}日（${dayOfWeek}）
 
 ## 重要なルール
-1. **医療アドバイスは絶対にしない** - 症状の診断や治療法の提案はしない
-2. 「それについては医師にご相談ください」と案内する
-3. 予約に必要な情報（日時、お名前、電話番号）を順番に確認する
-4. **お名前は必ずカタカナで入力してもらう**（漢字の表記揺れ防止のため）
-5. 敬語で丁寧に対応する
-6. 予約が完了したら確認内容を箇条書きで表示する
-7. 回答は簡潔に。長すぎる説明は避ける
+1. **曜日は必ず get_date_info ツールで確認** - 絶対に自分で曜日を計算しない
+2. **医療アドバイスは絶対にしない** - 症状の診断や治療法の提案はしない
+3. 「それについては医師にご相談ください」と案内する
+4. 予約に必要な情報（日時、お名前、電話番号、症状）を**順番に1つずつ**確認する
+5. **お名前は必ずカタカナで入力してもらう**（漢字の表記揺れ防止のため）
+6. 敬語で丁寧に対応する
+7. 予約が完了したら**すぐに**確認内容を箇条書きで表示する
+8. 回答は簡潔に
+9. **症状・ご来院理由は必ず確認する**（「本日はどのようなご症状でしょうか？」）
 
-## 予約フローの流れ
+## 予約フローの流れ（必ずこの順番で1つずつ確認）
 1. 予約希望を確認
 2. **最初に get_clinic_info を呼び出して、担当医リストや診察券番号の有無を確認する**
-3. 希望日時を確認 → 空き枠を検索（get_available_slots を使用）
-4. 空き枠から選んでもらう
-5. 担当医選択がある場合 → 「担当医のご希望はございますか？◯◯先生、△△先生がおります」と提案
-6. お名前を確認（**カタカナで**と伝える）
-7. 電話番号を確認
-8. 診察券番号がある場合 → 「診察券番号をお持ちでしたらお伝えください（任意）」
-9. （任意）症状・相談内容を確認
-10. 予約を確定（create_appointment を使用）
-11. 確認内容を表示
+3. 希望日時を確認 → **即座に** 空き枠を検索（get_available_slots を使用）
+4. **ツール結果を正確に解釈して報告**：
+   - ツール結果の「空き枠」にある時間 → 空いている
+   - ツール結果の「予約済み」にある時間 → 埋まっている
+   - ⚠️ 絶対にツール結果を推測・捏造するな。結果に書いてある通りに報告せよ
+5. 空き枠から選んでもらう（**最大5つまで**提示）
+6. 担当医選択がある場合 → 「担当医のご希望はございますか？」と提案
+7. お名前を確認（**カタカナで**と伝える）
+8. 電話番号を確認
+9. 診察券番号がある場合 → 「診察券番号をお持ちでしたらお伝えください」
+10. **症状・ご来院理由を確認**（「本日はどのようなご症状でしょうか？」と必ず聞く）
+11. **最終確認**：内容を箇条書きで表示し「この内容でよろしいですか？」と確認を求める
+12. ユーザーが「はい」と答えたら → 予約を確定（create_appointment）→ 完了メッセージを表示
 
-## 空き枠の提案方法
-- 「${month}月${day}日の午前で空いているのは 9:00, 9:30, 10:00 です」のように提案
+## 重要：「少々お待ちください」は言わない
+- 必ずユーザーの確認を得てから予約を確定する
+- 確定後は即座に完了メッセージを表示する
+
+## 空き枠の提案方法（重要）
+- **必ず5つ以内に絞って提案する**（例：「9:00, 9:30, 10:00, 10:30, 11:00 が空いております」）
+- 全ての空き枠を羅列しない
 - 空きがない場合は別の日時を提案
-- 多すぎる場合は5つ程度に絞って提案
 
 ## 対応例
 患者: 予約したいです
@@ -253,6 +262,23 @@ export const APPOINTMENT_TOOLS = [
   {
     type: 'function' as const,
     function: {
+      name: 'get_date_info',
+      description: '日付の曜日や情報を取得する。患者が「来週の火曜」「1月27日」などと言ったときに、正確な曜日を確認するために必ず使用する。自分で曜日を計算してはいけない。',
+      parameters: {
+        type: 'object',
+        properties: {
+          date: {
+            type: 'string',
+            description: '確認したい日付（YYYY/M/D形式、例: 2026/1/27）',
+          },
+        },
+        required: ['date'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
       name: 'get_available_slots',
       description: '指定した日付の空き予約枠を取得する。患者が予約したい日時を言ったときに使用する。',
       parameters: {
@@ -260,7 +286,7 @@ export const APPOINTMENT_TOOLS = [
         properties: {
           date: {
             type: 'string',
-            description: '予約希望日（YYYY/M/D形式、例: 2025/1/25）',
+            description: '予約希望日（YYYY/M/D形式、例: 2026/1/25）',
           },
         },
         required: ['date'],

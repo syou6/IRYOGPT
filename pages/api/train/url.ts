@@ -17,7 +17,7 @@ interface TrainRequest {
   forceRetrain?: boolean;
 }
 
-const MAX_TRAINING_PAGES = 20;
+const MAX_TRAINING_PAGES = 60;
 const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAILS || process.env.ADMIN_EMAILS || '')
   .split(',')
   .map((email) => email.trim().toLowerCase())

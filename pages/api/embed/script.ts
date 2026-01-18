@@ -22,10 +22,10 @@ export default async function handler(
       return res.status(400).json({ message: 'site_id is required' });
     }
 
-    // サイト情報を取得（is_embed_enabled を確認）
+    // サイト情報を取得（is_embed_enabled, chat_mode, spreadsheet_id を確認）
     const { data: site, error: siteError } = await supabaseClient
       .from('sites')
-      .select('id, is_embed_enabled, status')
+      .select('id, is_embed_enabled, status, chat_mode, spreadsheet_id')
       .eq('id', site_id)
       .single();
 
@@ -52,7 +52,12 @@ export default async function handler(
     const protocol = req.headers['x-forwarded-proto'] || (req.headers.referer?.startsWith('https') ? 'https' : 'http');
     const host = req.headers.host || 'localhost:3005';
     const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_SITE_URL || `${protocol}://${host}`;
-    const script = generateEmbedScript(site_id, apiBaseUrl);
+
+    // 予約モードかどうかを判定（appointment_only または hybrid、かつ spreadsheet_id がある場合）
+    const chatMode = site.chat_mode || 'rag_only';
+    const isAppointmentMode = (chatMode === 'appointment_only' || chatMode === 'hybrid') && !!site.spreadsheet_id;
+
+    const script = generateEmbedScript(site_id, apiBaseUrl, isAppointmentMode, chatMode);
 
     res.setHeader('Content-Type', 'application/javascript');
     res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate');
@@ -69,7 +74,7 @@ export default async function handler(
 /**
  * 埋め込みスクリプトを生成
  */
-function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
+function generateEmbedScript(siteId: string, apiBaseUrl: string, isAppointmentMode: boolean, chatMode: string): string {
   // 変数を安全にエスケープ
   const escapedSiteId = JSON.stringify(siteId);
   const escapedApiBaseUrl = JSON.stringify(apiBaseUrl);
@@ -78,6 +83,15 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
   // バッククォートを含む正規表現パターンをエスケープ
   const backtick3 = '```';
   const backtick1 = '`';
+
+  // モードに応じた初期メッセージ
+  let welcomeMessage = 'こんにちは！ご質問があればお気軽にどうぞ。';
+  if (chatMode === 'appointment_only') {
+    welcomeMessage = 'こんにちは！ご予約のお手伝いをいたします。ご希望の日時や空き状況についてお気軽にお聞きください。';
+  } else if (chatMode === 'hybrid') {
+    welcomeMessage = 'こんにちは！ご予約やお問い合わせを承ります。';
+  }
+  const escapedWelcomeMessage = JSON.stringify(welcomeMessage);
   
   return `(function() {
   'use strict';
@@ -89,6 +103,8 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
   const siteId = ${escapedSiteId};
   const apiBaseUrl = ${escapedApiBaseUrl};
   const iconUrl = ${escapedIconUrl};
+  const isAppointmentMode = ${isAppointmentMode};
+  const welcomeMessage = ${escapedWelcomeMessage};
 
   const styles = [
     '.sgpt-widget{position:fixed;right:24px;bottom:24px;z-index:9999;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;color:#e2e8f0}',
@@ -268,6 +284,8 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
       if (answerContainer) {
         updateStreamingMessage(answerContainer, item.response, null);
       }
+      // 会話履歴に追加（AIが文脈を把握できるように）
+      chatHistory.push([item.label, item.response]);
       lastAnswerBody = null;
     } else {
       // API呼び出し：通常の送信処理
@@ -289,12 +307,14 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string): string {
       // 初回のみ初期メッセージとクイックボタンを表示
       if (!hasShownInitialMessage && messagesDiv && messagesDiv.children.length === 0) {
         hasShownInitialMessage = true;
-        const initialMessage = addMessage('こんにちは！ご予約やお問い合わせを承ります。', false);
+        const initialMessage = addMessage(welcomeMessage, false);
         if (initialMessage) {
-          // クイックボタンを追加
-          const quickBtns = createQuickButtons();
-          if (initialMessage.parentElement) {
-            initialMessage.parentElement.appendChild(quickBtns);
+          // 予約モードの場合のみクイックボタンを追加
+          if (isAppointmentMode) {
+            const quickBtns = createQuickButtons();
+            if (initialMessage.parentElement) {
+              initialMessage.parentElement.appendChild(quickBtns);
+            }
           }
           scrollToBottom({ smooth: false });
         }

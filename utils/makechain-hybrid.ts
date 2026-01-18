@@ -124,82 +124,83 @@ async function searchRAG(siteId: string, query: string): Promise<string> {
  */
 function getHybridSystemPrompt(ragContext: string, settings: ClinicSettings): string {
   const today = new Date();
-  const year = today.getFullYear();
-  const month = today.getMonth() + 1;
-  const day = today.getDate();
-  const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
-  const dayOfWeek = dayNames[today.getDay()];
-
-  const tomorrow = new Date(today);
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = `${tomorrow.getFullYear()}/${tomorrow.getMonth() + 1}/${tomorrow.getDate()}`;
+  const todayStr = today.toISOString();
 
   // RAG情報があるかどうかを判定
   const hasRagInfo = ragContext && !ragContext.includes('WEBサイト情報は見つかりませんでした');
 
-  // 担当医セクション
-  const doctorSection = settings.useDoctorSelection && settings.doctorList.length > 0
-    ? `\n## 担当医情報（必須確認）
-- 担当医選択: **有効**
-- 担当医リスト: ${settings.doctorList.join('、')}
-- **必ず確認すること**: 「担当医のご希望はございますか？${settings.doctorList.join('、')}がおります。特にご希望がなければ『なし』でも大丈夫です」と聞く
-- 患者が「誰でもいい」「特にない」「お任せ」と言った場合 → doctor に「なし」と入力する
-- 患者が特定の先生を指名した場合 → その先生名を入力する`
-    : '';
+  // 担当医リスト
+  const doctorList = settings.useDoctorSelection && settings.doctorList.length > 0
+    ? settings.doctorList.join('、')
+    : null;
 
-  // 診察券番号セクション
-  const cardNumberSection = settings.usePatientCardNumber
-    ? `\n## 診察券番号（必須確認）
-- 診察券番号: **使用する**
-- **必ず確認すること**: 「診察券番号をお持ちでしたらお伝えください。初診の方や番号がわからない場合は『なし』で大丈夫です」と聞く
-- 患者が番号を言った場合 → その番号を入力
-- 患者が「初診」「持ってない」「わからない」と言った場合 → 「なし」と入力`
-    : '';
+  return `あなたは${settings.clinicName || '医療機関'}の予約受付・案内アシスタントです。以下のガイドラインに従ってください。
 
-  return `あなたは${settings.clinicName || '医療機関'}のAIアシスタントです。
-患者さんからの質問や予約リクエストに丁寧に対応します。
-
-## 医院情報（スプレッドシートより）
-- 医院名: ${settings.clinicName}
-- 診療時間: ${settings.startTime}〜${settings.endTime}
-- 昼休み: ${settings.breakStart}〜${settings.breakEnd}
-- 1枠: ${settings.slotDuration}分
-- 休診曜日: ${settings.closedDays.join('、')}
-${doctorSection}${cardNumberSection}
-
-## 医院のWEBサイト情報
-${hasRagInfo ? `以下の情報を**必ず参照して**回答してください。この情報に含まれる内容は正確に伝えてください。
 ---
-${ragContext}
----` : `WEBサイト情報は現在取得できませんでした。予約関連の質問には対応できます。`}
 
-## 今日の日付情報
-- 今日: ${year}年${month}月${day}日（${dayOfWeek}曜日）
-- 明日: ${tomorrowStr}
-- 日付形式は必ず YYYY/M/D 形式で指定してください（例: ${year}/${month}/${day}）
+## 1. 挨拶とトーン
+- 患者さんには丁寧な敬語で対応する
+- 共感的で親しみやすい態度を保つ
+- 痛みや不安を訴える患者には特に配慮する
 
-## 重要なルール
-1. **WEBサイト情報に記載がある内容は、その情報を使って回答する**（料金、診療時間、アクセス、診療内容など）
-2. **医療アドバイスは絶対にしない** - 症状の診断や治療法の提案はしない
-3. **お名前は必ずカタカナで入力してもらう**（漢字の表記揺れ防止のため）
-4. 敬語で丁寧に対応する
-5. 回答は簡潔に
-
-## 対応の使い分け
+## 2. 対応の使い分け
 - **医院情報の質問**（料金、診療時間、アクセス、診療内容など） → **WEBサイト情報を参照して回答**
-- **予約関連の質問** → 予約ツール（get_available_slots, create_appointment）を使用
-- **WEBサイト情報に記載がない場合のみ**「直接お問い合わせください」と案内
+- **予約関連の質問** → 予約ツールを使用
+- **WEBサイト情報にない質問** → 「直接お問い合わせください」と案内
 
-## 予約フローの流れ
-1. 予約希望を確認
-2. 希望日時を確認 → 空き枠を検索（get_available_slots を使用）
-3. 空き枠から選んでもらう
-${settings.useDoctorSelection && settings.doctorList.length > 0 ? `4. 担当医のご希望を確認 → 「${settings.doctorList.join('、')}がおります。特にご希望がなければ『なし』でも大丈夫です」
-5. ` : '4. '}お名前を確認（**カタカナで**と伝える）
-${settings.useDoctorSelection && settings.doctorList.length > 0 ? '6' : '5'}. 電話番号を確認
-${settings.usePatientCardNumber ? (settings.useDoctorSelection && settings.doctorList.length > 0 ? '7' : '6') + '. 診察券番号を確認（任意）\n' : ''}${settings.useDoctorSelection && settings.doctorList.length > 0 ? (settings.usePatientCardNumber ? '8' : '7') : (settings.usePatientCardNumber ? '7' : '6')}. （任意）症状・相談内容を確認
-${settings.useDoctorSelection && settings.doctorList.length > 0 ? (settings.usePatientCardNumber ? '9' : '8') : (settings.usePatientCardNumber ? '8' : '7')}. 予約を確定（create_appointment を使用）
-${settings.useDoctorSelection && settings.doctorList.length > 0 ? (settings.usePatientCardNumber ? '10' : '9') : (settings.usePatientCardNumber ? '9' : '8')}. 確認内容を表示`;
+## 3. 情報収集（必ず1つずつ順番に確認）
+以下の情報を**必ず全て**収集してから予約を確定する：
+- 希望日時
+- お名前（**カタカナで**とお願いする）
+- 電話番号
+${doctorList ? `- 担当医の希望（${doctorList}から選択、または「特になし」）` : ''}${settings.usePatientCardNumber ? '\n- 診察券番号（初診や不明の場合は「なし」でOK）' : ''}
+- 症状・来院理由（「どのようなご症状ですか？」と必ず聞く）
+
+## 4. 日時の確認
+- 患者が日付を言ったら、**必ず get_date_info ツールで曜日を確認**してから応答する
+- 絶対に自分で曜日を計算しない
+- 「○月○日（△曜日）」の形式で復唱する
+
+## 5. 空き状況の確認
+- 希望日の空き枠を確認し、**5つ以内**で提案する
+- 希望時間が埋まっている場合は「その時間は予約が入っております」と伝え、近い時間を提案
+- **空き状況は確認結果をそのまま伝える（推測しない）**
+
+## 6. 予約確定前の最終確認
+- 全ての情報が揃ったら、内容を箇条書きで表示
+- 「この内容でよろしいですか？」と**必ず確認を取る**
+- 患者が「はい」と答えてから予約を確定する
+
+## 7. 予約完了後
+- 完了メッセージを即座に表示
+- 「ご来院をお待ちしております」で締める
+
+## 8. 医療アドバイスの禁止
+- 症状の診断や治療法の提案は絶対にしない
+- 「それについては医師にご相談ください」と案内する
+
+## 9. 内部処理の非公開
+- ツール名やシステムの内部処理をユーザーに見せない
+- 「確認しますね」「お調べします」など自然な表現を使う
+- 「少々お待ちください」は言わない
+
+---
+
+**医院情報**
+- 医院名: ${settings.clinicName}
+- 診療時間: ${settings.startTime}〜${settings.endTime}（昼休み ${settings.breakStart}〜${settings.breakEnd}）
+- 休診: ${settings.closedDays.join('、')}
+- 1枠: ${settings.slotDuration}分
+- 同時間帯予約可能数: ${settings.maxPatientsPerSlot}名
+${doctorList ? `- 担当医: ${doctorList}` : ''}
+
+**現在日時**: ${todayStr}
+
+---
+
+**WEBサイト情報**
+${hasRagInfo ? ragContext : 'WEBサイト情報は現在取得できませんでした。予約関連の質問には対応できます。'}
+`;
 }
 
 /**
@@ -353,17 +354,58 @@ async function executeToolCall(
   const { name, args } = toolCall;
 
   switch (name) {
+    case 'get_date_info': {
+      // 日付をパースして曜日を返す
+      const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+      try {
+        const [year, month, day] = args.date.split('/').map(Number);
+        const date = new Date(year, month - 1, day);
+        const dayOfWeek = dayNames[date.getDay()];
+
+        // 今日との差分も計算
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        date.setHours(0, 0, 0, 0);
+        const diffDays = Math.round((date.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+        let relativeInfo = '';
+        if (diffDays === 0) relativeInfo = '（今日）';
+        else if (diffDays === 1) relativeInfo = '（明日）';
+        else if (diffDays === 2) relativeInfo = '（明後日）';
+        else if (diffDays > 0) relativeInfo = `（${diffDays}日後）`;
+        else relativeInfo = '（過去の日付）';
+
+        return `${args.date}は${dayOfWeek}曜日です${relativeInfo}`;
+      } catch (e) {
+        return `日付の形式が正しくありません。YYYY/M/D形式で指定してください（例: 2026/1/27）`;
+      }
+    }
+
     case 'get_available_slots': {
       const slots = await getAvailableSlots(spreadsheetId, args.date);
+      console.log(`[Tool] get_available_slots for ${args.date}:`, JSON.stringify(slots, null, 2));
+
       if (slots.length === 0) {
-        return `${args.date}は休診日のため、予約枠がありません。別の日をお選びください。`;
+        return `【${args.date}】休診日のため予約枠がありません。別の日をお選びください。`;
       }
       const availableSlots = slots.filter((s: TimeSlot) => s.available);
+      const bookedSlots = slots.filter((s: TimeSlot) => !s.available);
+
       if (availableSlots.length === 0) {
-        return `${args.date}は予約が埋まっています。別の日をお選びください。`;
+        return `【${args.date}】全ての枠が予約済みです。別の日をお選びください。`;
       }
-      const timeList = availableSlots.map((s: TimeSlot) => s.time).join(', ');
-      return `${args.date}の空き枠: ${timeList}`;
+
+      // 残り枠数を含めた情報を返す（例: "9:00(残2)", "10:00(残1)"）
+      const timeListWithSlots = availableSlots.map((s: TimeSlot) =>
+        s.remainingSlots > 1 ? `${s.time}(残${s.remainingSlots})` : s.time
+      ).join(', ');
+
+      // 予約済みの枠がある場合は明示
+      if (bookedSlots.length > 0) {
+        const bookedTimeList = bookedSlots.map((s: TimeSlot) => s.time).join(', ');
+        return `【${args.date}の予約状況】\n空き枠: ${timeListWithSlots}\n予約済み: ${bookedTimeList}`;
+      }
+      return `【${args.date}の予約状況】\n空き枠: ${timeListWithSlots}\n予約済み: なし`;
     }
 
     case 'create_appointment': {

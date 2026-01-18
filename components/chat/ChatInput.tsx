@@ -45,8 +45,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       }}
       className={`flex flex-col gap-3 sm:flex-row ${className}`}
     >
-      <div className="flex-1 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 
-                      shadow-[0_15px_35px_rgba(1,5,3,0.35)] backdrop-blur-sm
+      <div className="flex-1 rounded-2xl border border-premium-stroke bg-premium-surface px-4 py-3
+                      shadow-[0_15px_35px_rgba(0,0,0,0.08)] backdrop-blur-sm
                       focus-within:border-emerald-400/70 focus-within:ring-2 focus-within:ring-emerald-400/70
                       transition">
         <textarea
@@ -56,8 +56,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
             placeholder,
             rows: 2,
             className:
-              "w-full resize-none border-none bg-transparent text-sm text-slate-100 " +
-              "placeholder:text-slate-400 outline-none",
+              "w-full resize-none border-none bg-transparent text-sm text-premium-text " +
+              "placeholder:text-premium-muted outline-none",
             disabled,
           })}
           ref={textareaRef as React.Ref<HTMLTextAreaElement>}
@@ -74,7 +74,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
       >
         送信
       </button>
-      <p className="text-xs text-slate-400 sm:col-span-2 sm:mt-0 mt-[-8px]">
+      <p className="text-xs text-premium-muted sm:col-span-2 sm:mt-0 mt-[-8px]">
         Cmd/Ctrl + Enter で送信 · Enter で改行
       </p>
     </form>

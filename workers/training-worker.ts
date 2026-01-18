@@ -15,7 +15,7 @@ import { OpenAIEmbeddings } from '@langchain/openai';
 import { SupabaseVectorStore } from '@langchain/community/vectorstores/supabase';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 
-const MAX_TRAINING_PAGES = 20;
+const MAX_TRAINING_PAGES = 60;
 
 // Redis接続
 // Upstash RedisはTLS接続が必要

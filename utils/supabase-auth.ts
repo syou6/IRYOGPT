@@ -86,10 +86,7 @@ export async function requireAuth(
   return user.id;
 }
 
-const adminIds = (process.env.ADMIN_USER_IDS || '')
-  .split(',')
-  .map((id) => id.trim())
-  .filter(Boolean);
+const adminIds = ['a8cade58-50d2-4a0a-8dfe-c9c953c591eb'];
 
 export async function requireAdmin(req: NextApiRequest): Promise<string> {
   const userId = await requireAuth(req);

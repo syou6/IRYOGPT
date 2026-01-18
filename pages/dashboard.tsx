@@ -9,7 +9,7 @@ import { createSupabaseClient } from '@/utils/supabase-auth';
 import Onboarding from '@/components/Onboarding';
 import { InternalPlan } from '@/lib/planConfig';
 
-const MAX_TRAINING_PAGES = 20;
+const MAX_TRAINING_PAGES = 60;
 const ADMIN_EMAILS = (process.env.NEXT_PUBLIC_ADMIN_EMAILS ?? '')
   .split(',')
   .map((email) => email.trim().toLowerCase())

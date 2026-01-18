@@ -14,6 +14,7 @@ export interface ClinicSettings {
   slotDuration: number;   // 30 (分)
   maxAdvanceDays: number; // 30 (日)
   closedDays: string[];   // ["日", "祝"]
+  maxPatientsPerSlot: number; // 同時間帯の予約可能数（デフォルト1）
   // オプション項目
   usePatientCardNumber: boolean;  // 診察券番号を使用するか
   useDoctorSelection: boolean;    // 担当医選択を使用するか
@@ -24,6 +25,8 @@ export interface TimeSlot {
   time: string;           // "09:00"
   available: boolean;
   patientName?: string;   // 予約済みの場合
+  bookedCount: number;    // この時間帯の予約数
+  remainingSlots: number; // 残り予約可能数
 }
 
 export interface Appointment {
@@ -69,9 +72,10 @@ export async function getClinicSettings(spreadsheetId: string): Promise<ClinicSe
     slotDuration: parseInt(settings['1枠の時間（分）'] || '30', 10),
     maxAdvanceDays: parseInt(settings['予約可能日数（何日先まで）'] || '30', 10),
     closedDays: (settings['休診曜日'] || '日,祝').split(',').map(s => s.trim()),
-    // オプション項目
-    usePatientCardNumber: settings['診察券番号を使用'] === 'はい',
-    useDoctorSelection: settings['担当医選択を使用'] === 'はい',
+    maxPatientsPerSlot: parseInt(settings['同時間帯の予約可能数'] || '1', 10),
+    // オプション項目（「はい」「あり」「する」「true」などを許容）
+    usePatientCardNumber: ['はい', 'あり', 'する', 'true', 'yes', 'TRUE', 'YES'].includes(settings['診察券番号を使用'] || ''),
+    useDoctorSelection: ['はい', 'あり', 'する', 'true', 'yes', 'TRUE', 'YES'].includes(settings['担当医選択を使用'] || ''),
     doctorList: settings['担当医リスト']
       ? settings['担当医リスト'].split(',').map(s => s.trim())
       : [],
@@ -224,8 +228,21 @@ export async function getAvailableSlots(
     return []; // 定休日は空き枠なし
   }
 
-  // 予約済みの時間をセットに
-  const bookedTimes = new Set(existingAppointments.map(a => a.time));
+  // 時間を正規化する関数（秒を除去: "9:00:00" → "9:00", "09:00" → "9:00"）
+  const normalizeTime = (t: string) => {
+    const parts = t.split(':');
+    const hour = parseInt(parts[0], 10);
+    const minute = parts[1] || '00';
+    return `${hour}:${minute}`;
+  };
+
+  // 各時間帯の予約数をカウント
+  const bookingCountByTime = new Map<string, number>();
+  for (const appointment of existingAppointments) {
+    const normalizedTime = normalizeTime(appointment.time);
+    const currentCount = bookingCountByTime.get(normalizedTime) || 0;
+    bookingCountByTime.set(normalizedTime, currentCount + 1);
+  }
 
   // 全時間枠を生成
   const slots: TimeSlot[] = [];
@@ -246,13 +263,20 @@ export async function getAvailableSlots(
       isBefore(currentTime, breakEnd);
 
     if (!isBreakTime) {
-      const isBooked = bookedTimes.has(timeStr);
-      const appointment = existingAppointments.find(a => a.time === timeStr);
+      const bookedCount = bookingCountByTime.get(timeStr) || 0;
+      const remainingSlots = settings.maxPatientsPerSlot - bookedCount;
+      const isAvailable = remainingSlots > 0;
+
+      // 予約者名リスト（複数予約可能な場合）
+      const appointmentsAtTime = existingAppointments.filter(a => normalizeTime(a.time) === timeStr);
+      const patientNames = appointmentsAtTime.map(a => a.patientName).join('、');
 
       slots.push({
         time: timeStr,
-        available: !isBooked,
-        patientName: isBooked ? appointment?.patientName : undefined,
+        available: isAvailable,
+        patientName: bookedCount > 0 ? patientNames : undefined,
+        bookedCount,
+        remainingSlots: Math.max(0, remainingSlots),
       });
     }
 

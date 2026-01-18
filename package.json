@@ -18,7 +18,7 @@
     "test:insights": "tsx -r dotenv/config scripts/test-insights-api.ts",
     "test:redis": "tsx -r dotenv/config scripts/test-redis-connection.ts",
     "check:queue": "tsx -r dotenv/config scripts/check-queue-status.ts",
-    "worker": "tsx -r dotenv/config scripts/start-worker.ts",
+    "worker": "tsx scripts/start-worker.ts",
     "check-schema": "tsx -r dotenv/config scripts/check-schema.ts",
     "pdf-to-markdown": "tsx scripts/pdf-to-markdown.ts",
     "train:markdown": "tsx -r dotenv/config scripts/train-markdown-files.ts",

@@ -10,11 +10,32 @@ interface ClinicSettingsForPrompt {
   breakStart: string;
   breakEnd: string;
   slotDuration: number;
-  closedDays: string[];
+  closedDays: string[];           // 終日休診
+  closedDaysMorning: string[];    // 午前休診
+  closedDaysAfternoon: string[];  // 午後休診
   maxPatientsPerSlot: number;
   usePatientCardNumber: boolean;
   useDoctorSelection: boolean;
   doctorList: string[];
+}
+
+/**
+ * 休診日情報をフォーマット
+ */
+function formatClosedDays(settings: ClinicSettingsForPrompt): string {
+  const parts: string[] = [];
+
+  if (settings.closedDays.length > 0) {
+    parts.push(settings.closedDays.join('・'));
+  }
+  if (settings.closedDaysMorning && settings.closedDaysMorning.length > 0) {
+    parts.push(`${settings.closedDaysMorning.join('・')}の午前`);
+  }
+  if (settings.closedDaysAfternoon && settings.closedDaysAfternoon.length > 0) {
+    parts.push(`${settings.closedDaysAfternoon.join('・')}の午後`);
+  }
+
+  return parts.length > 0 ? parts.join('、') : 'なし';
 }
 
 /**
@@ -86,7 +107,7 @@ ${doctorList ? `- 担当医の希望（${doctorList}から選択、または「�
 **医院情報**
 - 医院名: ${settings.clinicName}
 - 診療時間: ${settings.startTime}〜${settings.endTime}（昼休み ${settings.breakStart}〜${settings.breakEnd}）
-- 休診: ${settings.closedDays.join('、')}
+- 休診: ${formatClosedDays(settings)}
 - 1枠: ${settings.slotDuration}分
 ${doctorList ? `- 担当医: ${doctorList}` : ''}
 

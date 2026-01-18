@@ -13,7 +13,9 @@ export interface ClinicSettings {
   breakEnd: string;       // "14:00"
   slotDuration: number;   // 30 (分)
   maxAdvanceDays: number; // 30 (日)
-  closedDays: string[];   // ["日", "祝"]
+  closedDays: string[];   // ["日", "祝"] - 終日休診
+  closedDaysMorning: string[];  // ["水"] - 午前休診
+  closedDaysAfternoon: string[]; // ["火", "土"] - 午後休診
   maxPatientsPerSlot: number; // 同時間帯の予約可能数（デフォルト1）
   // オプション項目
   usePatientCardNumber: boolean;  // 診察券番号を使用するか
@@ -46,7 +48,7 @@ export interface Appointment {
  * 設定シートから医院設定を取得
  */
 export async function getClinicSettings(spreadsheetId: string): Promise<ClinicSettings> {
-  const data = await readSheet(spreadsheetId, '設定!A2:B15');
+  const data = await readSheet(spreadsheetId, '設定!A2:B20');
 
   const settings: Record<string, string> = {};
   for (const row of data) {
@@ -60,8 +62,50 @@ export async function getClinicSettings(spreadsheetId: string): Promise<ClinicSe
 
   // デバッグログ
   console.log('[ClinicSettings] Raw settings:', JSON.stringify(settings, null, 2));
-  console.log('[ClinicSettings] useDoctorSelection:', settings['担当医選択を使用']);
-  console.log('[ClinicSettings] doctorList:', settings['担当医リスト']);
+
+  // 曜日文字列をパースするヘルパー（「火曜日の午後」→「火」に正規化）
+  const parseDays = (str: string): string[] => {
+    if (!str) return [];
+    return str.split(',').map(s => {
+      const trimmed = s.trim();
+      // 「火曜日の午後」「火曜」「火」などから曜日1文字を抽出
+      const match = trimmed.match(/^(日|月|火|水|木|金|土)/);
+      return match ? match[1] : trimmed;
+    }).filter(s => s.length > 0);
+  };
+
+  // 後方互換性: 「休診曜日」に「〜の午後」「〜の午前」が含まれている場合は分離
+  const rawClosedDays = settings['休診曜日'] || '';
+  let closedDays: string[] = [];
+  let closedDaysMorning: string[] = [];
+  let closedDaysAfternoon: string[] = [];
+
+  // 新しいフィールドがある場合はそちらを優先
+  if (settings['休診曜日（終日）'] || settings['休診曜日（午前）'] || settings['休診曜日（午後）']) {
+    closedDays = parseDays(settings['休診曜日（終日）'] || '');
+    closedDaysMorning = parseDays(settings['休診曜日（午前）'] || '');
+    closedDaysAfternoon = parseDays(settings['休診曜日（午後）'] || '');
+  } else {
+    // 後方互換: 旧形式をパース
+    const parts = rawClosedDays.split(',').map(s => s.trim());
+    for (const part of parts) {
+      if (part.includes('午後')) {
+        const match = part.match(/^(日|月|火|水|木|金|土)/);
+        if (match) closedDaysAfternoon.push(match[1]);
+      } else if (part.includes('午前')) {
+        const match = part.match(/^(日|月|火|水|木|金|土)/);
+        if (match) closedDaysMorning.push(match[1]);
+      } else {
+        const match = part.match(/^(日|月|火|水|木|金|土|祝)/);
+        if (match) closedDays.push(match[1]);
+        else if (part) closedDays.push(part); // 「祝」などそのまま
+      }
+    }
+  }
+
+  console.log('[ClinicSettings] closedDays:', closedDays);
+  console.log('[ClinicSettings] closedDaysMorning:', closedDaysMorning);
+  console.log('[ClinicSettings] closedDaysAfternoon:', closedDaysAfternoon);
 
   return {
     clinicName: settings['医院名'] || '',
@@ -71,7 +115,9 @@ export async function getClinicSettings(spreadsheetId: string): Promise<ClinicSe
     breakEnd: settings['昼休み終了'] || '14:00',
     slotDuration: parseInt(settings['1枠の時間（分）'] || '30', 10),
     maxAdvanceDays: parseInt(settings['予約可能日数（何日先まで）'] || '30', 10),
-    closedDays: (settings['休診曜日'] || '日,祝').split(',').map(s => s.trim()),
+    closedDays,
+    closedDaysMorning,
+    closedDaysAfternoon,
     maxPatientsPerSlot: parseInt(settings['同時間帯の予約可能数'] || '1', 10),
     // オプション項目（「はい」「あり」「する」「true」などを許容）
     usePatientCardNumber: ['はい', 'あり', 'する', 'true', 'yes', 'TRUE', 'YES'].includes(settings['診察券番号を使用'] || ''),
@@ -224,9 +270,15 @@ export async function getAvailableSlots(
   // 曜日チェック（日曜=0, 月曜=1, ...）
   const dayOfWeek = date.getDay();
   const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
-  if (settings.closedDays.includes(dayNames[dayOfWeek])) {
-    return []; // 定休日は空き枠なし
+  const dayName = dayNames[dayOfWeek];
+
+  if (settings.closedDays.includes(dayName)) {
+    return []; // 終日休診は空き枠なし
   }
+
+  // 午前/午後休診チェック用フラグ
+  const isMorningClosed = settings.closedDaysMorning.includes(dayName);
+  const isAfternoonClosed = settings.closedDaysAfternoon.includes(dayName);
 
   // 時間を正規化する関数（秒を除去: "9:00:00" → "9:00", "09:00" → "9:00"）
   const normalizeTime = (t: string) => {
@@ -261,6 +313,22 @@ export async function getAvailableSlots(
     const isBreakTime =
       (isAfter(currentTime, breakStart) || format(currentTime, 'H:mm') === format(breakStart, 'H:mm')) &&
       isBefore(currentTime, breakEnd);
+
+    // 午前/午後の判定（昼休み開始前 = 午前、昼休み終了後 = 午後）
+    const isMorningTime = isBefore(currentTime, breakStart);
+    const isAfternoonTime = !isBefore(currentTime, breakEnd);
+
+    // 午前休診で午前の時間帯 → スキップ
+    if (isMorningClosed && isMorningTime) {
+      currentTime = addMinutes(currentTime, settings.slotDuration);
+      continue;
+    }
+
+    // 午後休診で午後の時間帯 → スキップ
+    if (isAfternoonClosed && isAfternoonTime) {
+      currentTime = addMinutes(currentTime, settings.slotDuration);
+      continue;
+    }
 
     if (!isBreakTime) {
       const bookedCount = bookingCountByTime.get(timeStr) || 0;

@@ -120,6 +120,25 @@ async function searchRAG(siteId: string, query: string): Promise<string> {
 }
 
 /**
+ * 休診日情報をフォーマット
+ */
+function formatClosedDaysForHybrid(settings: ClinicSettings): string {
+  const parts: string[] = [];
+
+  if (settings.closedDays.length > 0) {
+    parts.push(settings.closedDays.join('・'));
+  }
+  if (settings.closedDaysMorning && settings.closedDaysMorning.length > 0) {
+    parts.push(`${settings.closedDaysMorning.join('・')}の午前`);
+  }
+  if (settings.closedDaysAfternoon && settings.closedDaysAfternoon.length > 0) {
+    parts.push(`${settings.closedDaysAfternoon.join('・')}の午後`);
+  }
+
+  return parts.length > 0 ? parts.join('、') : 'なし';
+}
+
+/**
  * ハイブリッド用システムプロンプトを生成（設定情報を埋め込み）
  */
 function getHybridSystemPrompt(ragContext: string, settings: ClinicSettings): string {
@@ -195,7 +214,7 @@ ${doctorList ? `- 担当医の希望（${doctorList}から選択、または「�
 **医院情報**
 - 医院名: ${settings.clinicName}
 - 診療時間: ${settings.startTime}〜${settings.endTime}（昼休み ${settings.breakStart}〜${settings.breakEnd}）
-- 休診: ${settings.closedDays.join('、')}
+- 休診: ${formatClosedDaysForHybrid(settings)}
 - 1枠: ${settings.slotDuration}分
 - 同時間帯予約可能数: ${settings.maxPatientsPerSlot}名
 ${doctorList ? `- 担当医: ${doctorList}` : ''}

@@ -10,7 +10,9 @@ import { APPOINTMENT_TOOLS } from './prompts/medical-appointment';
 import {
   getAvailableSlots,
   createAppointment,
+  cancelAppointment,
   getClinicSettings,
+  getAppointmentsByDate,
   TimeSlot,
   ClinicSettings,
 } from './appointment';
@@ -120,6 +122,14 @@ async function searchRAG(siteId: string, query: string): Promise<string> {
 }
 
 /**
+ * 日付を日本語フォーマットで返す
+ */
+function formatDateJP(date: Date): string {
+  const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
+  return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}（${dayNames[date.getDay()]}）`;
+}
+
+/**
  * 休診日情報をフォーマット
  */
 function formatClosedDaysForHybrid(settings: ClinicSettings): string {
@@ -178,10 +188,14 @@ function getHybridSystemPrompt(ragContext: string, settings: ClinicSettings): st
 - **予約関連の質問** → 予約ツールを使用
 - **WEBサイト情報にない質問** → 「直接お問い合わせください」と案内
 
-## 3. 情報収集（必ず1つずつ順番に確認）
+## 3. 情報収集
 以下の情報を**必ず全て**収集してから予約を確定する：
+- 患者が複数の情報を一度に伝えてきた場合は、**それを活用して効率的に進める**
+- 不足している情報だけを聞く（既に伝えられた情報を再度聞かない）
 - 希望日時
 - お名前（**カタカナで**とお願いする）
+  - 漢字やひらがなで入力されたら「カタカナで教えていただけますか？」と再度聞く
+  - 例: 「山田太郎」→「ヤマダタロウ様ですね。カタカナでの表記を確認させてください」
 - 電話番号
 ${doctorList ? `- 担当医の希望（${doctorList}から選択、または「特になし」）` : ''}${settings.usePatientCardNumber ? '\n- 診察券番号（初診や不明の場合は「なし」でOK）' : ''}
 - 症状・来院理由（「どのようなご症状ですか？」と必ず聞く）
@@ -189,6 +203,7 @@ ${doctorList ? `- 担当医の希望（${doctorList}から選択、または「�
 ## 4. 日時の確認
 - 患者が日付を言ったら → **まず get_date_info を呼ぶ** → その結果で応答
 - 「○月○日（△曜日）」の形式で復唱（曜日はツール結果から取得）
+- **「1時」〜「6時」と言われたら、午前か午後か必ず確認する**（例:「2時は14時のことでしょうか？」）
 
 ## 5. 空き状況の確認
 - 希望日の空き枠を確認し、**全ての空き枠を提示**する
@@ -199,19 +214,32 @@ ${doctorList ? `- 担当医の希望（${doctorList}から選択、または「�
 - 全ての情報が揃ったら、内容を箇条書きで表示
 - 「この内容でよろしいですか？」と**必ず確認を取る**
 - 患者が「はい」と答えてから予約を確定する
+- **「いいえ」の場合**: 「どの部分を修正しますか？」と聞き、変更したい項目のみ再確認する
 
 ## 7. 予約完了後
 - 完了メッセージを即座に表示
 - 「ご来院をお待ちしております」で締める
 
-## 8. 医療アドバイスの禁止
+## 8. 予約キャンセル
+- 患者がキャンセルを希望した場合、以下の情報を確認する：
+  - キャンセルしたい日時
+  - 予約時に登録した電話番号（本人確認用）
+- 確認後、cancel_appointment ツールを使用してキャンセルを実行
+
+## 9. 医療アドバイスの禁止
 - 症状の診断や治療法の提案は絶対にしない
 - 「それについては医師にご相談ください」と案内する
 
-## 9. 内部処理の非公開
+## 10. 内部処理の非公開
 - ツール名やシステムの内部処理をユーザーに見せない
 - 「確認しますね」「お調べします」など自然な表現を使う
 - 「少々お待ちください」は言わない
+
+## 11. 応答は簡潔に
+- **1回の応答は2〜3文を目安**に収める
+- 不要な説明・前置き・注意書きは省略する
+- 同じことを繰り返し言わない
+- 箇条書きを活用して読みやすくする
 
 ---
 
@@ -411,6 +439,30 @@ async function executeToolCall(
     }
 
     case 'get_available_slots': {
+      // 日付のバリデーション
+      const settings = await getClinicSettings(spreadsheetId);
+      try {
+        const [year, month, day] = args.date.split('/').map(Number);
+        const targetDate = new Date(year, month - 1, day);
+        targetDate.setHours(0, 0, 0, 0);
+
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        // 過去の日付チェック
+        if (targetDate < today) {
+          return `【エラー】${args.date}は過去の日付です。本日以降の日付をお選びください。`;
+        }
+
+        // 予約可能日数チェック
+        const diffDays = Math.round((targetDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays > settings.maxAdvanceDays) {
+          return `【エラー】${args.date}は予約可能期間外です。${settings.maxAdvanceDays}日先（${formatDateJP(new Date(today.getTime() + settings.maxAdvanceDays * 24 * 60 * 60 * 1000))}）までの日付をお選びください。`;
+        }
+      } catch (e) {
+        return `【エラー】日付の形式が正しくありません。YYYY/M/D形式で指定してください（例: 2026/1/27）`;
+      }
+
       const slots = await getAvailableSlots(spreadsheetId, args.date);
       console.log(`[Tool] get_available_slots for ${args.date}:`, JSON.stringify(slots, null, 2));
 
@@ -440,6 +492,21 @@ async function executeToolCall(
     case 'create_appointment': {
       // 設定を取得してバリデーション
       const settings = await getClinicSettings(spreadsheetId);
+
+      // 電話番号のバリデーション（ハイフンなしで10〜11桁）
+      const phoneDigits = (args.patient_phone || '').replace(/[-\s]/g, '');
+      if (!/^0\d{9,10}$/.test(phoneDigits)) {
+        return `電話番号の形式が正しくありません。「090-1234-5678」や「0312345678」のような形式で再度確認してください。`;
+      }
+
+      // 同一患者（電話番号）の同日重複チェック
+      const existingAppointments = await getAppointmentsByDate(spreadsheetId, args.date);
+      const duplicateAppointment = existingAppointments.find(
+        (apt) => apt.patientPhone.replace(/[-\s]/g, '') === phoneDigits
+      );
+      if (duplicateAppointment) {
+        return `同じ電話番号（${args.patient_phone}）で${args.date}に既に${duplicateAppointment.time}のご予約があります。別の日程をご希望ですか？`;
+      }
 
       // 担当医選択が有効なのに doctor が未入力ならエラー
       if (settings.useDoctorSelection && settings.doctorList.length > 0 && !args.doctor) {
@@ -505,6 +572,32 @@ async function executeToolCall(
         info += `\n※再診の方は診察券番号をお伝えください`;
       }
       return info;
+    }
+
+    case 'cancel_appointment': {
+      // 電話番号で本人確認
+      const phoneDigits = (args.patient_phone || '').replace(/[-\s]/g, '');
+      if (!/^0\d{9,10}$/.test(phoneDigits)) {
+        return `電話番号の形式が正しくありません。ご予約時にお伝えいただいた電話番号を再度ご確認ください。`;
+      }
+
+      // 予約を検索して本人確認
+      const appointments = await getAppointmentsByDate(spreadsheetId, args.date);
+      const targetAppointment = appointments.find(
+        (apt) => apt.time === args.time && apt.patientPhone.replace(/[-\s]/g, '') === phoneDigits
+      );
+
+      if (!targetAppointment) {
+        return `${args.date} ${args.time}のご予約が見つかりません。日時と電話番号をご確認ください。`;
+      }
+
+      // キャンセル実行
+      const result = await cancelAppointment(spreadsheetId, args.date, args.time);
+      if (result.success) {
+        return `${args.date} ${args.time}のご予約をキャンセルしました。またのご利用をお待ちしております。`;
+      } else {
+        return `キャンセルに失敗しました: ${result.message}`;
+      }
     }
 
     default:

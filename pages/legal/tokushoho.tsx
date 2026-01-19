@@ -27,7 +27,7 @@ export default function Tokushoho() {
 
           <section>
             <h2 className="text-xl font-semibold text-premium-text border-b border-premium-stroke pb-2">代表者</h2>
-            <p className="mt-4 text-premium-muted">代表社員 佐藤 翔</p>
+            <p className="mt-4 text-premium-muted">代表社員 川本 翔</p>
           </section>
 
           <section>

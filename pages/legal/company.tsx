@@ -35,7 +35,7 @@ export default function Company() {
                   代表者
                 </th>
                 <td className="px-6 py-4 text-base text-premium-muted">
-                  代表社員 佐藤 翔
+                  代表社員 川本 翔
                 </td>
               </tr>
               <tr>

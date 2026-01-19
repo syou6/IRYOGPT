@@ -782,6 +782,10 @@ export default function Home() {
                 <span className="font-bold text-premium-text">よやくらく</span>
               </div>
               <nav className="flex flex-wrap items-center justify-center gap-4 text-sm">
+                <Link href="/legal/company" className="text-premium-muted hover:text-premium-text transition">
+                  会社概要
+                </Link>
+                <span className="text-premium-stroke">|</span>
                 <Link href="/legal/tokushoho" className="text-premium-muted hover:text-premium-text transition">
                   特定商取引法に基づく表記
                 </Link>

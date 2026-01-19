@@ -22,22 +22,22 @@ export default function Tokushoho() {
         <div className="mt-8 space-y-8">
           <section>
             <h2 className="text-xl font-semibold text-premium-text border-b border-premium-stroke pb-2">販売事業者</h2>
-            <p className="mt-4 text-premium-muted">【事業者名を記載】</p>
+            <p className="mt-4 text-premium-muted">合同会社AMOR</p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-premium-text border-b border-premium-stroke pb-2">代表者</h2>
-            <p className="mt-4 text-premium-muted">【代表者名を記載】</p>
+            <p className="mt-4 text-premium-muted">代表社員 佐藤 翔</p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-premium-text border-b border-premium-stroke pb-2">所在地</h2>
-            <p className="mt-4 text-premium-muted">【住所を記載】</p>
+            <p className="mt-4 text-premium-muted">〒160-0022 東京都新宿区新宿1-36-2 新宿第七葉山ビル 3F</p>
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-premium-text border-b border-premium-stroke pb-2">電話番号</h2>
-            <p className="mt-4 text-premium-muted">【電話番号を記載】</p>
+            <p className="mt-4 text-premium-muted">090-3639-9477</p>
           </section>
 
           <section>

@@ -475,11 +475,15 @@ export default function Home() {
                 </ul>
               </div>
               <div className="order-1 flex justify-center lg:order-2">
-                <div className="flex h-80 w-80 items-center justify-center rounded-3xl bg-gradient-to-br from-[#34A853] to-[#0F9D58] p-8 shadow-2xl sm:h-96 sm:w-96">
-                  <div className="text-center text-white">
-                    <div className="mx-auto mb-4">
-                      <Icon3D name="table" size={96} />
-                    </div>
+                <div className="relative h-80 w-80 overflow-hidden rounded-3xl shadow-2xl sm:h-96 sm:w-96">
+                  <Image
+                    src="https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&h=600&fit=crop"
+                    alt="医療とテクノロジー"
+                    fill
+                    className="object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#34A853]/90 via-[#34A853]/40 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-8 text-center text-white">
                     <p className="text-2xl font-bold">Google</p>
                     <p className="text-3xl font-bold">スプレッドシート</p>
                   </div>
@@ -490,11 +494,15 @@ export default function Home() {
             {/* Reason 2 */}
             <div className="mt-20 grid items-center gap-10 lg:mt-28 lg:grid-cols-2 lg:gap-16">
               <div className="flex justify-center">
-                <div className="flex h-80 w-80 items-center justify-center rounded-3xl bg-gradient-to-br from-[#F59E0B] to-[#D97706] p-8 shadow-2xl sm:h-96 sm:w-96">
-                  <div className="text-center text-white">
-                    <div className="mx-auto mb-4">
-                      <Icon3D name="money-bag" size={96} />
-                    </div>
+                <div className="relative h-80 w-80 overflow-hidden rounded-3xl shadow-2xl sm:h-96 sm:w-96">
+                  <Image
+                    src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=600&h=600&fit=crop"
+                    alt="データ分析とコスト削減"
+                    fill
+                    className="object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#F59E0B]/90 via-[#F59E0B]/40 to-transparent" />
+                  <div className="absolute bottom-0 left-0 right-0 p-8 text-center text-white">
                     <p className="text-2xl font-bold">年間</p>
                     <p className="text-5xl font-bold">250万円</p>
                     <p className="text-2xl font-bold">削減</p>

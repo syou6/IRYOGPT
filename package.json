@@ -32,6 +32,7 @@
     "@langchain/core": "^1.0.3",
     "@langchain/openai": "^1.0.0",
     "@langchain/textsplitters": "^1.0.0",
+    "@line/bot-sdk": "^10.5.0",
     "@microsoft/fetch-event-source": "^2.0.1",
     "@supabase/supabase-js": "^2.10.0",
     "bullmq": "^5.0.0",

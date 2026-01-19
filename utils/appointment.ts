@@ -1,8 +1,14 @@
 import { readSheet, appendToSheet, updateSheet } from './google-sheets';
 import { format, parse, addMinutes, isAfter, isBefore, isSameDay } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
+import { TIMEZONE, DEFAULT_SETTINGS, SHEET_NAMES, SHEET_RANGES, CACHE_CONFIG } from './constants';
 
-const TIMEZONE = 'Asia/Tokyo';
+// 設定キャッシュ（スプレッドシートIDごと）
+interface CacheEntry {
+  settings: ClinicSettings;
+  cachedAt: number;
+}
+const settingsCache = new Map<string, CacheEntry>();
 
 // 型定義
 export interface ClinicSettings {
@@ -45,10 +51,38 @@ export interface Appointment {
 }
 
 /**
- * 設定シートから医院設定を取得
+ * 設定シートから医院設定を取得（5分間キャッシュ）
  */
 export async function getClinicSettings(spreadsheetId: string): Promise<ClinicSettings> {
-  const data = await readSheet(spreadsheetId, '設定!A2:B20');
+  // キャッシュを確認
+  const cached = settingsCache.get(spreadsheetId);
+  if (cached && Date.now() - cached.cachedAt < CACHE_CONFIG.SETTINGS_TTL_MS) {
+    return cached.settings;
+  }
+
+  let data: any[][];
+  try {
+    data = await readSheet(spreadsheetId, SHEET_RANGES.SETTINGS);
+  } catch (error) {
+    console.error('[getClinicSettings] Failed to read settings sheet:', error);
+    // デフォルト設定を返す（キャッシュはしない）
+    return {
+      clinicName: '医院',
+      startTime: DEFAULT_SETTINGS.START_TIME,
+      endTime: DEFAULT_SETTINGS.END_TIME,
+      breakStart: DEFAULT_SETTINGS.BREAK_START,
+      breakEnd: DEFAULT_SETTINGS.BREAK_END,
+      slotDuration: DEFAULT_SETTINGS.SLOT_DURATION,
+      maxAdvanceDays: DEFAULT_SETTINGS.MAX_ADVANCE_DAYS,
+      closedDays: [],
+      closedDaysMorning: [],
+      closedDaysAfternoon: [],
+      maxPatientsPerSlot: DEFAULT_SETTINGS.MAX_PATIENTS_PER_SLOT,
+      usePatientCardNumber: false,
+      useDoctorSelection: false,
+      doctorList: [],
+    };
+  }
 
   const settings: Record<string, string> = {};
   for (const row of data) {
@@ -107,7 +141,7 @@ export async function getClinicSettings(spreadsheetId: string): Promise<ClinicSe
   console.log('[ClinicSettings] closedDaysMorning:', closedDaysMorning);
   console.log('[ClinicSettings] closedDaysAfternoon:', closedDaysAfternoon);
 
-  return {
+  const result: ClinicSettings = {
     clinicName: settings['医院名'] || '',
     startTime: settings['診療開始時間'] || '09:00',
     endTime: settings['診療終了時間'] || '18:00',
@@ -126,13 +160,21 @@ export async function getClinicSettings(spreadsheetId: string): Promise<ClinicSe
       ? settings['担当医リスト'].split(',').map(s => s.trim())
       : [],
   };
+
+  // キャッシュに保存
+  settingsCache.set(spreadsheetId, {
+    settings: result,
+    cachedAt: Date.now(),
+  });
+
+  return result;
 }
 
 /**
  * 休診日リストを取得
  */
 export async function getHolidays(spreadsheetId: string): Promise<Date[]> {
-  const data = await readSheet(spreadsheetId, '休診日!A2:A100');
+  const data = await readSheet(spreadsheetId, SHEET_RANGES.HOLIDAYS);
   const holidays: Date[] = [];
 
   for (const row of data) {
@@ -157,7 +199,7 @@ export async function getAppointmentsByDate(
   spreadsheetId: string,
   targetDate: string
 ): Promise<Appointment[]> {
-  const data = await readSheet(spreadsheetId, '予約表!A2:J1000');
+  const data = await readSheet(spreadsheetId, SHEET_RANGES.APPOINTMENTS);
   const appointments: Appointment[] = [];
 
   for (const row of data) {
@@ -192,7 +234,7 @@ export async function getAllAppointments(
     includeCancel?: boolean;
   }
 ): Promise<Appointment[]> {
-  const data = await readSheet(spreadsheetId, '予約表!A2:J1000');
+  const data = await readSheet(spreadsheetId, SHEET_RANGES.APPOINTMENTS);
   const appointments: Appointment[] = [];
 
   for (const row of data) {
@@ -374,7 +416,7 @@ export async function createAppointment(
   }
 
   // 予約を追加（カラム: 日付, 時間, 患者名, 電話番号, メール, 診察券番号, 担当医, 症状, ステータス, 予約経由）
-  await appendToSheet(spreadsheetId, '予約表!A:J', [
+  await appendToSheet(spreadsheetId, SHEET_RANGES.APPOINTMENTS_APPEND, [
     [
       appointment.date,
       appointment.time,
@@ -402,7 +444,7 @@ export async function cancelAppointment(
   targetTime: string
 ): Promise<{ success: boolean; message: string; rowIndex?: number }> {
   // 予約表を全件取得して該当行を探す
-  const data = await readSheet(spreadsheetId, '予約表!A2:J1000');
+  const data = await readSheet(spreadsheetId, SHEET_RANGES.APPOINTMENTS);
 
   let rowIndex = -1;
   for (let i = 0; i < data.length; i++) {
@@ -417,7 +459,7 @@ export async function cancelAppointment(
   }
 
   // ステータスを「キャンセル」に更新（I列 = index 8）
-  await updateSheet(spreadsheetId, `予約表!I${rowIndex}`, [['キャンセル']]);
+  await updateSheet(spreadsheetId, `${SHEET_NAMES.APPOINTMENTS}!I${rowIndex}`, [['キャンセル']]);
 
   return { success: true, message: '予約をキャンセルしました', rowIndex };
 }

@@ -15,6 +15,15 @@ interface Site {
   chat_mode: 'rag_only' | 'appointment_only' | 'hybrid' | null;
 }
 
+interface LineConfig {
+  lineChannelId: string;
+  lineChannelSecret: string;
+  lineChannelAccessToken: string;
+  lineEnabled: boolean;
+  hasChannelSecret: boolean;
+  hasChannelAccessToken: boolean;
+}
+
 type ChatMode = 'rag_only' | 'appointment_only' | 'hybrid';
 
 const CHAT_MODE_OPTIONS: { value: ChatMode; label: string; description: string }[] = [
@@ -49,6 +58,26 @@ export default function EmbedSettingsPage() {
   const [spreadsheetSaved, setSpreadsheetSaved] = useState(false);
   const [chatMode, setChatMode] = useState<ChatMode>('rag_only');
   const [savingChatMode, setSavingChatMode] = useState(false);
+
+  // LINE 設定関連の状態
+  const [lineConfig, setLineConfig] = useState<LineConfig>({
+    lineChannelId: '',
+    lineChannelSecret: '',
+    lineChannelAccessToken: '',
+    lineEnabled: false,
+    hasChannelSecret: false,
+    hasChannelAccessToken: false,
+  });
+  const [lineChannelIdInput, setLineChannelIdInput] = useState('');
+  const [lineChannelSecretInput, setLineChannelSecretInput] = useState('');
+  const [lineChannelAccessTokenInput, setLineChannelAccessTokenInput] = useState('');
+  const [lineEnabled, setLineEnabled] = useState(false);
+  const [savingLine, setSavingLine] = useState(false);
+  const [lineSaved, setLineSaved] = useState(false);
+  const [showLineSecret, setShowLineSecret] = useState(false);
+  const [showLineToken, setShowLineToken] = useState(false);
+  const [lineWebhookCopied, setLineWebhookCopied] = useState(false);
+
   const supabase = createSupabaseClient();
 
   // 認証チェック
@@ -188,6 +217,28 @@ export default function EmbedSettingsPage() {
         setIsEmbedEnabled(Boolean(normalizedSite.is_embed_enabled));
         setSpreadsheetId(normalizedSite.spreadsheet_id || '');
         setChatMode(normalizedSite.chat_mode || 'rag_only');
+
+        // LINE 設定を取得
+        try {
+          const lineResponse = await fetch(`/api/sites/${siteId}/line-config`, {
+            headers: {
+              Authorization: `Bearer ${session.access_token}`,
+            },
+          });
+
+          if (lineResponse.ok) {
+            const lineData: LineConfig = await lineResponse.json();
+            setLineConfig(lineData);
+            setLineChannelIdInput(lineData.lineChannelId || '');
+            setLineChannelSecretInput(lineData.lineChannelSecret || '');
+            setLineChannelAccessTokenInput(lineData.lineChannelAccessToken || '');
+            setLineEnabled(lineData.lineEnabled || false);
+          }
+        } catch (lineError) {
+          console.error('[EmbedSettings] Failed to fetch LINE config:', lineError);
+          // LINE設定取得に失敗してもページは表示する
+        }
+
         setLoading(false);
       } catch (error) {
         console.error('Error fetching site:', error);
@@ -343,6 +394,119 @@ export default function EmbedSettingsPage() {
       setChatMode(site.chat_mode || 'rag_only');
     } finally {
       setSavingChatMode(false);
+    }
+  };
+
+  // LINE Webhook URLを取得
+  const getLineWebhookUrl = () => {
+    if (!site) return '';
+    const protocol = typeof window !== 'undefined' && window.location.protocol === 'https:' ? 'https' : 'http';
+    const host = typeof window !== 'undefined' ? window.location.host : 'localhost:3005';
+    return `${protocol}://${host}/api/line/webhook?site_id=${site.id}`;
+  };
+
+  // LINE Webhook URLをコピー
+  const handleCopyLineWebhook = async () => {
+    const webhookUrl = getLineWebhookUrl();
+    try {
+      await navigator.clipboard.writeText(webhookUrl);
+      setLineWebhookCopied(true);
+      setTimeout(() => setLineWebhookCopied(false), 2000);
+    } catch (error) {
+      console.error('Failed to copy:', error);
+      alert('コピーに失敗しました');
+    }
+  };
+
+  // LINE 設定を保存
+  const handleSaveLineConfig = async () => {
+    if (!site || savingLine) return;
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) return;
+
+    try {
+      setSavingLine(true);
+
+      const response = await fetch(`/api/sites/${site.id}/line-config`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          lineChannelId: lineChannelIdInput,
+          lineChannelSecret: lineChannelSecretInput,
+          lineChannelAccessToken: lineChannelAccessTokenInput,
+          lineEnabled: lineEnabled,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'LINE設定の保存に失敗しました');
+      }
+
+      const updatedConfig: LineConfig = await response.json();
+      setLineConfig(updatedConfig);
+      setLineChannelSecretInput(updatedConfig.lineChannelSecret || '');
+      setLineChannelAccessTokenInput(updatedConfig.lineChannelAccessToken || '');
+      setLineSaved(true);
+      setTimeout(() => setLineSaved(false), 2000);
+    } catch (error) {
+      console.error('Error saving LINE config:', error);
+      alert(error instanceof Error ? error.message : 'LINE設定の保存に失敗しました');
+    } finally {
+      setSavingLine(false);
+    }
+  };
+
+  // LINE有効/無効の切り替え
+  const handleToggleLine = async () => {
+    if (!site || savingLine) return;
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) return;
+
+    // 有効にする場合は設定が完了しているかチェック
+    if (!lineEnabled && (!lineChannelIdInput || !lineConfig.hasChannelSecret || !lineConfig.hasChannelAccessToken)) {
+      alert('LINE連携を有効にするには、まずチャネル設定を保存してください');
+      return;
+    }
+
+    try {
+      setSavingLine(true);
+      const newValue = !lineEnabled;
+
+      const response = await fetch(`/api/sites/${site.id}/line-config`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          lineEnabled: newValue,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('LINE設定の更新に失敗しました');
+      }
+
+      const updatedConfig: LineConfig = await response.json();
+      setLineEnabled(newValue);
+      setLineConfig(updatedConfig);
+    } catch (error) {
+      console.error('Error toggling LINE:', error);
+      alert('LINE設定の更新に失敗しました');
+    } finally {
+      setSavingLine(false);
     }
   };
 
@@ -694,6 +858,215 @@ export default function EmbedSettingsPage() {
                   </span>
                 )}
               </p>
+            </div>
+          )}
+
+          {/* LINE連携設定 */}
+          {(chatMode === 'appointment_only' || chatMode === 'hybrid') && (
+            <div className="rounded-3xl border border-premium-stroke bg-premium-surface p-6">
+              <div className="mb-4 flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#06C755]/20">
+                  <svg className="h-6 w-6 text-[#06C755]" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63h2.386c.349 0 .63.285.63.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.105.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.627-.63.349 0 .631.285.631.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.349 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.282.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-lg font-semibold text-premium-text">LINE連携設定</h2>
+                  <p className="mt-1 text-sm text-premium-muted">
+                    LINE公式アカウントと連携して、LINEからも予約を受け付けられます。
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                {/* LINE有効化スイッチ */}
+                <div className="flex items-center justify-between rounded-2xl border border-premium-stroke bg-premium-surface p-4">
+                  <div>
+                    <h3 className="text-sm font-medium text-premium-text">LINE連携を有効にする</h3>
+                    <p className="mt-1 text-xs text-premium-muted">
+                      有効にするには、まず下記のチャネル設定を保存してください
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleToggleLine}
+                    disabled={savingLine}
+                    className={`relative inline-flex h-7 w-14 flex-shrink-0 cursor-pointer items-center rounded-full border border-premium-stroke transition ${
+                      lineEnabled ? 'bg-[#06C755]' : 'bg-premium-elevated'
+                    } ${savingLine ? 'cursor-not-allowed opacity-40' : ''}`}
+                  >
+                    <span
+                      className={`ml-1 inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+                        lineEnabled ? 'translate-x-6' : 'translate-x-0'
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {/* チャネル設定 */}
+                <div className="space-y-4">
+                  {/* チャネルID */}
+                  <div>
+                    <label className="block text-sm font-medium text-premium-text mb-2">
+                      チャネルID
+                    </label>
+                    <input
+                      type="text"
+                      value={lineChannelIdInput}
+                      onChange={(e) => setLineChannelIdInput(e.target.value)}
+                      placeholder="例: 1234567890"
+                      className="w-full rounded-xl border border-premium-stroke bg-slate-100 px-4 py-2.5 text-sm text-premium-text placeholder-slate-400 focus:border-[#06C755]/50 focus:outline-none focus:ring-1 focus:ring-[#06C755]/50"
+                    />
+                  </div>
+
+                  {/* チャネルシークレット */}
+                  <div>
+                    <label className="block text-sm font-medium text-premium-text mb-2">
+                      チャネルシークレット
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showLineSecret ? 'text' : 'password'}
+                        value={lineChannelSecretInput}
+                        onChange={(e) => setLineChannelSecretInput(e.target.value)}
+                        placeholder={lineConfig.hasChannelSecret ? '設定済み（変更する場合は新しい値を入力）' : '例: abcdef123456...'}
+                        className="w-full rounded-xl border border-premium-stroke bg-slate-100 px-4 py-2.5 pr-12 text-sm text-premium-text placeholder-slate-400 focus:border-[#06C755]/50 focus:outline-none focus:ring-1 focus:ring-[#06C755]/50"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowLineSecret(!showLineSecret)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-premium-muted hover:text-premium-text"
+                      >
+                        {showLineSecret ? (
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                          </svg>
+                        ) : (
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* チャネルアクセストークン */}
+                  <div>
+                    <label className="block text-sm font-medium text-premium-text mb-2">
+                      チャネルアクセストークン（長期）
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showLineToken ? 'text' : 'password'}
+                        value={lineChannelAccessTokenInput}
+                        onChange={(e) => setLineChannelAccessTokenInput(e.target.value)}
+                        placeholder={lineConfig.hasChannelAccessToken ? '設定済み（変更する場合は新しい値を入力）' : '例: XYZABC123...'}
+                        className="w-full rounded-xl border border-premium-stroke bg-slate-100 px-4 py-2.5 pr-12 text-sm text-premium-text placeholder-slate-400 focus:border-[#06C755]/50 focus:outline-none focus:ring-1 focus:ring-[#06C755]/50"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowLineToken(!showLineToken)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-premium-muted hover:text-premium-text"
+                      >
+                        {showLineToken ? (
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                          </svg>
+                        ) : (
+                          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* 保存ボタン */}
+                  <div className="flex justify-end">
+                    <button
+                      onClick={handleSaveLineConfig}
+                      disabled={savingLine}
+                      className={`rounded-xl px-6 py-2.5 text-sm font-semibold transition ${
+                        lineSaved
+                          ? 'bg-[#06C755] text-white'
+                          : 'bg-[#06C755] text-white shadow-[0_10px_20px_rgba(6,199,85,0.25)]'
+                      } ${savingLine ? 'cursor-not-allowed opacity-50' : 'hover:opacity-90'}`}
+                    >
+                      {lineSaved ? '保存済み' : savingLine ? '保存中...' : 'チャネル設定を保存'}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Webhook URL */}
+                {lineConfig.hasChannelSecret && lineConfig.hasChannelAccessToken && (
+                  <div className="border-t border-premium-stroke pt-6">
+                    <label className="block text-sm font-medium text-premium-text mb-2">
+                      Webhook URL
+                    </label>
+                    <p className="mb-3 text-xs text-premium-muted">
+                      このURLをLINE Developersコンソールの「Webhook URL」に設定してください。
+                    </p>
+                    <div className="relative rounded-xl border border-premium-stroke bg-slate-100 p-4">
+                      <code className="block break-all text-sm text-[#06C755]">{getLineWebhookUrl()}</code>
+                      <button
+                        onClick={handleCopyLineWebhook}
+                        className="absolute right-3 top-3 rounded-full bg-[#06C755] px-4 py-1.5 text-xs font-semibold text-white shadow-md"
+                      >
+                        {lineWebhookCopied ? 'コピー済み' : 'コピー'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 設定手順 */}
+                <div className="rounded-2xl border border-[#06C755]/20 bg-[#06C755]/10 p-4 text-sm text-[#06C755]">
+                  <h3 className="mb-2 text-sm font-semibold">設定手順</h3>
+                  <ol className="list-decimal space-y-1 pl-5 text-xs">
+                    <li>
+                      <a
+                        href="https://developers.line.biz/console/"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="underline"
+                      >
+                        LINE Developers Console
+                      </a>
+                      にアクセス
+                    </li>
+                    <li>プロバイダーを作成し、Messaging APIチャネルを作成</li>
+                    <li>「チャネル基本設定」からチャネルID、チャネルシークレットを取得</li>
+                    <li>「Messaging API設定」からチャネルアクセストークン（長期）を発行</li>
+                    <li>上記の設定を保存後、Webhook URLをLINE Developersに設定</li>
+                    <li>「Webhook設定」でWebhookの利用を「ON」にする</li>
+                  </ol>
+                </div>
+
+                {/* 現在の状態表示 */}
+                <div className="rounded-2xl border border-premium-stroke bg-premium-surface p-4">
+                  <h3 className="text-sm font-medium text-premium-text mb-2">LINE連携状態</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {lineEnabled ? (
+                      <span className="inline-flex items-center rounded-full bg-[#06C755]/20 px-3 py-1 text-xs font-medium text-[#06C755]">
+                        LINE連携: 有効
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-slate-500/20 px-3 py-1 text-xs font-medium text-slate-600">
+                        LINE連携: 無効
+                      </span>
+                    )}
+                    {lineConfig.hasChannelSecret && lineConfig.hasChannelAccessToken ? (
+                      <span className="inline-flex items-center rounded-full bg-[#06C755]/20 px-3 py-1 text-xs font-medium text-[#06C755]">
+                        チャネル設定: 完了
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center rounded-full bg-amber-500/20 px-3 py-1 text-xs font-medium text-amber-700">
+                        チャネル設定: 未完了
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>

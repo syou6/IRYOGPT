@@ -17,10 +17,24 @@ import {
   ClinicSettings,
 } from './appointment';
 import { sendAppointmentConfirmationEmail } from './email';
+import { RAG_CONFIG, DAY_NAMES } from './constants';
+import {
+  validateDateFormat,
+  validateTimeFormat,
+  validatePhone,
+  validateEmail,
+  validatePatientName,
+  validateSymptom,
+} from './validators';
+import {
+  sanitizeForSheet,
+  sanitizeForPrompt,
+  normalizeOptionalValue,
+} from './sanitizers';
 
-// RAG検索の設定（通常RAGに合わせる）
-const RAG_MAX_CHUNKS = 6;
-const RAG_MATCH_COUNT = 15;
+// RAG検索の設定
+const RAG_MAX_CHUNKS = RAG_CONFIG.MAX_CHUNKS;
+const RAG_MATCH_COUNT = RAG_CONFIG.MATCH_COUNT;
 
 export interface HybridChatMessage {
   role: 'system' | 'user' | 'assistant' | 'tool';
@@ -323,7 +337,7 @@ export async function runHybridChat(
         result = 'ツールの実行に失敗しました。しばらくしてからお試しください。';
       }
 
-      if (toolCall.name === 'create_appointment' && result.includes('完了')) {
+      if (toolCall.name === 'create_appointment' && result.startsWith('予約が完了しました')) {
         appointmentCreated = true;
       }
 
@@ -439,28 +453,30 @@ async function executeToolCall(
     }
 
     case 'get_available_slots': {
-      // 日付のバリデーション
+      // 日付のバリデーション（厳密）
+      const dateValidation = validateDateFormat(args.date);
+      if (!dateValidation.valid) {
+        return dateValidation.error || '日付の形式が正しくありません。';
+      }
+
       const settings = await getClinicSettings(spreadsheetId);
-      try {
-        const [year, month, day] = args.date.split('/').map(Number);
-        const targetDate = new Date(year, month - 1, day);
-        targetDate.setHours(0, 0, 0, 0);
+      const [year, month, day] = dateValidation.normalized!.split('/').map(Number);
+      const targetDate = new Date(year, month - 1, day);
+      targetDate.setHours(0, 0, 0, 0);
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
-        // 過去の日付チェック
-        if (targetDate < today) {
-          return `【エラー】${args.date}は過去の日付です。本日以降の日付をお選びください。`;
-        }
+      // 過去の日付チェック
+      if (targetDate < today) {
+        return `${args.date}は過去の日付です。本日以降の日付をお選びください。`;
+      }
 
-        // 予約可能日数チェック
-        const diffDays = Math.round((targetDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-        if (diffDays > settings.maxAdvanceDays) {
-          return `【エラー】${args.date}は予約可能期間外です。${settings.maxAdvanceDays}日先（${formatDateJP(new Date(today.getTime() + settings.maxAdvanceDays * 24 * 60 * 60 * 1000))}）までの日付をお選びください。`;
-        }
-      } catch (e) {
-        return `【エラー】日付の形式が正しくありません。YYYY/M/D形式で指定してください（例: 2026/1/27）`;
+      // 予約可能日数チェック
+      const diffDays = Math.round((targetDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      if (diffDays > settings.maxAdvanceDays) {
+        const maxDate = new Date(today.getTime() + settings.maxAdvanceDays * 24 * 60 * 60 * 1000);
+        return `${args.date}は予約可能期間外です。${settings.maxAdvanceDays}日先（${formatDateJP(maxDate)}）までの日付をお選びください。`;
       }
 
       const slots = await getAvailableSlots(spreadsheetId, args.date);
@@ -493,10 +509,45 @@ async function executeToolCall(
       // 設定を取得してバリデーション
       const settings = await getClinicSettings(spreadsheetId);
 
-      // 電話番号のバリデーション（ハイフンなしで10〜11桁）
-      const phoneDigits = (args.patient_phone || '').replace(/[-\s]/g, '');
-      if (!/^0\d{9,10}$/.test(phoneDigits)) {
-        return `電話番号の形式が正しくありません。「090-1234-5678」や「0312345678」のような形式で再度確認してください。`;
+      // 日付バリデーション
+      const dateVal = validateDateFormat(args.date);
+      if (!dateVal.valid) {
+        return dateVal.error || '日付の形式が正しくありません。';
+      }
+
+      // 時刻バリデーション
+      const timeVal = validateTimeFormat(args.time);
+      if (!timeVal.valid) {
+        return timeVal.error || '時刻の形式が正しくありません。';
+      }
+
+      // 電話番号バリデーション（国際形式対応）
+      const phoneVal = validatePhone(args.patient_phone);
+      if (!phoneVal.valid) {
+        return phoneVal.error || '電話番号の形式が正しくありません。';
+      }
+      const phoneDigits = phoneVal.normalized!;
+
+      // 患者名バリデーション
+      const nameVal = validatePatientName(args.patient_name);
+      if (!nameVal.valid) {
+        return nameVal.error || 'お名前を入力してください。';
+      }
+
+      // メールバリデーション（任意）
+      if (args.patient_email) {
+        const emailVal = validateEmail(args.patient_email);
+        if (!emailVal.valid) {
+          return emailVal.error || 'メールアドレスの形式が正しくありません。';
+        }
+      }
+
+      // 症状バリデーション（任意）
+      if (args.symptom) {
+        const symptomVal = validateSymptom(args.symptom);
+        if (!symptomVal.valid) {
+          return symptomVal.error || 'ご来院の目的が長すぎます。';
+        }
       }
 
       // 同一患者（電話番号）の同日重複チェック
@@ -509,45 +560,55 @@ async function executeToolCall(
       }
 
       // 担当医選択が有効なのに doctor が未入力ならエラー
+      const normalizedDoctor = normalizeOptionalValue(args.doctor || '');
       if (settings.useDoctorSelection && settings.doctorList.length > 0 && !args.doctor) {
         return `担当医の確認が必要です。「${settings.doctorList.join('、')}」の中からご希望を確認するか、特にご希望がなければ「なし」と入力してください。`;
       }
 
       // 診察券番号が有効なのに未入力ならエラー
+      const normalizedCardNumber = normalizeOptionalValue(args.patient_card_number || '');
       if (settings.usePatientCardNumber && !args.patient_card_number) {
         return `診察券番号の確認が必要です。「診察券番号をお持ちでしたらお伝えください。初診の方や番号がわからない場合は『なし』で大丈夫です」と確認してください。`;
       }
 
+      // サニタイズしてから保存
       const result = await createAppointment(spreadsheetId, {
-        date: args.date,
-        time: args.time,
-        patientName: args.patient_name,
-        patientPhone: args.patient_phone,
-        patientEmail: args.patient_email || '',
-        patientCardNumber: args.patient_card_number || '',
-        doctor: args.doctor || '',
-        symptom: args.symptom || '',
+        date: dateVal.normalized!,
+        time: timeVal.normalized!,
+        patientName: sanitizeForSheet(nameVal.normalized!),
+        patientPhone: phoneDigits,
+        patientEmail: args.patient_email ? sanitizeForSheet(args.patient_email) : '',
+        patientCardNumber: normalizedCardNumber,
+        doctor: normalizedDoctor,
+        symptom: args.symptom ? sanitizeForSheet(args.symptom) : '',
         bookedVia: 'ChatBot',
       });
 
       if (result.success) {
         // メール送信（患者にメールアドレスがある場合）
+        let emailSent = false;
         if (args.patient_email) {
-          sendAppointmentConfirmationEmail({
-            patientName: args.patient_name,
-            patientEmail: args.patient_email,
-            date: args.date,
-            time: args.time,
-            clinicName: settings.clinicName,
-            symptom: args.symptom,
-          }).catch((err) => {
+          try {
+            await sendAppointmentConfirmationEmail({
+              patientName: args.patient_name,
+              patientEmail: args.patient_email,
+              date: args.date,
+              time: args.time,
+              clinicName: settings.clinicName,
+              symptom: args.symptom,
+            });
+            emailSent = true;
+          } catch (err) {
             console.error('[Hybrid] Email send error:', err);
-          });
+          }
         }
         // 結果メッセージを組み立て
         let confirmMsg = `予約が完了しました。日時: ${args.date} ${args.time}、患者名: ${args.patient_name}`;
-        if (args.doctor) {
-          confirmMsg += `、担当医: ${args.doctor}`;
+        if (normalizedDoctor) {
+          confirmMsg += `、担当医: ${normalizedDoctor}`;
+        }
+        if (args.patient_email && !emailSent) {
+          confirmMsg += `（確認メールの送信に失敗しました）`;
         }
         return confirmMsg;
       } else {
@@ -575,16 +636,29 @@ async function executeToolCall(
     }
 
     case 'cancel_appointment': {
-      // 電話番号で本人確認
-      const phoneDigits = (args.patient_phone || '').replace(/[-\s]/g, '');
-      if (!/^0\d{9,10}$/.test(phoneDigits)) {
-        return `電話番号の形式が正しくありません。ご予約時にお伝えいただいた電話番号を再度ご確認ください。`;
+      // 日付バリデーション
+      const cancelDateVal = validateDateFormat(args.date);
+      if (!cancelDateVal.valid) {
+        return cancelDateVal.error || '日付の形式が正しくありません。';
       }
 
+      // 時刻バリデーション
+      const cancelTimeVal = validateTimeFormat(args.time);
+      if (!cancelTimeVal.valid) {
+        return cancelTimeVal.error || '時刻の形式が正しくありません。';
+      }
+
+      // 電話番号バリデーション（国際形式対応）
+      const cancelPhoneVal = validatePhone(args.patient_phone);
+      if (!cancelPhoneVal.valid) {
+        return `ご予約時にお伝えいただいた電話番号を再度ご確認ください。${cancelPhoneVal.error || ''}`;
+      }
+      const phoneDigits = cancelPhoneVal.normalized!;
+
       // 予約を検索して本人確認
-      const appointments = await getAppointmentsByDate(spreadsheetId, args.date);
+      const appointments = await getAppointmentsByDate(spreadsheetId, cancelDateVal.normalized!);
       const targetAppointment = appointments.find(
-        (apt) => apt.time === args.time && apt.patientPhone.replace(/[-\s]/g, '') === phoneDigits
+        (apt) => apt.time === cancelTimeVal.normalized && apt.patientPhone.replace(/[-\s]/g, '') === phoneDigits
       );
 
       if (!targetAppointment) {

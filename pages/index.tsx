@@ -1,8 +1,38 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import Layout from '@/components/layout';
 import Button from '@/components/ui/Button';
+
+// Animation variants
+const fadeInUp = {
+  hidden: { opacity: 0, y: 40 },
+  visible: { opacity: 1, y: 0 },
+};
+
+const fadeInLeft = {
+  hidden: { opacity: 0, x: -40 },
+  visible: { opacity: 1, x: 0 },
+};
+
+const fadeInRight = {
+  hidden: { opacity: 0, x: 40 },
+  visible: { opacity: 1, x: 0 },
+};
+
+const staggerContainer = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.15 },
+  },
+};
+
+const scaleIn = {
+  hidden: { opacity: 0, scale: 0.8 },
+  visible: { opacity: 1, scale: 1 },
+};
 
 // 3D Icons from Icons8
 const Icon3D = ({ name, size = 48 }: { name: string; size?: number }) => (
@@ -160,22 +190,43 @@ export default function Home() {
           </div>
 
           <div className="relative mx-auto max-w-7xl">
-            <div className="lg:max-w-[55%]">
-              <p className="inline-flex items-center gap-2 rounded-full border border-[#19c37d]/30 bg-[#19c37d]/10 px-6 py-3 text-lg font-medium text-[#7af4c1]">
+            <motion.div
+              className="lg:max-w-[55%]"
+              initial="hidden"
+              animate="visible"
+              variants={staggerContainer}
+            >
+              <motion.p
+                variants={fadeInUp}
+                transition={{ duration: 0.6 }}
+                className="inline-flex items-center gap-2 rounded-full border border-[#19c37d]/30 bg-[#19c37d]/10 px-6 py-3 text-lg font-medium text-[#7af4c1]"
+              >
                 <Icon3D name="goal" size={24} />
                 医療・美容業界特化
-              </p>
-              <h1 className="font-hero mt-8 text-5xl leading-[1.1] text-white sm:text-6xl md:text-7xl lg:text-[5.5rem] xl:text-[6.5rem]">
+              </motion.p>
+              <motion.h1
+                variants={fadeInUp}
+                transition={{ duration: 0.6 }}
+                className="font-hero mt-8 text-5xl leading-[1.1] text-white sm:text-6xl md:text-7xl lg:text-[5.5rem] xl:text-[6.5rem]"
+              >
                 <span className="whitespace-nowrap">もう予約電話に</span>
                 <br />
                 <span className="whitespace-nowrap bg-gradient-to-r from-[#7af4c1] to-[#4ade80] bg-clip-text text-transparent">振り回されない</span>
-              </h1>
-              <p className="mt-8 text-2xl leading-relaxed text-white/80 sm:text-3xl lg:mt-10">
+              </motion.h1>
+              <motion.p
+                variants={fadeInUp}
+                transition={{ duration: 0.6 }}
+                className="mt-8 text-2xl leading-relaxed text-white/80 sm:text-3xl lg:mt-10"
+              >
                 24時間365日、AIが予約を自動受付。
                 <br />
                 スタッフは本業に集中できます。
-              </p>
-              <div className="mt-10 flex flex-col gap-4 sm:flex-row lg:mt-12">
+              </motion.p>
+              <motion.div
+                variants={fadeInUp}
+                transition={{ duration: 0.6 }}
+                className="mt-10 flex flex-col gap-4 sm:flex-row lg:mt-12"
+              >
                 <Button size="lg" className="px-10 py-5 text-xl" onClick={() => (window.location.href = '/contact')}>
                   無料で相談する
                 </Button>
@@ -187,10 +238,14 @@ export default function Home() {
                 >
                   機能を見る
                 </Button>
-              </div>
+              </motion.div>
 
               {/* Trust Badges */}
-              <div className="mt-12 flex flex-wrap items-center gap-8 border-t border-white/10 pt-8 lg:mt-16 lg:gap-12 lg:pt-10">
+              <motion.div
+                variants={fadeInUp}
+                transition={{ duration: 0.6 }}
+                className="mt-12 flex flex-wrap items-center gap-8 border-t border-white/10 pt-8 lg:mt-16 lg:gap-12 lg:pt-10"
+              >
                 <div className="flex items-center gap-4">
                   <Icon3D name="hospital" size={56} />
                   <div>
@@ -212,11 +267,16 @@ export default function Home() {
                     <p className="text-lg text-white/60">業務効率化</p>
                   </div>
                 </div>
-              </div>
-            </div>
+              </motion.div>
+            </motion.div>
 
             {/* Laptop Mockup */}
-            <div className="pointer-events-none absolute -right-20 top-1/2 hidden -translate-y-1/2 lg:block xl:right-0">
+            <motion.div
+              initial={{ opacity: 0, x: 100 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.8, delay: 0.4 }}
+              className="pointer-events-none absolute -right-20 top-1/2 hidden -translate-y-1/2 lg:block xl:right-0"
+            >
               <div className="relative rounded-t-3xl bg-gray-800 p-4 shadow-2xl xl:p-5">
                 <div className="absolute left-1/2 top-3 h-3 w-3 -translate-x-1/2 rounded-full bg-gray-600" />
                 <div className="overflow-hidden rounded-2xl bg-white">
@@ -229,14 +289,20 @@ export default function Home() {
                 <div className="absolute inset-x-1/4 top-0 h-2 rounded-b bg-gray-600" />
               </div>
               <div className="h-2.5 rounded-b-2xl bg-gray-800 shadow-lg" />
-            </div>
+            </motion.div>
           </div>
         </section>
 
         {/* ===== BANNER SECTION ===== */}
         <section className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6">
-            <div className="overflow-hidden rounded-2xl bg-premium-surface">
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-100px" }}
+            variants={staggerContainer}
+            className="grid grid-cols-2 gap-4 md:grid-cols-4 md:gap-6"
+          >
+            <motion.div variants={scaleIn} transition={{ duration: 0.5 }} className="overflow-hidden rounded-2xl bg-premium-surface">
               <Image
                 src="https://images.unsplash.com/photo-1629909613654-28e377c37b09?w=400&h=300&fit=crop"
                 alt="歯科医院"
@@ -244,8 +310,8 @@ export default function Home() {
                 height={300}
                 className="h-48 w-full object-cover transition hover:scale-105"
               />
-            </div>
-            <div className="overflow-hidden rounded-2xl bg-premium-surface">
+            </motion.div>
+            <motion.div variants={scaleIn} transition={{ duration: 0.5 }} className="overflow-hidden rounded-2xl bg-premium-surface">
               <Image
                 src="https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?w=400&h=300&fit=crop"
                 alt="クリニック受付"
@@ -253,8 +319,8 @@ export default function Home() {
                 height={300}
                 className="h-48 w-full object-cover transition hover:scale-105"
               />
-            </div>
-            <div className="overflow-hidden rounded-2xl bg-premium-surface">
+            </motion.div>
+            <motion.div variants={scaleIn} transition={{ duration: 0.5 }} className="overflow-hidden rounded-2xl bg-premium-surface">
               <Image
                 src="https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=400&h=300&fit=crop"
                 alt="医療スタッフ"
@@ -262,8 +328,8 @@ export default function Home() {
                 height={300}
                 className="h-48 w-full object-cover transition hover:scale-105"
               />
-            </div>
-            <div className="overflow-hidden rounded-2xl bg-premium-surface">
+            </motion.div>
+            <motion.div variants={scaleIn} transition={{ duration: 0.5 }} className="overflow-hidden rounded-2xl bg-premium-surface">
               <Image
                 src="https://images.unsplash.com/photo-1600880292203-757bb62b4baf?w=400&h=300&fit=crop"
                 alt="予約システム"
@@ -271,8 +337,8 @@ export default function Home() {
                 height={300}
                 className="h-48 w-full object-cover transition hover:scale-105"
               />
-            </div>
-          </div>
+            </motion.div>
+          </motion.div>
         </section>
 
         {/* ===== LOGO SLIDER ===== */}
@@ -300,17 +366,31 @@ export default function Home() {
         {/* ===== BEFORE/AFTER SECTION ===== */}
         <section className="bg-gradient-to-b from-[#e8f4f8] to-white py-20 lg:py-28">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-            <div className="text-center">
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-100px" }}
+              variants={fadeInUp}
+              transition={{ duration: 0.6 }}
+              className="text-center"
+            >
               <h2 className="text-4xl font-bold text-premium-text sm:text-5xl lg:text-6xl">
                 予約対応の悩みを
                 <br />
                 <span className="text-premium-accent">AIがまるっと解決</span>
               </h2>
-            </div>
+            </motion.div>
 
             <div className="mt-16 grid items-center gap-8 lg:grid-cols-[1fr_auto_1fr] lg:gap-6">
               {/* Before */}
-              <div className="relative">
+              <motion.div
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: "-50px" }}
+                variants={fadeInLeft}
+                transition={{ duration: 0.6 }}
+                className="relative"
+              >
                 <div className="absolute -left-2 -top-2 z-10 rounded-full bg-red-500 px-5 py-2 text-base font-bold text-white lg:-left-4 lg:-top-4">
                   Before
                 </div>
@@ -326,10 +406,17 @@ export default function Home() {
                     <div className="absolute right-[12%] top-[82%] rounded-lg bg-white px-4 py-3 text-base font-medium text-orange-500 shadow-md">📅 休日も対応</div>
                   </div>
                 </div>
-              </div>
+              </motion.div>
 
               {/* Arrow */}
-              <div className="flex flex-col items-center justify-center py-4 lg:py-0">
+              <motion.div
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: "-50px" }}
+                variants={scaleIn}
+                transition={{ duration: 0.5, delay: 0.2 }}
+                className="flex flex-col items-center justify-center py-4 lg:py-0"
+              >
                 <div className="flex items-center gap-4">
                   <div className="h-0.5 w-8 bg-gray-300 lg:w-12" />
                   <div className="flex h-28 w-28 flex-col items-center justify-center rounded-2xl border-2 border-premium-accent bg-white shadow-lg">
@@ -343,10 +430,17 @@ export default function Home() {
                     <div className="h-0 w-0 border-y-[8px] border-l-[12px] border-y-transparent border-l-premium-accent" />
                   </div>
                 </div>
-              </div>
+              </motion.div>
 
               {/* After */}
-              <div className="relative">
+              <motion.div
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: "-50px" }}
+                variants={fadeInRight}
+                transition={{ duration: 0.6 }}
+                className="relative"
+              >
                 <div className="absolute -right-2 -top-2 z-10 rounded-full bg-premium-accent px-5 py-2 text-base font-bold text-white lg:-right-4 lg:-top-4">
                   After
                 </div>
@@ -396,7 +490,7 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             </div>
           </div>
         </section>
@@ -404,19 +498,34 @@ export default function Home() {
         {/* ===== PAIN POINTS SECTION ===== */}
         <section className="py-20 lg:py-28">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-            <div className="text-center">
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-100px" }}
+              variants={fadeInUp}
+              transition={{ duration: 0.6 }}
+              className="text-center"
+            >
               <h2 className="text-4xl font-bold text-premium-text sm:text-5xl lg:text-6xl">
                 こんなお悩みありませんか？
               </h2>
               <p className="mt-6 text-xl text-premium-muted lg:text-2xl">
                 予約対応に追われる毎日から解放されましょう
               </p>
-            </div>
-            <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:mt-16">
-              {PAIN_POINTS.map((point) => (
-                <div
+            </motion.div>
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-50px" }}
+              variants={staggerContainer}
+              className="mt-12 grid gap-6 sm:grid-cols-2 lg:mt-16"
+            >
+              {PAIN_POINTS.map((point, index) => (
+                <motion.div
                   key={point.title}
-                  className="flex gap-6 rounded-2xl border border-premium-stroke bg-white p-8 shadow-sm lg:p-10"
+                  variants={fadeInUp}
+                  transition={{ duration: 0.5 }}
+                  className="flex gap-6 rounded-2xl border border-premium-stroke bg-white p-8 shadow-sm transition-shadow hover:shadow-lg lg:p-10"
                 >
                   <div className="flex-shrink-0">
                     <Icon3D name={point.icon} size={64} />
@@ -425,26 +534,40 @@ export default function Home() {
                     <h3 className="text-2xl font-semibold text-premium-text">{point.title}</h3>
                     <p className="mt-3 text-lg text-premium-muted leading-relaxed">{point.description}</p>
                   </div>
-                </div>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           </div>
         </section>
 
         {/* ===== WHY CHOOSE US SECTION ===== */}
         <section className="bg-gradient-to-b from-premium-surface to-white py-20 lg:py-28">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-            <div className="text-center">
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-100px" }}
+              variants={fadeInUp}
+              transition={{ duration: 0.6 }}
+              className="text-center"
+            >
               <p className="text-xl font-semibold text-premium-accent">WHY CHOOSE US</p>
               <h2 className="mt-3 text-4xl font-bold text-premium-text sm:text-5xl lg:text-6xl">
                 <span className="text-premium-accent">よやくらく</span>が選ばれる
                 <span className="text-premium-accent">2</span>つの理由
               </h2>
-            </div>
+            </motion.div>
 
             {/* Reason 1 */}
             <div className="mt-16 grid items-center gap-10 lg:mt-20 lg:grid-cols-2 lg:gap-16">
-              <div className="order-2 lg:order-1">
+              <motion.div
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: "-50px" }}
+                variants={fadeInLeft}
+                transition={{ duration: 0.6 }}
+                className="order-2 lg:order-1"
+              >
                 <div className="flex items-center gap-3">
                   <span className="flex h-14 w-14 items-center justify-center rounded-full bg-premium-accent text-2xl font-bold text-white">1</span>
                   <p className="text-base font-medium text-premium-accent">REASON 01</p>
@@ -473,8 +596,15 @@ export default function Home() {
                     AI×人のハイブリッド運用
                   </li>
                 </ul>
-              </div>
-              <div className="order-1 flex justify-center lg:order-2">
+              </motion.div>
+              <motion.div
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: "-50px" }}
+                variants={fadeInRight}
+                transition={{ duration: 0.6 }}
+                className="order-1 flex justify-center lg:order-2"
+              >
                 <div className="relative h-80 w-80 overflow-hidden rounded-3xl shadow-2xl sm:h-96 sm:w-96">
                   <Image
                     src="https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&h=600&fit=crop"
@@ -488,12 +618,19 @@ export default function Home() {
                     <p className="text-3xl font-bold">スプレッドシート</p>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             </div>
 
             {/* Reason 2 */}
             <div className="mt-20 grid items-center gap-10 lg:mt-28 lg:grid-cols-2 lg:gap-16">
-              <div className="flex justify-center">
+              <motion.div
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: "-50px" }}
+                variants={fadeInLeft}
+                transition={{ duration: 0.6 }}
+                className="flex justify-center"
+              >
                 <div className="relative h-80 w-80 overflow-hidden rounded-3xl shadow-2xl sm:h-96 sm:w-96">
                   <Image
                     src="https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=600&h=600&fit=crop"
@@ -508,8 +645,14 @@ export default function Home() {
                     <p className="text-2xl font-bold">削減</p>
                   </div>
                 </div>
-              </div>
-              <div>
+              </motion.div>
+              <motion.div
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: "-50px" }}
+                variants={fadeInRight}
+                transition={{ duration: 0.6 }}
+              >
                 <div className="flex items-center gap-3">
                   <span className="flex h-14 w-14 items-center justify-center rounded-full bg-premium-accent text-2xl font-bold text-white">2</span>
                   <p className="text-base font-medium text-premium-accent">REASON 02</p>
@@ -538,7 +681,7 @@ export default function Home() {
                     夜間予約で売上30%アップ
                   </li>
                 </ul>
-              </div>
+              </motion.div>
             </div>
           </div>
         </section>
@@ -546,7 +689,14 @@ export default function Home() {
         {/* ===== FEATURES SECTION ===== */}
         <section id="features" className="py-20 lg:py-28">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-            <div className="text-center">
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-100px" }}
+              variants={fadeInUp}
+              transition={{ duration: 0.6 }}
+              className="text-center"
+            >
               <p className="text-xl font-semibold text-premium-accent">FEATURES</p>
               <h2 className="mt-3 text-4xl font-bold text-premium-text sm:text-5xl lg:text-6xl">
                 よやくらくの機能
@@ -554,26 +704,41 @@ export default function Home() {
               <p className="mt-6 text-xl text-premium-muted lg:text-2xl">
                 AI予約システムで業務効率を劇的に改善
               </p>
-            </div>
-            <div className="mt-12 grid gap-8 md:grid-cols-2 lg:mt-16">
+            </motion.div>
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-50px" }}
+              variants={staggerContainer}
+              className="mt-12 grid gap-8 md:grid-cols-2 lg:mt-16"
+            >
               {FEATURES.map((feature) => (
-                <div
+                <motion.div
                   key={feature.title}
-                  className="rounded-2xl border border-premium-stroke bg-white p-8 shadow-sm transition hover:shadow-md lg:p-10"
+                  variants={fadeInUp}
+                  transition={{ duration: 0.5 }}
+                  className="rounded-2xl border border-premium-stroke bg-white p-8 shadow-sm transition-shadow hover:shadow-lg lg:p-10"
                 >
                   <Icon3D name={feature.icon} size={72} />
                   <h3 className="mt-6 text-2xl font-semibold text-premium-text lg:text-3xl">{feature.title}</h3>
                   <p className="mt-4 text-lg text-premium-muted leading-relaxed lg:text-xl">{feature.description}</p>
-                </div>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           </div>
         </section>
 
         {/* ===== HOW IT WORKS SECTION ===== */}
         <section className="bg-premium-surface py-20 lg:py-28">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-            <div className="text-center">
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-100px" }}
+              variants={fadeInUp}
+              transition={{ duration: 0.6 }}
+              className="text-center"
+            >
               <p className="text-xl font-semibold text-premium-accent">HOW IT WORKS</p>
               <h2 className="mt-3 text-4xl font-bold text-premium-text sm:text-5xl lg:text-6xl">
                 シンプルな仕組み
@@ -581,8 +746,14 @@ export default function Home() {
               <p className="mt-6 text-xl text-premium-muted lg:text-2xl">
                 患者様とスタッフ、両方にとって使いやすい設計
               </p>
-            </div>
-            <div className="mt-12 grid gap-8 md:grid-cols-3 lg:mt-16">
+            </motion.div>
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-50px" }}
+              variants={staggerContainer}
+              className="mt-12 grid gap-8 md:grid-cols-3 lg:mt-16"
+            >
               {[
                 {
                   step: 1,
@@ -603,7 +774,12 @@ export default function Home() {
                   image: 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=400&h=300&fit=crop',
                 },
               ].map((item) => (
-                <div key={item.step} className="relative rounded-2xl bg-white p-8 shadow-sm lg:p-10">
+                <motion.div
+                  key={item.step}
+                  variants={fadeInUp}
+                  transition={{ duration: 0.5 }}
+                  className="relative rounded-2xl bg-white p-8 shadow-sm transition-shadow hover:shadow-lg lg:p-10"
+                >
                   <div className="absolute -top-5 left-8">
                     <span className="flex h-12 w-12 items-center justify-center rounded-full bg-premium-accent text-white text-xl font-bold">{item.step}</span>
                   </div>
@@ -614,16 +790,23 @@ export default function Home() {
                     <h3 className="mt-6 text-2xl font-semibold text-premium-text">{item.title}</h3>
                     <p className="mt-3 text-lg text-premium-muted leading-relaxed">{item.description}</p>
                   </div>
-                </div>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           </div>
         </section>
 
         {/* ===== DEMO VIDEO SECTION ===== */}
         <section className="py-20 lg:py-28">
           <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-            <div className="text-center">
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-100px" }}
+              variants={fadeInUp}
+              transition={{ duration: 0.6 }}
+              className="text-center"
+            >
               <p className="text-xl font-semibold text-premium-accent">DEMO</p>
               <h2 className="mt-3 text-4xl font-bold text-premium-text sm:text-5xl lg:text-6xl">
                 実際の動作をご覧ください
@@ -631,45 +814,74 @@ export default function Home() {
               <p className="mt-6 text-xl text-premium-muted lg:text-2xl">
                 AIが自然な会話で予約を完了する様子
               </p>
-            </div>
-            <div className="mt-12 lg:mt-16">
+            </motion.div>
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-50px" }}
+              variants={scaleIn}
+              transition={{ duration: 0.6 }}
+              className="mt-12 lg:mt-16"
+            >
               <div className="overflow-hidden rounded-3xl border border-premium-stroke bg-white shadow-xl">
                 <video controls playsInline className="h-auto w-full">
                   <source src="/videos/demo.mp4" type="video/mp4" />
                   お使いのブラウザは動画再生に対応していません。
                 </video>
               </div>
-            </div>
+            </motion.div>
           </div>
         </section>
 
         {/* ===== TARGET INDUSTRIES ===== */}
         <section className="bg-premium-surface py-20 lg:py-28">
           <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-            <div className="text-center">
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-100px" }}
+              variants={fadeInUp}
+              transition={{ duration: 0.6 }}
+              className="text-center"
+            >
               <h2 className="text-4xl font-bold text-premium-text sm:text-5xl lg:text-6xl">対象業種</h2>
               <p className="mt-6 text-xl text-premium-muted lg:text-2xl">
                 予約管理が必要なあらゆる業種に対応
               </p>
-            </div>
-            <div className="mt-12 grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-6 lg:mt-16">
+            </motion.div>
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-50px" }}
+              variants={staggerContainer}
+              className="mt-12 grid grid-cols-2 gap-6 sm:grid-cols-3 md:grid-cols-6 lg:mt-16"
+            >
               {TARGET_INDUSTRIES.map((industry) => (
-                <div
+                <motion.div
                   key={industry.name}
-                  className="flex flex-col items-center rounded-2xl bg-white p-6 shadow-sm transition hover:shadow-md lg:p-8"
+                  variants={scaleIn}
+                  transition={{ duration: 0.4 }}
+                  className="flex flex-col items-center rounded-2xl bg-white p-6 shadow-sm transition-shadow hover:shadow-lg lg:p-8"
                 >
                   <Icon3D name={industry.icon} size={64} />
                   <span className="mt-4 text-lg font-medium text-premium-text">{industry.name}</span>
-                </div>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           </div>
         </section>
 
         {/* ===== PRICING SECTION ===== */}
         <section id="pricing" className="py-20 lg:py-28">
           <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-            <div className="text-center">
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-100px" }}
+              variants={fadeInUp}
+              transition={{ duration: 0.6 }}
+              className="text-center"
+            >
               <p className="text-xl font-semibold text-premium-accent">PRICING</p>
               <h2 className="mt-3 text-4xl font-bold text-premium-text sm:text-5xl lg:text-6xl">
                 シンプルな料金体系
@@ -677,8 +889,15 @@ export default function Home() {
               <p className="mt-6 text-xl text-premium-muted lg:text-2xl">
                 追加料金なし。必要な機能がすべて含まれています
               </p>
-            </div>
-            <div className="mt-12 lg:mt-16">
+            </motion.div>
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-50px" }}
+              variants={scaleIn}
+              transition={{ duration: 0.6 }}
+              className="mt-12 lg:mt-16"
+            >
               <div className="overflow-hidden rounded-3xl border-2 border-premium-accent bg-white shadow-lg">
                 <div className="bg-premium-accent px-8 py-12 text-center text-white">
                   <p className="text-xl font-medium opacity-90">よやくらく スタンダード</p>
@@ -706,28 +925,43 @@ export default function Home() {
                   </Button>
                 </div>
               </div>
-            </div>
+            </motion.div>
           </div>
         </section>
 
         {/* ===== FAQ SECTION ===== */}
         <section id="faq" className="bg-premium-surface py-20 lg:py-28">
           <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
-            <div className="text-center">
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-100px" }}
+              variants={fadeInUp}
+              transition={{ duration: 0.6 }}
+              className="text-center"
+            >
               <p className="text-xl font-semibold text-premium-accent">FAQ</p>
               <h2 className="mt-3 text-4xl font-bold text-premium-text sm:text-5xl lg:text-6xl">
                 よくある質問
               </h2>
-            </div>
-            <div className="mt-12 space-y-4 lg:mt-16">
+            </motion.div>
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-50px" }}
+              variants={staggerContainer}
+              className="mt-12 space-y-4 lg:mt-16"
+            >
               {FAQ_ITEMS.map((faq, idx) => {
                 const isOpen = openFaqIndex === idx;
                 return (
-                  <button
+                  <motion.button
                     key={faq.question}
+                    variants={fadeInUp}
+                    transition={{ duration: 0.4 }}
                     type="button"
                     onClick={() => setOpenFaqIndex(isOpen ? null : idx)}
-                    className="w-full rounded-2xl border border-premium-stroke bg-white px-8 py-7 text-left shadow-sm transition hover:shadow-md"
+                    className="w-full rounded-2xl border border-premium-stroke bg-white px-8 py-7 text-left shadow-sm transition-shadow hover:shadow-md"
                   >
                     <div className="flex items-center justify-between">
                       <p className="text-xl font-semibold text-premium-text pr-4">{faq.question}</p>
@@ -738,17 +972,24 @@ export default function Home() {
                     {isOpen && (
                       <p className="mt-5 text-lg text-premium-muted leading-relaxed">{faq.answer}</p>
                     )}
-                  </button>
+                  </motion.button>
                 );
               })}
-            </div>
+            </motion.div>
           </div>
         </section>
 
         {/* ===== CTA SECTION ===== */}
         <section className="py-20 lg:py-28">
           <div className="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8">
-            <div className="rounded-3xl bg-gradient-to-r from-premium-accent to-premium-accentDeep p-10 text-center text-white sm:p-16">
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, margin: "-100px" }}
+              variants={scaleIn}
+              transition={{ duration: 0.6 }}
+              className="rounded-3xl bg-gradient-to-r from-premium-accent to-premium-accentDeep p-10 text-center text-white sm:p-16"
+            >
               <h2 className="text-4xl font-bold sm:text-5xl lg:text-6xl">
                 まずは無料相談から
               </h2>
@@ -773,7 +1014,7 @@ export default function Home() {
                   heartssh@gmail.com
                 </a>
               </div>
-            </div>
+            </motion.div>
           </div>
         </section>
       </main>

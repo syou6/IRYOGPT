@@ -998,7 +998,7 @@ export default function Home() {
                 <br />
                 専門スタッフが丁寧にご説明いたします。
               </p>
-              <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+              <div className="mt-10">
                 <Button
                   size="lg"
                   variant="secondary"
@@ -1007,12 +1007,6 @@ export default function Home() {
                 >
                   無料で相談する
                 </Button>
-                <a
-                  href="mailto:heartssh@gmail.com"
-                  className="text-lg text-white underline underline-offset-4 opacity-90 transition hover:opacity-100"
-                >
-                  heartssh@gmail.com
-                </a>
               </div>
             </motion.div>
           </div>

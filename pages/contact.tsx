@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Link from 'next/link';
 import Layout from '@/components/layout';
 
 export default function ContactPage() {
@@ -28,6 +29,12 @@ export default function ContactPage() {
           <div className="absolute inset-x-0 top-0 h-48 bg-gradient-to-b from-emerald-500/15 to-transparent blur-3xl" />
         </div>
         <div className="relative space-y-6">
+          <Link href="/" className="inline-flex items-center gap-2 text-sm text-premium-muted hover:text-premium-accent transition">
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+            </svg>
+            トップページに戻る
+          </Link>
           <div className="rounded-[32px] border border-premium-stroke bg-white p-6 shadow-sm">
             <p className="text-xs uppercase tracking-[0.35em] text-premium-accent">Contact</p>
             <h1 className="mt-2 text-4xl font-semibold text-premium-text">お問い合わせ</h1>

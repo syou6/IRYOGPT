@@ -96,7 +96,7 @@ export default function Privacy() {
             <p className="mt-4">
               個人情報の取り扱いに関するお問い合わせは、下記までご連絡ください。
             </p>
-            <p className="mt-2">メールアドレス: heartssh@gmail.com</p>
+            <p className="mt-2">メールアドレス: info@yoyakuraku.com</p>
           </section>
         </div>
 

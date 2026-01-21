@@ -9,9 +9,9 @@ const resend = process.env.RESEND_API_KEY
   ? new Resend(process.env.RESEND_API_KEY)
   : null;
 
-// デフォルトの送信元（Resendの無料プランでは onboarding@resend.dev を使用）
+// デフォルトの送信元
 const DEFAULT_FROM_EMAIL =
-  process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+  process.env.RESEND_FROM_EMAIL || 'info@yoyakuraku.com';
 
 /**
  * 予約確認メールのデータ

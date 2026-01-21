@@ -35,6 +35,8 @@
     "@line/bot-sdk": "^10.5.0",
     "@microsoft/fetch-event-source": "^2.0.1",
     "@supabase/supabase-js": "^2.10.0",
+    "@upstash/ratelimit": "^2.0.8",
+    "@upstash/redis": "^1.36.1",
     "bullmq": "^5.0.0",
     "cheerio": "1.0.0-rc.12",
     "clsx": "^1.2.1",

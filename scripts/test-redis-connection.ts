@@ -23,9 +23,9 @@ async function testRedisConnection() {
   if (!password) {
     console.error('❌ REDIS_PASSWORDが設定されていません');
     console.log('\n.env.localに以下を追加してください:');
-    console.log('REDIS_HOST=pleasing-frog-34743.upstash.io');
+    console.log('REDIS_HOST=<your-redis-host>');
     console.log('REDIS_PORT=6379');
-    console.log('REDIS_PASSWORD=AYe3AAIncDI1ZDczZjEyMDc3N2Q0YjFhOGU1NjFhZTQ5ZmNkZWIzYXAyMzQ3NDM');
+    console.log('REDIS_PASSWORD=<your-redis-password>');
     process.exit(1);
   }
 

@@ -8,6 +8,7 @@ import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { supabaseClient } from '@/utils/supabase-client';
 import { getAuthUser } from '@/utils/supabase-auth';
 import { trainingQueue } from '@/lib/queue';
+import { checkRateLimit } from '@/utils/rate-limit';
 
 interface TrainRequest {
   site_id: string;
@@ -321,6 +322,10 @@ export default async function handler(
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
+
+  // レートリミットチェック（1時間に5リクエストまで）
+  const allowed = await checkRateLimit(req, res, 'training');
+  if (!allowed) return;
 
   try {
     // 認証チェック

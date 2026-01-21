@@ -7,6 +7,7 @@ import { supabaseClient } from '@/utils/supabase-client';
 import { makeChain } from '@/utils/makechain';
 import { runAppointmentChat, AppointmentChatMessage } from '@/utils/makechain-appointment';
 import { runHybridChat, HybridChatMessage } from '@/utils/makechain-hybrid';
+import { checkRateLimit } from '@/utils/rate-limit';
 
 function sanitizeChunk(raw: string) {
   if (!raw) return '';
@@ -90,6 +91,10 @@ export default async function handler(
   if (req.method !== 'POST') {
     return res.status(405).json({ message: 'Method not allowed' });
   }
+
+  // レートリミットチェック（1分間に20リクエストまで）
+  const allowed = await checkRateLimit(req, res, 'embedChat');
+  if (!allowed) return;
 
   try {
     const { question, history, site_id } = req.body;

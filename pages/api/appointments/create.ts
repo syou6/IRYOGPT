@@ -1,5 +1,6 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createAppointment } from '@/utils/appointment';
+import { checkRateLimit } from '@/utils/rate-limit';
 
 /**
  * 予約作成API
@@ -32,6 +33,10 @@ export default async function handler(
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
+
+  // レートリミットチェック（1分間に10リクエストまで）
+  const allowed = await checkRateLimit(req, res, 'appointment');
+  if (!allowed) return;
 
   try {
     const {

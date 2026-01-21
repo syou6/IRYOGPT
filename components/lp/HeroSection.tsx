@@ -115,7 +115,7 @@ const HeroSection = () => {
             initial={{ opacity: 0, x: 30 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ duration: 0.6, delay: 0.2 }}
-            className="relative hidden lg:flex lg:justify-end lg:items-center"
+            className="relative hidden lg:flex lg:justify-center lg:items-center"
           >
             <div className="relative">
               {/* Main laptop mockup */}
@@ -127,7 +127,7 @@ const HeroSection = () => {
                 <div className="rounded-t-3xl bg-gray-800 p-4 shadow-2xl">
                   <div className="absolute left-1/2 top-3 h-3 w-3 -translate-x-1/2 rounded-full bg-gray-600" />
                   <div className="overflow-hidden rounded-xl bg-white">
-                    <video autoPlay muted loop playsInline className="h-auto w-[580px] xl:w-[650px]">
+                    <video autoPlay muted loop playsInline className="h-auto w-[480px] xl:w-[540px] 2xl:w-[600px]">
                       <source src="/videos/demo.mp4" type="video/mp4" />
                     </video>
                   </div>
@@ -140,7 +140,7 @@ const HeroSection = () => {
 
               {/* Floating cards */}
               <motion.div
-                className="absolute -left-16 top-20 z-20 rounded-xl bg-white p-5 shadow-xl"
+                className="absolute -left-12 top-20 z-20 rounded-xl bg-white p-5 shadow-xl"
                 animate={{ y: [0, -6, 0] }}
                 transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.2 }}
               >
@@ -158,7 +158,7 @@ const HeroSection = () => {
               </motion.div>
 
               <motion.div
-                className="absolute -right-8 top-12 z-20 rounded-xl bg-white p-5 shadow-xl"
+                className="absolute right-4 top-12 z-20 rounded-xl bg-white p-5 shadow-xl"
                 animate={{ y: [0, -6, 0] }}
                 transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.4 }}
               >
@@ -176,7 +176,7 @@ const HeroSection = () => {
               </motion.div>
 
               <motion.div
-                className="absolute bottom-12 -right-12 z-20 rounded-xl bg-white p-5 shadow-xl"
+                className="absolute bottom-12 right-0 z-20 rounded-xl bg-white p-5 shadow-xl"
                 animate={{ y: [0, -6, 0] }}
                 transition={{ duration: 4, repeat: Infinity, ease: "easeInOut", delay: 0.1 }}
               >

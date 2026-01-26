@@ -37,7 +37,7 @@ export function validateOrigin(
   // base_urlが設定されていない場合は許可しない（セキュリティ優先）
   // ただし、開発環境ではlocalhostを許可
   if (!siteBaseUrl) {
-    if (isLocalhost(requestOrigin)) {
+    if (isLocalhost(requestOrigin) && process.env.NODE_ENV === 'development') {
       return requestOrigin;
     }
     return null;
@@ -54,8 +54,8 @@ export function validateOrigin(
     return requestOrigin;
   }
 
-  // localhostからのリクエストは開発用に許可
-  if (isLocalhost(requestOrigin)) {
+  // localhostからのリクエストは開発環境のみ許可
+  if (isLocalhost(requestOrigin) && process.env.NODE_ENV === 'development') {
     return requestOrigin;
   }
 

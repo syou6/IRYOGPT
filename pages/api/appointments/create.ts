@@ -1,8 +1,9 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createAppointment } from '@/utils/appointment';
 import { checkRateLimit } from '@/utils/rate-limit';
-import { requireSiteWithSpreadsheet } from '@/utils/supabase-auth';
+import { supabaseClient } from '@/utils/supabase-client';
 import { getSafeErrorMessage } from '@/utils/error-handler';
+import { setCorsHeaders, handlePreflight } from '@/utils/cors';
 
 /**
  * 予約作成API
@@ -32,6 +33,11 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
+  // OPTIONSリクエスト（プリフライト）
+  if (handlePreflight(req, res)) {
+    return;
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -52,17 +58,32 @@ export default async function handler(
       booked_via,
     } = req.body;
 
-    // site_idからspreadsheet_idを取得（認証）
     if (!site_id) {
       return res.status(400).json({ error: 'site_id is required' });
     }
 
-    let spreadsheet_id: string;
-    try {
-      spreadsheet_id = await requireSiteWithSpreadsheet(site_id);
-    } catch {
-      return res.status(403).json({ error: 'Invalid site_id or spreadsheet not configured' });
+    // サイト情報を取得（spreadsheet_id, base_url）
+    const { data: site, error: siteError } = await supabaseClient
+      .from('sites')
+      .select('spreadsheet_id, base_url')
+      .eq('id', site_id)
+      .single();
+
+    if (siteError || !site) {
+      return res.status(404).json({ error: 'Site not found' });
     }
+
+    // CORS検証
+    const corsAllowed = setCorsHeaders(req, res, site.base_url);
+    if (!corsAllowed) {
+      return res.status(403).json({ error: 'Origin not allowed' });
+    }
+
+    if (!site.spreadsheet_id) {
+      return res.status(400).json({ error: 'Spreadsheet not configured for this site' });
+    }
+
+    const spreadsheet_id = site.spreadsheet_id;
     if (!date) {
       return res.status(400).json({ error: 'date is required' });
     }

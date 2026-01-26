@@ -82,6 +82,60 @@ export const rateLimiters = {
 
 type RateLimiterType = keyof typeof rateLimiters;
 
+// メモリ内フォールバック用のストレージ
+interface MemoryRateLimitEntry {
+  count: number;
+  resetAt: number;
+}
+const memoryRateLimitMap = new Map<string, MemoryRateLimitEntry>();
+
+// 各タイプのデフォルト制限（1分あたり）
+const MEMORY_LIMITS: Record<RateLimiterType, { limit: number; windowMs: number }> = {
+  standard: { limit: 30, windowMs: 60000 },
+  chat: { limit: 10, windowMs: 60000 },
+  embedChat: { limit: 20, windowMs: 60000 },
+  training: { limit: 5, windowMs: 3600000 },
+  contact: { limit: 5, windowMs: 3600000 },
+  appointment: { limit: 10, windowMs: 60000 },
+};
+
+/**
+ * メモリ内フォールバックでレートリミットをチェック
+ */
+function checkMemoryRateLimit(
+  identifier: string,
+  type: RateLimiterType
+): { success: boolean; remaining: number } {
+  const now = Date.now();
+  const { limit, windowMs } = MEMORY_LIMITS[type];
+  const entry = memoryRateLimitMap.get(identifier);
+
+  // エントリがない、または期限切れの場合はリセット
+  if (!entry || entry.resetAt < now) {
+    memoryRateLimitMap.set(identifier, { count: 1, resetAt: now + windowMs });
+    return { success: true, remaining: limit - 1 };
+  }
+
+  // 制限に達した場合
+  if (entry.count >= limit) {
+    return { success: false, remaining: 0 };
+  }
+
+  // カウントを増加
+  entry.count++;
+  return { success: true, remaining: limit - entry.count };
+}
+
+// 定期的にメモリをクリーンアップ（5分ごと）
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, entry] of memoryRateLimitMap.entries()) {
+    if (entry.resetAt < now) {
+      memoryRateLimitMap.delete(key);
+    }
+  }
+}, 5 * 60 * 1000);
+
 /**
  * クライアントのIPアドレスを取得
  */
@@ -139,8 +193,22 @@ export async function checkRateLimit(
 
     return true;
   } catch (error) {
-    console.error('[RateLimit] Error:', error);
-    // エラー時はリクエストを許可（フェイルオープン）
+    console.error('[RateLimit] Redis error, using memory fallback:', error);
+
+    // メモリ内フォールバックでレートリミットを適用
+    const { success, remaining } = checkMemoryRateLimit(identifier, type);
+
+    res.setHeader('X-RateLimit-Remaining', remaining.toString());
+    res.setHeader('X-RateLimit-Fallback', 'memory');
+
+    if (!success) {
+      res.status(429).json({
+        error: 'Too Many Requests',
+        message: 'リクエスト数が上限に達しました。しばらく待ってから再度お試しください。',
+      });
+      return false;
+    }
+
     return true;
   }
 }

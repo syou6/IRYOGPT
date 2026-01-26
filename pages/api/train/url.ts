@@ -9,6 +9,7 @@ import { supabaseClient } from '@/utils/supabase-client';
 import { getAuthUser } from '@/utils/supabase-auth';
 import { trainingQueue } from '@/lib/queue';
 import { checkRateLimit } from '@/utils/rate-limit';
+import { generateUniqueId } from '@/utils/id-generator';
 
 interface TrainRequest {
   site_id: string;
@@ -254,7 +255,7 @@ async function embedDocumentsWithSiteId(
   const beforeInsertTime = new Date();
   
   // 各ドキュメントに一意の識別子をmetadataに追加
-  const uniqueId = `site_${siteId}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  const uniqueId = generateUniqueId(`site_${siteId}`);
   const docsWithMarker = docs.map((doc) => ({
     ...doc,
     metadata: {

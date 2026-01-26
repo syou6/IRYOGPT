@@ -8,6 +8,7 @@ import { makeChain } from '@/utils/makechain';
 import { runAppointmentChat, AppointmentChatMessage } from '@/utils/makechain-appointment';
 import { runHybridChat, HybridChatMessage } from '@/utils/makechain-hybrid';
 import { getSafeStreamingError } from '@/utils/error-handler';
+import { generateSessionId } from '@/utils/id-generator';
 
 function sanitizeChunk(raw: string) {
   if (!raw) return '';
@@ -428,7 +429,7 @@ export default async function handler(
       // セッションIDを生成（クライアントから送られてくるか、サーバーで生成）
       const sessionId =
         req.body.session_id ||
-        `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        generateSessionId();
 
       await supabaseClient.from('chat_logs').insert({
         user_id: userId,
@@ -545,7 +546,7 @@ async function handleAppointmentChat(
     try {
       const sessionId =
         req.body.session_id ||
-        `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        generateSessionId();
 
       await supabaseClient.from('chat_logs').insert({
         user_id: userId,
@@ -646,7 +647,7 @@ async function handleHybridChat(
     try {
       const sessionId =
         req.body.session_id ||
-        `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        generateSessionId();
 
       await supabaseClient.from('chat_logs').insert({
         user_id: userId,

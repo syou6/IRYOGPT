@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { createAppointment } from '@/utils/appointment';
 import { checkRateLimit } from '@/utils/rate-limit';
+import { requireSiteWithSpreadsheet } from '@/utils/supabase-auth';
 
 /**
  * 予約作成API
@@ -9,7 +10,7 @@ import { checkRateLimit } from '@/utils/rate-limit';
  *
  * Body:
  * {
- *   spreadsheet_id: "xxx",
+ *   site_id: "uuid",                       // 必須: サイトID（これからspreadsheet_idを取得）
  *   date: "2025/1/25",
  *   time: "10:00",
  *   patient_name: "山田太郎",
@@ -40,7 +41,7 @@ export default async function handler(
 
   try {
     const {
-      spreadsheet_id,
+      site_id,
       date,
       time,
       patient_name,
@@ -50,9 +51,16 @@ export default async function handler(
       booked_via,
     } = req.body;
 
-    // バリデーション
-    if (!spreadsheet_id) {
-      return res.status(400).json({ error: 'spreadsheet_id is required' });
+    // site_idからspreadsheet_idを取得（認証）
+    if (!site_id) {
+      return res.status(400).json({ error: 'site_id is required' });
+    }
+
+    let spreadsheet_id: string;
+    try {
+      spreadsheet_id = await requireSiteWithSpreadsheet(site_id);
+    } catch {
+      return res.status(403).json({ error: 'Invalid site_id or spreadsheet not configured' });
     }
     if (!date) {
       return res.status(400).json({ error: 'date is required' });

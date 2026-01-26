@@ -86,7 +86,10 @@ export async function requireAuth(
   return user.id;
 }
 
-const adminIds = ['a8cade58-50d2-4a0a-8dfe-c9c953c591eb'];
+const adminIds = (process.env.ADMIN_USER_IDS || process.env.NEXT_PUBLIC_ADMIN_USER_IDS || '')
+  .split(',')
+  .map(id => id.trim())
+  .filter(Boolean);
 
 export async function requireAdmin(req: NextApiRequest): Promise<string> {
   const userId = await requireAuth(req);
@@ -97,4 +100,42 @@ export async function requireAdmin(req: NextApiRequest): Promise<string> {
     throw new Error('Forbidden');
   }
   return userId;
+}
+
+/**
+ * site_idからspreadsheet_idを取得（予約API用）
+ * site_idが無効な場合はnullを返す
+ */
+export async function getSpreadsheetIdBySiteId(siteId: string): Promise<string | null> {
+  const supabaseAdmin = getSupabaseAdmin();
+
+  const { data, error } = await supabaseAdmin
+    .from('sites')
+    .select('spreadsheet_id')
+    .eq('id', siteId)
+    .single();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return data.spreadsheet_id;
+}
+
+/**
+ * site_idが有効かつspreadsheet_idが設定されているか検証
+ * 有効な場合はspreadsheet_idを返す、無効な場合はエラーをthrow
+ */
+export async function requireSiteWithSpreadsheet(siteId: string): Promise<string> {
+  if (!siteId) {
+    throw new Error('site_id is required');
+  }
+
+  const spreadsheetId = await getSpreadsheetIdBySiteId(siteId);
+
+  if (!spreadsheetId) {
+    throw new Error('Site not found or spreadsheet not configured');
+  }
+
+  return spreadsheetId;
 }

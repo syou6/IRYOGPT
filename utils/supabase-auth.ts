@@ -78,11 +78,26 @@ export async function getUserIdFromRequest(
   }
 }
 
+// 許可されたメールアドレスのリスト（環境変数から取得）
+const allowedEmails = (process.env.ALLOWED_EMAILS || '')
+  .split(',')
+  .map(email => email.trim().toLowerCase())
+  .filter(Boolean);
+
 // API Routes用：認証チェック（認証されていない場合はエラーを返す）
 export async function requireAuth(
   req: NextApiRequest,
 ): Promise<string> {
   const user = await getAuthUser(req);
+
+  // 許可メールリストが設定されている場合、メールをチェック
+  if (allowedEmails.length > 0) {
+    const userEmail = user.email?.toLowerCase() || '';
+    if (!allowedEmails.includes(userEmail)) {
+      throw new Error('AccessDenied');
+    }
+  }
+
   return user.id;
 }
 

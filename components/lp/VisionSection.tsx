@@ -12,10 +12,10 @@ const VisionSection = () => {
             viewport={{ once: true }}
             className="text-center lg:text-left"
           >
-            <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-6 lg:mb-10 leading-tight">
-              <span className="text-emerald-400">予約対応</span>から解放され、
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold mb-6 lg:mb-10 leading-tight">
+              <span className="whitespace-nowrap"><span className="text-emerald-400">予約対応</span>から解放され、</span>
               <br />
-              <span className="text-emerald-400">本業</span>に集中できる未来へ
+              <span className="whitespace-nowrap"><span className="text-emerald-400">本業</span>に集中できる未来へ</span>
             </h2>
             <p className="text-xl lg:text-2xl 2xl:text-3xl opacity-80 mb-10 lg:mb-12 leading-relaxed">
               AIの力で、医療・美容業界の働き方を変える

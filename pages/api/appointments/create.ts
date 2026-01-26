@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { createAppointment } from '@/utils/appointment';
 import { checkRateLimit } from '@/utils/rate-limit';
 import { requireSiteWithSpreadsheet } from '@/utils/supabase-auth';
+import { getSafeErrorMessage } from '@/utils/error-handler';
 
 /**
  * 予約作成API
@@ -105,7 +106,7 @@ export default async function handler(
     console.error('Error creating appointment:', error);
     return res.status(500).json({
       error: 'Failed to create appointment',
-      message: error.message,
+      message: getSafeErrorMessage(error),
     });
   }
 }

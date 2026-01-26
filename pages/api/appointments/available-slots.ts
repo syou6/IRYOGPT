@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { getAvailableSlots, getClinicSettings } from '@/utils/appointment';
 import { requireSiteWithSpreadsheet } from '@/utils/supabase-auth';
+import { getSafeErrorMessage } from '@/utils/error-handler';
 
 /**
  * 空き枠取得API
@@ -58,7 +59,7 @@ export default async function handler(
     console.error('Error getting available slots:', error);
     return res.status(500).json({
       error: 'Failed to get available slots',
-      message: error.message,
+      message: getSafeErrorMessage(error),
     });
   }
 }

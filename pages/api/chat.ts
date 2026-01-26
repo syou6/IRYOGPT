@@ -7,6 +7,7 @@ import { supabaseClient } from '@/utils/supabase-client';
 import { makeChain } from '@/utils/makechain';
 import { runAppointmentChat, AppointmentChatMessage } from '@/utils/makechain-appointment';
 import { runHybridChat, HybridChatMessage } from '@/utils/makechain-hybrid';
+import { getSafeStreamingError } from '@/utils/error-handler';
 
 function sanitizeChunk(raw: string) {
   if (!raw) return '';
@@ -454,7 +455,7 @@ export default async function handler(
     }
   } catch (error) {
     console.error('[Chat API] Error:', error);
-    sendData(JSON.stringify({ error: String(error) }));
+    sendData(JSON.stringify({ error: getSafeStreamingError(error) }));
   } finally {
     // 最も類似度の高い引用元を1つだけ送信
     const sourceToSend: BestSourceType | null = bestSource;
@@ -565,7 +566,7 @@ async function handleAppointmentChat(
     }
   } catch (error) {
     console.error('[Chat API] Appointment chat error:', error);
-    sendData(JSON.stringify({ error: String(error) }));
+    sendData(JSON.stringify({ error: getSafeStreamingError(error) }));
   } finally {
     sendData('[DONE]');
     res.end();
@@ -666,7 +667,7 @@ async function handleHybridChat(
     }
   } catch (error) {
     console.error('[Chat API] Hybrid chat error:', error);
-    sendData(JSON.stringify({ error: String(error) }));
+    sendData(JSON.stringify({ error: getSafeStreamingError(error) }));
   } finally {
     sendData('[DONE]');
     res.end();

@@ -2,6 +2,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { runAppointmentChat, AppointmentChatMessage } from '@/utils/makechain-appointment';
 import { supabaseClient } from '@/utils/supabase-client';
 import { setCorsHeaders, handlePreflight } from '@/utils/cors';
+import { getSafeErrorMessage, getSafeStreamingError } from '@/utils/error-handler';
 
 /**
  * 予約対応チャットAPI
@@ -113,7 +114,7 @@ export default async function handler(
 
     } catch (error: any) {
       console.error('[Appointment Chat API] Error:', error);
-      sendData(JSON.stringify({ error: error.message }));
+      sendData(JSON.stringify({ error: getSafeStreamingError(error) }));
     } finally {
       sendData('[DONE]');
       res.end();
@@ -123,7 +124,7 @@ export default async function handler(
     console.error('[Appointment Chat API] Error:', error);
     return res.status(500).json({
       error: 'Internal server error',
-      message: error.message,
+      message: getSafeErrorMessage(error),
     });
   }
 }

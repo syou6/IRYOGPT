@@ -9,6 +9,7 @@ import { runAppointmentChat, AppointmentChatMessage } from '@/utils/makechain-ap
 import { runHybridChat, HybridChatMessage } from '@/utils/makechain-hybrid';
 import { checkRateLimit } from '@/utils/rate-limit';
 import { setCorsHeaders, handlePreflight } from '@/utils/cors';
+import { getSafeErrorMessage, getSafeStreamingError } from '@/utils/error-handler';
 
 function sanitizeChunk(raw: string) {
   if (!raw) return '';
@@ -415,7 +416,7 @@ export default async function handler(
       }
     } catch (error) {
       console.error('[Embed Chat API] Error:', error);
-      sendData(JSON.stringify({ error: String(error) }));
+      sendData(JSON.stringify({ error: getSafeStreamingError(error) }));
     } finally {
       // 最も類似度の高い引用元を1つだけ送信
       const sourceToSend: BestSourceType | null = bestSource;
@@ -435,7 +436,7 @@ export default async function handler(
     console.error('[Embed Chat API] Error:', error);
     return res.status(500).json({
       message: 'Internal server error',
-      error: error instanceof Error ? error.message : String(error),
+      error: getSafeErrorMessage(error),
     });
   }
 }
@@ -561,7 +562,7 @@ async function handleAppointmentChat(
 
   } catch (error: any) {
     console.error('[Embed Chat API] Appointment chat error:', error);
-    sendData(JSON.stringify({ error: error.message }));
+    sendData(JSON.stringify({ error: getSafeStreamingError(error) }));
   } finally {
     sendData('[DONE]');
     res.end();
@@ -691,7 +692,7 @@ async function handleHybridChat(
 
   } catch (error: any) {
     console.error('[Embed Chat API] Hybrid chat error:', error);
-    sendData(JSON.stringify({ error: error.message }));
+    sendData(JSON.stringify({ error: getSafeStreamingError(error) }));
   } finally {
     sendData('[DONE]');
     res.end();

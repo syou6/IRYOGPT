@@ -90,11 +90,14 @@ export async function runAppointmentChat(
     }
 
     // ツール結果を含めて再度実行（こちらはストリーミングあり）
+    // NOTE: response.content を空にする。
+    // OpenAIがツール呼び出し時に「少々お待ちください」等のテキストを返すことがあるが、
+    // これを会話履歴に含めると最終応答にも影響するため、意図的に空にする。
     const newMessages = [
       ...fullMessages,
       {
         role: 'assistant' as const,
-        content: response.content || '',
+        content: '',  // ツール呼び出し時のテキストは無視
         tool_calls: response.tool_calls,
       },
       ...toolResults,

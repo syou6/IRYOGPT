@@ -8,6 +8,7 @@ import { makeChain } from '@/utils/makechain';
 import { runAppointmentChat, AppointmentChatMessage } from '@/utils/makechain-appointment';
 import { runHybridChat, HybridChatMessage } from '@/utils/makechain-hybrid';
 import { checkRateLimit } from '@/utils/rate-limit';
+import { setCorsHeaders, handlePreflight } from '@/utils/cors';
 
 function sanitizeChunk(raw: string) {
   if (!raw) return '';
@@ -72,20 +73,18 @@ function calculateCost(inputTokens: number, outputTokens: number): number {
 
 /**
  * POST /api/embed/chat
- * 
+ *
  * 埋め込み用チャットAPI（認証不要）
  * site_idとis_embed_enabledのチェックでセキュリティを確保
+ * CORSはサイトのbase_urlで制限
  */
 export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
+  // OPTIONSリクエスト（プリフライト）はリクエストのOriginを許可
+  if (handlePreflight(req, res)) {
+    return;
   }
 
   if (req.method !== 'POST') {
@@ -107,15 +106,21 @@ export default async function handler(
       return res.status(400).json({ message: 'site_id is required' });
     }
 
-    // サイト情報を取得（is_embed_enabled, status, spreadsheet_id, chat_mode を確認）
+    // サイト情報を取得（is_embed_enabled, status, spreadsheet_id, chat_mode, base_url を確認）
     const { data: site, error: siteError } = await supabaseClient
       .from('sites')
-      .select('id, user_id, is_embed_enabled, status, spreadsheet_id, chat_mode')
+      .select('id, user_id, is_embed_enabled, status, spreadsheet_id, chat_mode, base_url')
       .eq('id', site_id)
       .single();
 
     if (siteError || !site) {
       return res.status(404).json({ message: 'Site not found' });
+    }
+
+    // CORS検証（サイトのbase_urlと一致するOriginのみ許可）
+    const corsAllowed = setCorsHeaders(req, res, site.base_url);
+    if (!corsAllowed) {
+      return res.status(403).json({ message: 'Origin not allowed' });
     }
 
     // is_embed_enabled が false の場合はエラー
@@ -291,7 +296,7 @@ export default async function handler(
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
       Connection: 'keep-alive',
-      'Access-Control-Allow-Origin': '*', // CORS対応（埋め込み用）
+      'Access-Control-Allow-Origin': req.headers.origin || '*',
     });
 
     const sendData = (data: string) => {
@@ -474,7 +479,7 @@ async function handleAppointmentChat(
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache, no-transform',
     Connection: 'keep-alive',
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': req.headers.origin || '*',
   });
 
   const sendData = (data: string) => {
@@ -602,7 +607,7 @@ async function handleHybridChat(
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache, no-transform',
     Connection: 'keep-alive',
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': req.headers.origin || '*',
   });
 
   const sendData = (data: string) => {

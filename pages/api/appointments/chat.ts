@@ -1,6 +1,7 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 import { runAppointmentChat, AppointmentChatMessage } from '@/utils/makechain-appointment';
 import { supabaseClient } from '@/utils/supabase-client';
+import { setCorsHeaders, handlePreflight } from '@/utils/cors';
 
 /**
  * 予約対応チャットAPI
@@ -27,13 +28,9 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse
 ) {
-  // CORS対応
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-
-  if (req.method === 'OPTIONS') {
-    return res.status(204).end();
+  // OPTIONSリクエスト（プリフライト）はリクエストのOriginを許可
+  if (handlePreflight(req, res)) {
+    return;
   }
 
   if (req.method !== 'POST') {
@@ -51,15 +48,21 @@ export default async function handler(
       return res.status(400).json({ error: 'message is required' });
     }
 
-    // サイト情報を取得（spreadsheet_idを含む）
+    // サイト情報を取得（spreadsheet_id, base_url を含む）
     const { data: site, error: siteError } = await supabaseClient
       .from('sites')
-      .select('id, spreadsheet_id, is_embed_enabled')
+      .select('id, spreadsheet_id, is_embed_enabled, base_url')
       .eq('id', site_id)
       .single();
 
     if (siteError || !site) {
       return res.status(404).json({ error: 'Site not found' });
+    }
+
+    // CORS検証（サイトのbase_urlと一致するOriginのみ許可）
+    const corsAllowed = setCorsHeaders(req, res, site.base_url);
+    if (!corsAllowed) {
+      return res.status(403).json({ error: 'Origin not allowed' });
     }
 
     if (!site.spreadsheet_id) {

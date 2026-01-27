@@ -328,6 +328,25 @@ export async function runHybridChat(
     throw error;
   }
 
+  // ④-a ツールを呼ばずに「確認します」系の応答を返した場合、ツール呼び出しを強制リトライ
+  // gpt-4o-miniがツールを呼ぶべき場面で「確認いたします」とだけ返すことがある
+  const contentText = typeof response.content === 'string' ? response.content : '';
+  const shouldHaveCalledTool = (!response.tool_calls || response.tool_calls.length === 0)
+    && /確認いたします|確認します|お調べします|検索します|空き状況を|お待ち/.test(contentText);
+
+  if (shouldHaveCalledTool) {
+    console.log('[Hybrid] AI returned checking text without tool call, retrying with tool_choice=required');
+    try {
+      response = await model.invoke(fullMessages as any, {
+        tools: APPOINTMENT_TOOLS,
+        tool_choice: 'required',
+      });
+    } catch (error) {
+      console.error('[Hybrid] Retry with required tool_choice failed:', error);
+      // リトライ失敗時は元のレスポンスを使う（下のフローで処理）
+    }
+  }
+
   // ④ ツール呼び出しがある場合
   if (response.tool_calls && response.tool_calls.length > 0) {
     const toolResults: HybridChatMessage[] = [];

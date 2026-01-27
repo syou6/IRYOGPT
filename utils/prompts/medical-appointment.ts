@@ -81,6 +81,7 @@ export function getMedicalSystemPromptWithSettings(settings: ClinicSettingsForPr
   - 漢字やひらがなで入力されたら「カタカナで教えていただけますか？」と再度聞く
   - 例: 「山田太郎」→「ヤマダタロウ様ですね。カタカナでの表記を確認させてください」
 - 電話番号
+- メールアドレス（「確認メールをお送りしますので、メールアドレスを教えていただけますか？（任意です）」と聞く）
 ${doctorList ? `- 担当医の希望（${doctorList}から選択、または「特になし」）` : ''}${settings.usePatientCardNumber ? '\n- 診察券番号（初診や不明の場合は「なし」でOK）' : ''}
 - 症状・来院理由（「どのようなご症状ですか？」と必ず聞く）
 

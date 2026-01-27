@@ -101,6 +101,11 @@ export async function runAppointmentChat(
         tool_calls: response.tool_calls,
       },
       ...toolResults,
+      // ツール結果を受け取った後、即座に結果を伝えるよう明示的に指示
+      {
+        role: 'system' as const,
+        content: '【重要】ツールの実行結果が上記にあります。「お待ちください」「確認します」は絶対に言わず、結果を即座にユーザーに伝えてください。',
+      },
     ];
 
     const streamingModel = new ChatOpenAI({

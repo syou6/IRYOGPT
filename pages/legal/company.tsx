@@ -61,7 +61,7 @@ export default function Company() {
                   メールアドレス
                 </th>
                 <td className="px-6 py-4 text-base text-premium-muted">
-                  amor.main@icloud.com
+                  info@amorjp.com
                 </td>
               </tr>
               <tr>

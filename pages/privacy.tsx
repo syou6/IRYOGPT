@@ -21,7 +21,7 @@ export default function PrivacyPage() {
     },
     {
       title: '5. お問い合わせ',
-      content: '個人情報の開示・訂正・削除をご希望の場合は info@amorjp.com までご連絡ください。',
+      content: '個人情報の開示・訂正・削除をご希望の場合は info@yoyakuraku.com までご連絡ください。',
     },
   ];
 

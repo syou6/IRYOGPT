@@ -11,7 +11,7 @@ const resend = process.env.RESEND_API_KEY
 
 // デフォルトの送信元
 const DEFAULT_FROM_EMAIL =
-  process.env.RESEND_FROM_EMAIL || 'info@amorjp.com';
+  process.env.RESEND_FROM_EMAIL || 'info@yoyakuraku.com';
 
 /**
  * 予約確認メールのデータ

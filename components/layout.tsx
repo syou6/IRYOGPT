@@ -83,7 +83,7 @@ export default function Layout({ children, showShellHeader = true, fullWidth = f
         )}
       </div>
       <Script
-        src="https://iryogpt-gamma.vercel.app/api/embed/script?site_id=fe8aba45-7a35-41a5-9e57-9fbb88224c03"
+        src="https://yoyakuraku.com/api/embed/script?site_id=fe8aba45-7a35-41a5-9e57-9fbb88224c03"
         strategy="afterInteractive"
       />
             {/* <Script

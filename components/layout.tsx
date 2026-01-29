@@ -83,7 +83,7 @@ export default function Layout({ children, showShellHeader = true, fullWidth = f
         )}
       </div>
       <Script
-        src="https://yoyakuraku.com/api/embed/script?site_id=fe8aba45-7a35-41a5-9e57-9fbb88224c03"
+        src="https://yoyakuraku.com/api/embed/script?site_id=d2f19a87-aca1-4276-ac76-8052b589d365"
         strategy="afterInteractive"
       />
             {/* <Script

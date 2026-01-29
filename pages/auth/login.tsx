@@ -4,6 +4,12 @@ import Layout from '@/components/layout';
 import Button from '@/components/ui/Button';
 import { createSupabaseClient } from '@/utils/supabase-auth';
 
+// 許可されたメールアドレスのリスト
+const ALLOWED_EMAILS = (process.env.NEXT_PUBLIC_ALLOWED_EMAILS || '')
+  .split(',')
+  .map(email => email.trim().toLowerCase())
+  .filter(Boolean);
+
 export default function Login() {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -47,6 +53,12 @@ export default function Login() {
         if (error) throw error;
 
         if (data.user) {
+          // 許可リストチェック
+          const userEmail = data.user.email?.toLowerCase() || '';
+          if (ALLOWED_EMAILS.length > 0 && !ALLOWED_EMAILS.includes(userEmail)) {
+            await supabase.auth.signOut();
+            throw new Error('このアカウントではログインできません。');
+          }
           // ダッシュボードにリダイレクト
           router.push('/dashboard');
         }
@@ -66,7 +78,7 @@ export default function Login() {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/dashboard`,
+          redirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 

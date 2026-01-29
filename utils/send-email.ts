@@ -1,5 +1,5 @@
 const RESEND_API_KEY = process.env.RESEND_API_KEY;
-const DEFAULT_FROM = process.env.RESEND_FROM_EMAIL || 'よやくらく <info@yoyakuraku.com>';
+const DEFAULT_FROM = process.env.RESEND_FROM_EMAIL || 'よやくらく <info@amorjp.com>';
 
 interface SendEmailParams {
   to: string | string[];

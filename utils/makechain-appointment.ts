@@ -67,33 +67,27 @@ export async function runAppointmentChat(
 
   let response = await model.invoke(fullMessages as any, {
     tools: APPOINTMENT_TOOLS,
-    tool_choice: 'auto',
+    tool_choice: 'required',
   });
 
-  // ツールを呼ばずに「確認します」系の応答を返した場合、ツール呼び出しを強制リトライ
-  // gpt-4o-miniがツールを呼ぶべき場面で「確認いたします」とだけ返すことがある
-  const contentText = typeof response.content === 'string' ? response.content : '';
-  const shouldHaveCalledTool = (!response.tool_calls || response.tool_calls.length === 0)
-    && /確認いたします|確認します|お調べします|検索します|空き状況を|お待ち/.test(contentText);
-
-  if (shouldHaveCalledTool) {
-    console.log('[Appointment] AI returned checking text without tool call, retrying with tool_choice=required');
-    try {
-      response = await model.invoke(fullMessages as any, {
-        tools: APPOINTMENT_TOOLS,
-        tool_choice: 'required',
-      });
-    } catch (error) {
-      console.error('[Appointment] Retry with required tool_choice failed:', error);
-    }
+  // ツール呼び出しを処理
+  if (!response.tool_calls || response.tool_calls.length === 0) {
+    console.error('[Appointment] No tool calls despite tool_choice=required');
+    return {
+      message: 'ご質問にお答えできませんでした。もう一度お試しください。',
+    };
   }
 
-  // ツール呼び出しがある場合
-  if (response.tool_calls && response.tool_calls.length > 0) {
+  // send_message と他のツールを分離
+  const sendMessageCall = response.tool_calls.find((tc: any) => tc.name === 'send_message');
+  const otherToolCalls = response.tool_calls.filter((tc: any) => tc.name !== 'send_message');
+
+  // 他のツールがある場合 → 他のツールを優先実行
+  if (otherToolCalls.length > 0) {
     const toolResults: AppointmentChatMessage[] = [];
     let appointmentCreated = false;
 
-    for (const toolCall of response.tool_calls) {
+    for (const toolCall of otherToolCalls) {
       const result = await executeToolCall(spreadsheetId, toolCall);
 
       if (toolCall.name === 'create_appointment' && result.startsWith('予約が完了しました')) {
@@ -107,19 +101,23 @@ export async function runAppointmentChat(
       });
     }
 
-    // ツール結果を含めて再度実行（こちらはストリーミングあり）
-    // NOTE: response.content を空にする。
-    // OpenAIがツール呼び出し時に「少々お待ちください」等のテキストを返すことがあるが、
-    // これを会話履歴に含めると最終応答にも影響するため、意図的に空にする。
+    // send_message が同時に呼ばれていた場合、ダミーの結果を返す（APIエラー防止）
+    if (sendMessageCall) {
+      toolResults.push({
+        role: 'tool',
+        content: '（メッセージ送信はスキップ。ツール結果を基に応答してください）',
+        tool_call_id: sendMessageCall.id,
+      });
+    }
+
     const newMessages = [
       ...fullMessages,
       {
         role: 'assistant' as const,
-        content: '',  // ツール呼び出し時のテキストは無視
+        content: '',
         tool_calls: response.tool_calls,
       },
       ...toolResults,
-      // ツール結果を受け取った後、即座に結果を伝えるよう明示的に指示
       {
         role: 'system' as const,
         content: '【重要】ツールの実行結果が上記にあります。「お待ちください」「確認します」は絶対に言わず、結果を即座にユーザーに伝えてください。',
@@ -146,37 +144,21 @@ export async function runAppointmentChat(
 
     return {
       message: finalResponse.content as string,
-      toolCalls: response.tool_calls,
+      toolCalls: otherToolCalls,
       appointmentCreated,
     };
   }
 
-  // ツール呼び出しがない場合（通常の応答）
-  // ストリーミングで再実行
+  // send_message のみの場合 → メッセージをそのまま返す（2回目のLLM呼び出し不要）
+  const messageText = sendMessageCall!.args?.message || '';
   if (onToken) {
-    const streamingModel = new ChatOpenAI({
-      model: 'gpt-4o-mini',
-      temperature: 0.7,
-      streaming: true,
-    });
-
-    const streamingResponse = await streamingModel.invoke(fullMessages as any, {
-      callbacks: [
-        {
-          handleLLMNewToken: (token: string) => {
-            onToken(token);
-          },
-        },
-      ],
-    });
-
-    return {
-      message: streamingResponse.content as string,
-    };
+    for (const char of messageText) {
+      onToken(char);
+    }
   }
 
   return {
-    message: response.content as string,
+    message: messageText,
   };
 }
 

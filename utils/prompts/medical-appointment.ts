@@ -436,6 +436,23 @@ export const APPOINTMENT_TOOLS = [
   {
     type: 'function' as const,
     function: {
+      name: 'send_message',
+      description: 'ユーザーにテキストメッセージを送信する。予約ツール（get_available_slots, create_appointment等）を呼ぶ必要がない場合に使用する。挨拶、質問、確認などの通常の会話に使う。',
+      parameters: {
+        type: 'object',
+        properties: {
+          message: {
+            type: 'string',
+            description: '送信するメッセージ',
+          },
+        },
+        required: ['message'],
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
       name: 'cancel_appointment',
       description: '予約をキャンセルする。患者が予約のキャンセルを希望したときに使用する。日付、時間、電話番号で予約を特定してキャンセルする。',
       parameters: {

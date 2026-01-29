@@ -38,7 +38,7 @@ export default function Home() {
         <main>
           <HeroSection />
           <FeatureBanners />
-          <ClientLogos />
+          {/* <ClientLogos /> */}
           <CampaignBanner />
           <ReasonsSection />
           <DepartmentsSection />

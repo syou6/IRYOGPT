@@ -76,11 +76,33 @@ export default function Terms() {
               <p>1. 当社は、本サービスの完全性、正確性、有用性等について保証しません。</p>
               <p>2. 本サービスの利用により生じた損害について、当社の故意または重過失による場合を除き、当社は責任を負いません。</p>
               <p>3. AIによる応答内容については、医療アドバイスを含まないよう設計されていますが、利用者は自己の責任において本サービスを利用するものとします。</p>
+              <p>4. 当社の損害賠償責任は、いかなる場合においても、利用者が過去12ヶ月間に当社に支払った利用料金の総額を上限とします。</p>
+              <p>5. 当社は、OpenAI、Google、Supabase等の第三者サービスの障害、仕様変更、またはサービス終了に起因する損害について責任を負いません。</p>
             </div>
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-premium-text border-b border-premium-stroke pb-2">第7条（解約）</h2>
+            <h2 className="text-xl font-semibold text-premium-text border-b border-premium-stroke pb-2">第7条（予約の正確性）</h2>
+            <div className="mt-4 space-y-2">
+              <p>1. 本サービスはAI技術を使用しており、予約内容の誤認識、誤登録が発生する可能性があります。</p>
+              <p>2. 利用者（医療機関等）は、本サービスを通じて行われた予約について、最終的な確認および管理の責任を負うものとします。</p>
+              <p>3. AIの誤認識等により生じた予約の重複、誤り、または患者とのトラブルについて、当社は責任を負いません。</p>
+              <p>4. 利用者は、本サービスの予約データを定期的に確認し、必要に応じて修正を行うものとします。</p>
+            </div>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-premium-text border-b border-premium-stroke pb-2">第8条（患者データの取扱い）</h2>
+            <div className="mt-4 space-y-2">
+              <p>1. 本サービスを通じて取得される患者の個人情報（氏名、電話番号、症状等）について、利用者（医療機関等）がデータ管理者となります。</p>
+              <p>2. 当社は、利用者の指示に基づきデータを処理するデータ処理者として、適切なセキュリティ対策を講じます。</p>
+              <p>3. 利用者は、患者に対して本サービスの利用および個人情報の取扱いについて適切に説明し、必要な同意を取得する責任を負います。</p>
+              <p>4. 患者データの漏洩、紛失、不正アクセス等が発生した場合、利用者の管理不備に起因するものについては、当社は責任を負いません。</p>
+            </div>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-premium-text border-b border-premium-stroke pb-2">第9条（解約）</h2>
             <div className="mt-4 space-y-2">
               <p>1. 利用者は、当社所定の方法により、いつでも本サービスを解約することができます。</p>
               <p>2. 解約月の末日をもってサービスを終了いたします。</p>
@@ -89,7 +111,7 @@ export default function Terms() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-premium-text border-b border-premium-stroke pb-2">第8条（規約の変更）</h2>
+            <h2 className="text-xl font-semibold text-premium-text border-b border-premium-stroke pb-2">第10条（規約の変更）</h2>
             <p className="mt-4">
               当社は、必要に応じて本規約を変更することができます。
               変更後の規約は、当ウェブサイトに掲載した時点から効力を生じます。
@@ -97,7 +119,7 @@ export default function Terms() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-premium-text border-b border-premium-stroke pb-2">第9条（準拠法・管轄裁判所）</h2>
+            <h2 className="text-xl font-semibold text-premium-text border-b border-premium-stroke pb-2">第11条（準拠法・管轄裁判所）</h2>
             <div className="mt-4 space-y-2">
               <p>1. 本規約の解釈は、日本法に準拠するものとします。</p>
               <p>2. 本サービスに関する紛争については、当社の本店所在地を管轄する裁判所を専属的合意管轄裁判所とします。</p>

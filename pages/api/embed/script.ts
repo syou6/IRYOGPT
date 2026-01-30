@@ -128,7 +128,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string, isAppointmentMo
     '.sgpt-answer-header{display:flex;align-items:center;gap:10px;margin-bottom:8px}',
     '.sgpt-answer-header span{font-size:.72rem;letter-spacing:.25em;text-transform:uppercase;color:rgba(226,232,240,.65)}',
     '.sgpt-answer-tagline{font-size:.78rem;color:rgba(226,232,240,.7);font-family:"IBM Plex Mono",monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
-    '.sgpt-answer-body{color:#e2e8f0;font-size:.95rem;line-height:1.7;padding-right:6px;overflow-wrap:break-word;word-break:break-word;max-width:100%}',
+    '.sgpt-answer-body{color:#e2e8f0;font-size:.95rem;line-height:1.7;padding-right:6px;overflow-wrap:anywhere;word-break:auto-phrase;max-width:100%}',
     '.sgpt-input-bar{padding:16px 20px;border-top:1px solid rgba(255,255,255,.06);display:flex;gap:12px;align-items:center}',
     '.sgpt-input{flex:1;border-radius:16px;border:1px solid rgba(148,163,184,.3);background:rgba(15,23,42,.8);color:#f1f5f9;padding:12px 16px;font-size:.95rem;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}',
     '.sgpt-input::placeholder{color:#64748b}',

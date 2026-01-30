@@ -89,7 +89,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string, isAppointmentMo
   if (chatMode === 'appointment_only') {
     welcomeMessage = 'こんにちは！ご予約のお手伝いをいたします。ご希望の日時や空き状況についてお気軽にお聞きください。';
   } else if (chatMode === 'hybrid') {
-    welcomeMessage = 'こんにちは！ご予約やお問い合わせを承ります。';
+    welcomeMessage = 'こんにちは！ご予約を承ります。';
   }
   const escapedWelcomeMessage = JSON.stringify(welcomeMessage);
   

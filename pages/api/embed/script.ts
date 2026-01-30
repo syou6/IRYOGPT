@@ -394,7 +394,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string, isAppointmentMo
 
   function showLoading(target) {
     if (!target) return null;
-    target.textContent = '▌ よやくらく が回答を準備しています...';
+    target.textContent = '▌ 回答を準備中...';
     return target;
   }
 

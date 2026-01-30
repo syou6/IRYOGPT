@@ -229,14 +229,18 @@ async function executeToolCall(
       const slots = await getAvailableSlots(spreadsheetId, args.date);
       console.log(`[Tool] get_available_slots for ${args.date}:`, JSON.stringify(slots, null, 2));
 
+      // 曜日を計算（AIが間違えないように結果に含める）
+      const dayOfWeek = DAY_NAMES[targetDate.getDay()];
+      const dateWithDay = `${args.date}（${dayOfWeek}）`;
+
       if (slots.length === 0) {
-        return `【${args.date}】休診日のため予約枠がありません。別の日をお選びください。`;
+        return `【${dateWithDay}】休診日のため予約枠がありません。別の日をお選びください。`;
       }
       const availableSlots = slots.filter((s: TimeSlot) => s.available);
       const bookedSlots = slots.filter((s: TimeSlot) => !s.available);
 
       if (availableSlots.length === 0) {
-        return `【${args.date}】全ての枠が予約済みです。別の日をお選びください。`;
+        return `【${dateWithDay}】全ての枠が予約済みです。別の日をお選びください。`;
       }
 
       // 残り枠数を含めた情報を返す（例: "9:00(残2)", "10:00(残1)"）
@@ -247,9 +251,9 @@ async function executeToolCall(
       // 予約済みの枠がある場合は明示
       if (bookedSlots.length > 0) {
         const bookedTimeList = bookedSlots.map((s: TimeSlot) => s.time).join(', ');
-        return `【${args.date}の予約状況】\n空き枠: ${timeListWithSlots}\n予約済み: ${bookedTimeList}`;
+        return `【${dateWithDay}の予約状況】\n空き枠: ${timeListWithSlots}\n予約済み: ${bookedTimeList}`;
       }
-      return `【${args.date}の予約状況】\n空き枠: ${timeListWithSlots}\n予約済み: なし`;
+      return `【${dateWithDay}の予約状況】\n空き枠: ${timeListWithSlots}\n予約済み: なし`;
     }
 
     case 'create_appointment': {

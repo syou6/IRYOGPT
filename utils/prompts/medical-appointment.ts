@@ -363,7 +363,7 @@ export const APPOINTMENT_TOOLS = [
     type: 'function' as const,
     function: {
       name: 'get_available_slots',
-      description: '指定した日付の空き予約枠を取得する。患者が予約したい日時を言ったときに使用する。',
+      description: '指定した日付の空き予約枠を取得する。患者が日付や時間を言ったら即座にこのツールを呼べ。「確認します」と言ってsend_messageを使うな。',
       parameters: {
         type: 'object',
         properties: {
@@ -437,7 +437,7 @@ export const APPOINTMENT_TOOLS = [
     type: 'function' as const,
     function: {
       name: 'send_message',
-      description: 'ユーザーにテキストメッセージを送信する。予約ツール（get_available_slots, create_appointment等）を呼ぶ必要がない場合に使用する。挨拶、質問、確認などの通常の会話に使う。',
+      description: 'ユーザーにテキストメッセージを送信する。【重要】日付・時間が含まれる場合は絶対にこのツールを使わず、get_available_slotsを使え。このツールは挨拶や質問への回答など、予約ツールが不要な場合のみ使用。「確認します」「お待ちください」を含むメッセージは禁止。',
       parameters: {
         type: 'object',
         properties: {

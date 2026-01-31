@@ -417,10 +417,70 @@ export async function runHybridChat(
     };
   }
 
-  // send_message のみの場合 → メッセージをそのまま返す（2回目のLLM呼び出し不要）
+  // send_message のみの場合
   const messageText = sendMessageCall!.args?.message || '';
+
+  // 禁止ワードチェック：「お待ちください」「確認いたします」等が含まれていたらget_available_slotsを強制呼び出し
+  const hasForbiddenPhrase = /お待ちください|確認いたします|確認します|お調べします/.test(messageText);
+  const userMentionedDate = /\d+日|\d+時|明日|明後日|来週/.test(query);
+
+  if (hasForbiddenPhrase && userMentionedDate) {
+    console.log('[Hybrid] Forbidden phrase detected, forcing get_available_slots');
+    // 日付を抽出して強制的にget_available_slotsを呼ぶ
+    const dateMatch = query.match(/(\d+)月(\d+)日/) || query.match(/(\d+)日/);
+    if (dateMatch) {
+      const today = new Date();
+      const month = dateMatch.length === 3 ? parseInt(dateMatch[1]) : today.getMonth() + 1;
+      const day = dateMatch.length === 3 ? parseInt(dateMatch[2]) : parseInt(dateMatch[1]);
+      const year = today.getFullYear();
+      const targetDate = `${year}/${month}/${day}`;
+
+      // get_available_slotsを直接実行
+      const toolResult = await executeToolCall(spreadsheetId, {
+        name: 'get_available_slots',
+        args: { date: targetDate },
+      });
+
+      // 結果を含めて再度LLM呼び出し
+      const retryMessages = [
+        ...fullMessages,
+        {
+          role: 'assistant' as const,
+          content: '',
+          tool_calls: [{ id: 'forced_slots', name: 'get_available_slots', args: { date: targetDate } }],
+        },
+        {
+          role: 'tool' as const,
+          content: toolResult,
+          tool_call_id: 'forced_slots',
+        },
+        {
+          role: 'system' as const,
+          content: '【重要】上記の空き状況を即座にユーザーに伝えてください。「お待ちください」は絶対に言うな。',
+        },
+      ];
+
+      const retryModel = new ChatOpenAI({
+        model: 'gpt-4o-mini',
+        temperature: 0.7,
+        streaming: Boolean(onToken),
+      });
+
+      const retryResponse = await retryModel.invoke(retryMessages as any, {
+        callbacks: onToken
+          ? [{ handleLLMNewToken: (token: string) => onToken(token) }]
+          : undefined,
+      });
+
+      return {
+        message: retryResponse.content as string,
+        toolCalls: [{ name: 'get_available_slots', args: { date: targetDate } }],
+        ragContext,
+      };
+    }
+  }
+
   if (onToken) {
-    // ストリーミング風にトークンを送信
     for (const char of messageText) {
       onToken(char);
     }

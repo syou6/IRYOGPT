@@ -278,6 +278,131 @@ ${data.clinicName}
 }
 
 /**
+ * リマインドメールを送信
+ */
+export async function sendAppointmentReminderEmail(
+  data: AppointmentEmailData
+): Promise<{ success: boolean; message: string; id?: string }> {
+  if (!resend) {
+    console.log('[Email] Resend API key not configured, skipping reminder');
+    return { success: true, message: 'Email sending skipped (no API key)' };
+  }
+
+  if (!data.patientEmail) {
+    return { success: true, message: 'No email provided' };
+  }
+
+  try {
+    const subject = `【${data.clinicName}】明日のご予約リマインド`;
+    const htmlContent = generateReminderEmailHtml(data);
+    const textContent = generateReminderEmailText(data);
+
+    const result = await resend.emails.send({
+      from: `${data.clinicName} <${DEFAULT_FROM_EMAIL}>`,
+      to: data.patientEmail,
+      subject,
+      html: htmlContent,
+      text: textContent,
+    });
+
+    if (result.error) {
+      console.error('[Email] Reminder failed:', result.error);
+      return { success: false, message: result.error.message };
+    }
+
+    console.log('[Email] Reminder sent:', result.data?.id);
+    return { success: true, message: 'Reminder sent', id: result.data?.id };
+  } catch (error: any) {
+    console.error('[Email] Reminder error:', error);
+    return { success: false, message: error.message || 'Failed to send' };
+  }
+}
+
+/**
+ * リマインドメールのHTMLを生成
+ */
+function generateReminderEmailHtml(data: AppointmentEmailData): string {
+  return `
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;font-family:'Hiragino Sans','Meiryo',sans-serif;background:#f5f5f5;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:40px 20px;">
+    <tr>
+      <td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:8px;overflow:hidden;">
+          <tr>
+            <td style="background:linear-gradient(120deg,#f59e0b,#fbbf24);padding:30px;text-align:center;">
+              <h1 style="margin:0;color:#fff;font-size:24px;">明日のご予約</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:40px 30px;">
+              <p style="margin:0 0 20px;color:#333;font-size:16px;">${escapeHtml(data.patientName)} 様</p>
+              <p style="margin:0 0 30px;color:#666;font-size:14px;">明日のご予約のリマインドです。</p>
+              <table width="100%" style="background:#f8fafc;border-radius:8px;padding:20px;margin-bottom:30px;">
+                <tr><td style="padding:20px;">
+                  <p style="margin:0 0 8px;color:#64748b;font-size:12px;">日時</p>
+                  <p style="margin:0 0 20px;font-size:18px;font-weight:bold;color:#1e293b;">${escapeHtml(data.date)} ${escapeHtml(data.time)}</p>
+                  <p style="margin:0 0 8px;color:#64748b;font-size:12px;">医院</p>
+                  <p style="margin:0;font-size:16px;color:#1e293b;">${escapeHtml(data.clinicName)}</p>
+                </td></tr>
+              </table>
+              <div style="background:#fef3c7;border-left:4px solid #f59e0b;padding:16px;border-radius:4px;">
+                <p style="margin:0;color:#92400e;font-size:14px;">
+                  ・保険証をご持参ください<br>
+                  ・5分前までにお越しください<br>
+                  ・キャンセルはお電話で
+                </p>
+              </div>
+            </td>
+          </tr>
+          <tr>
+            <td style="background:#f8fafc;padding:20px;text-align:center;border-top:1px solid #e2e8f0;">
+              <p style="margin:0;color:#94a3b8;font-size:12px;">このメールは自動送信です</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`.trim();
+}
+
+/**
+ * リマインドメールのテキストを生成
+ */
+function generateReminderEmailText(data: AppointmentEmailData): string {
+  return `
+【${data.clinicName}】明日のご予約リマインド
+
+${data.patientName} 様
+
+明日のご予約のリマインドです。
+
+━━━━━━━━━━━━━━━━━━━━━━
+■ ご予約内容
+━━━━━━━━━━━━━━━━━━━━━━
+日時: ${data.date} ${data.time}
+医院: ${data.clinicName}
+
+━━━━━━━━━━━━━━━━━━━━━━
+■ ご来院時のお願い
+━━━━━━━━━━━━━━━━━━━━━━
+・保険証をご持参ください
+・5分前までにお越しください
+・キャンセル・変更はお電話で
+
+━━━━━━━━━━━━━━━━━━━━━━
+このメールは自動送信です。
+`.trim();
+}
+
+/**
  * HTMLエスケープ
  */
 function escapeHtml(str: string): string {

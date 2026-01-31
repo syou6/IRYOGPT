@@ -67,7 +67,49 @@ export default function Privacy() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-premium-text border-b border-premium-stroke pb-2">5. Cookieの使用について</h2>
+            <h2 className="text-xl font-semibold text-premium-text border-b border-premium-stroke pb-2">5. チャットボットを通じた患者情報の取扱い</h2>
+            <p className="mt-4">
+              本サービスの予約チャットボット機能を通じて、以下の患者情報が収集・処理されます。
+            </p>
+            <div className="mt-4 space-y-4">
+              <div>
+                <h3 className="font-semibold text-premium-text">収集する情報</h3>
+                <ul className="mt-2 list-disc list-inside space-y-1">
+                  <li>患者氏名</li>
+                  <li>電話番号</li>
+                  <li>メールアドレス（任意）</li>
+                  <li>症状・来院理由</li>
+                  <li>希望予約日時</li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-semibold text-premium-text">データの保存・処理</h3>
+                <ul className="mt-2 list-disc list-inside space-y-1">
+                  <li>予約データは、利用者（医療機関）が指定したGoogleスプレッドシートに保存されます</li>
+                  <li>会話内容はOpenAI社のAPIを通じてAI処理されます（OpenAI社のデータ利用ポリシーに従います）</li>
+                  <li>チャット履歴は当社のデータベース（Supabase）にサービス改善目的で保存される場合があります</li>
+                </ul>
+              </div>
+              <div>
+                <h3 className="font-semibold text-premium-text">データ管理責任</h3>
+                <p className="mt-2">
+                  患者情報のデータ管理者は利用者（医療機関等）となります。当社はデータ処理者として、
+                  利用者の指示に基づきデータを処理します。患者ご本人からの情報開示・削除等のご要望は、
+                  予約先の医療機関へ直接お問い合わせください。
+                </p>
+              </div>
+              <div>
+                <h3 className="font-semibold text-premium-text">データ保持期間</h3>
+                <p className="mt-2">
+                  予約データの保持期間は利用者（医療機関）の設定に従います。
+                  チャット履歴は、サービス改善およびサポート対応の目的で最大12ヶ月間保持した後、削除されます。
+                </p>
+              </div>
+            </div>
+          </section>
+
+          <section>
+            <h2 className="text-xl font-semibold text-premium-text border-b border-premium-stroke pb-2">6. Cookieの使用について</h2>
             <p className="mt-4">
               当社のウェブサイトでは、サービスの利便性向上のためCookieを使用しています。
               ブラウザの設定によりCookieを無効にすることも可能ですが、
@@ -76,7 +118,7 @@ export default function Privacy() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-premium-text border-b border-premium-stroke pb-2">6. 個人情報の開示・訂正・削除</h2>
+            <h2 className="text-xl font-semibold text-premium-text border-b border-premium-stroke pb-2">7. 個人情報の開示・訂正・削除</h2>
             <p className="mt-4">
               お客様ご本人から個人情報の開示、訂正、削除のご請求があった場合、
               本人確認の上、合理的な期間内に対応いたします。
@@ -84,7 +126,7 @@ export default function Privacy() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-premium-text border-b border-premium-stroke pb-2">7. プライバシーポリシーの変更</h2>
+            <h2 className="text-xl font-semibold text-premium-text border-b border-premium-stroke pb-2">8. プライバシーポリシーの変更</h2>
             <p className="mt-4">
               当社は、必要に応じて本プライバシーポリシーを変更することがあります。
               変更後のプライバシーポリシーは、当ウェブサイトに掲載した時点から効力を生じます。
@@ -92,7 +134,7 @@ export default function Privacy() {
           </section>
 
           <section>
-            <h2 className="text-xl font-semibold text-premium-text border-b border-premium-stroke pb-2">8. お問い合わせ</h2>
+            <h2 className="text-xl font-semibold text-premium-text border-b border-premium-stroke pb-2">9. お問い合わせ</h2>
             <p className="mt-4">
               個人情報の取り扱いに関するお問い合わせは、下記までご連絡ください。
             </p>

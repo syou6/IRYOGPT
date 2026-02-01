@@ -143,7 +143,12 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string, isAppointmentMo
     '.sgpt-widget .sgpt-footer{padding:0 20px 16px;text-align:center;font-size:.7rem;color:#475569}',
     '.sgpt-scroll-hint{position:absolute;right:24px;bottom:96px;background:rgba(15,23,42,.9);border:1px solid rgba(148,163,184,.4);color:#cbd5f5;padding:8px 14px;border-radius:999px;font-size:.75rem;display:flex;align-items:center;gap:6px;box-shadow:0 15px 40px rgba(2,6,23,.6);opacity:0;pointer-events:none;transition:opacity .25s ease}',
     '.sgpt-scroll-hint svg{width:14px;height:14px}',
-    '.sgpt-scroll-hint.is-visible{opacity:1;pointer-events:auto}'
+    '.sgpt-scroll-hint.is-visible{opacity:1;pointer-events:auto}',
+    '.sgpt-consent{padding:20px;text-align:center}',
+    '.sgpt-consent-text{font-size:.8rem;color:#94a3b8;line-height:1.6;margin-bottom:16px}',
+    '.sgpt-consent-btn{background:linear-gradient(120deg,#34d399,#22d3ee);color:#0f172a;border:none;padding:12px 24px;border-radius:12px;font-weight:600;cursor:pointer;width:100%}',
+    '.sgpt-consent-btn:hover{opacity:.9}',
+    '.sgpt-disclaimer{font-size:.65rem;color:#64748b;text-align:center;padding:8px 20px;border-top:1px solid rgba(255,255,255,.06)}'
   ].join('');
 
   const styleEl = document.createElement('style');
@@ -161,10 +166,15 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string, isAppointmentMo
     '      <button class="sgpt-close-btn" id="webgpt-close-btn">×</button>',
     '    </div>',
     '    <div class="sgpt-messages" id="webgpt-messages"></div>',
-    '    <div class="sgpt-input-bar">',
+    '    <div class="sgpt-consent" id="webgpt-consent">',
+    '      <div class="sgpt-consent-text">ご入力いただいた情報（お名前・電話番号・症状等）はAIによる予約処理のため、外部サービス（OpenAI）に送信されます。<br><a href="https://yoyakuraku.com/legal/privacy" target="_blank" style="color:#34d399;">プライバシーポリシー</a>に同意の上ご利用ください。</div>',
+    '      <button class="sgpt-consent-btn" id="webgpt-consent-btn">同意して利用する</button>',
+    '    </div>',
+    '    <div class="sgpt-input-bar" id="webgpt-input-bar" style="display:none;">',
     '      <input type="text" id="webgpt-input" class="sgpt-input" placeholder="質問を入力..." />',
     '      <button id="webgpt-send-btn" class="sgpt-send-btn">送信</button>',
     '    </div>',
+    '    <div class="sgpt-disclaimer">本チャットは医師の診断に代わるものではありません</div>',
     '    <div class="sgpt-footer">Powered by よやくらく</div>',
     '  </div>',
     '  <button class="sgpt-fab" id="webgpt-toggle-btn"></button>',
@@ -198,6 +208,48 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string, isAppointmentMo
   // sticky UI removed; messages appear only in list
   const inputField = document.getElementById('webgpt-input');
   const sendBtn = document.getElementById('webgpt-send-btn');
+  const consentDiv = document.getElementById('webgpt-consent');
+  const consentBtn = document.getElementById('webgpt-consent-btn');
+  const inputBar = document.getElementById('webgpt-input-bar');
+
+  // 同意状態の確認（localStorageに保存）
+  const consentKey = 'webgpt_consent_' + siteId;
+  let hasConsented = false;
+  try {
+    hasConsented = localStorage.getItem(consentKey) === 'true';
+  } catch (e) {
+    // localStorage使用不可の場合は毎回同意を求める
+  }
+
+  function showChatUI() {
+    if (consentDiv) consentDiv.style.display = 'none';
+    if (inputBar) inputBar.style.display = 'flex';
+    if (messagesDiv) messagesDiv.style.display = 'flex';
+  }
+
+  function showConsentUI() {
+    if (consentDiv) consentDiv.style.display = 'block';
+    if (inputBar) inputBar.style.display = 'none';
+    if (messagesDiv) messagesDiv.style.display = 'none';
+  }
+
+  // 初期表示
+  if (hasConsented) {
+    showChatUI();
+  } else {
+    showConsentUI();
+  }
+
+  // 同意ボタンのクリック
+  if (consentBtn) {
+    consentBtn.addEventListener('click', function() {
+      try {
+        localStorage.setItem(consentKey, 'true');
+      } catch (e) {}
+      hasConsented = true;
+      showChatUI();
+    });
+  }
   const scrollHint = document.createElement('button');
   scrollHint.className = 'sgpt-scroll-hint';
   scrollHint.setAttribute('type', 'button');

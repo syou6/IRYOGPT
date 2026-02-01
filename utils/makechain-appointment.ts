@@ -220,8 +220,6 @@ export async function runAppointmentChat(
 
   // 禁止ワードチェック：「お待ちください」「確認いたします」等が含まれていたらget_available_slotsを強制呼び出し
   const hasForbiddenPhrase = /お待ちください|確認いたします|確認します|お調べします/.test(messageText);
-  const userMessage = messages.find(m => m.role === 'user');
-  const query = userMessage?.content || '';
   const userMentionedDate = /\d+日|\d+時|明日|明後日|来週/.test(query);
 
   if (hasForbiddenPhrase && userMentionedDate) {

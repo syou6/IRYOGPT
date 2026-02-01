@@ -1,9 +1,9 @@
 {
-  "name": "supabase-langchain-notion",
-  "version": "0.1.0",
+  "name": "yoyakuraku",
+  "version": "1.0.0",
   "private": true,
-  "license": "MIT",
-  "author": "Mayooear",
+  "license": "UNLICENSED",
+  "author": "合同会社AMOR",
   "type": "module",
   "scripts": {
     "dev": "next dev",

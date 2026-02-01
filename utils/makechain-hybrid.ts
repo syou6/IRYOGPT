@@ -305,12 +305,74 @@ export async function runHybridChat(
   // ③ システムプロンプトを生成（RAG情報 + 医院設定を含む）
   const systemPrompt = getHybridSystemPrompt(ragContext, settings);
 
+  // ④ 日付が含まれていたら先に空き状況を取得（AIの判断を待たない）
+  let preloadedSlots: string | null = null;
+  const datePatterns = [
+    /(\d{1,2})月(\d{1,2})日/,
+    /(\d{1,2})日/,
+    /明日/,
+    /明後日/,
+    /来週/,
+    /(\d{1,2})時/,
+  ];
+  const hasDateMention = datePatterns.some(p => p.test(query));
+
+  if (hasDateMention) {
+    console.log('[Hybrid] Date mentioned, preloading slots for:', query);
+    try {
+      // 日付を抽出
+      const today = new Date();
+      let targetDate: string | null = null;
+
+      const fullDateMatch = query.match(/(\d{1,2})月(\d{1,2})日/);
+      const dayOnlyMatch = query.match(/(\d{1,2})日/);
+
+      if (fullDateMatch) {
+        const month = parseInt(fullDateMatch[1]);
+        const day = parseInt(fullDateMatch[2]);
+        const year = today.getFullYear();
+        targetDate = `${year}/${month}/${day}`;
+      } else if (dayOnlyMatch) {
+        const day = parseInt(dayOnlyMatch[1]);
+        const month = today.getMonth() + 1;
+        const year = today.getFullYear();
+        targetDate = `${year}/${month}/${day}`;
+      } else if (query.includes('明日')) {
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        targetDate = `${tomorrow.getFullYear()}/${tomorrow.getMonth() + 1}/${tomorrow.getDate()}`;
+      } else if (query.includes('明後日')) {
+        const dayAfter = new Date(today);
+        dayAfter.setDate(dayAfter.getDate() + 2);
+        targetDate = `${dayAfter.getFullYear()}/${dayAfter.getMonth() + 1}/${dayAfter.getDate()}`;
+      }
+
+      if (targetDate) {
+        preloadedSlots = await executeToolCall(spreadsheetId, {
+          name: 'get_available_slots',
+          args: { date: targetDate },
+        });
+        console.log('[Hybrid] Preloaded slots:', preloadedSlots);
+      }
+    } catch (error) {
+      console.error('[Hybrid] Preload slots failed:', error);
+    }
+  }
+
   const fullMessages = [
     { role: 'system' as const, content: systemPrompt },
     ...messages,
   ];
 
-  // ③ 最初の呼び出し（ツール判定用、ストリーミングなし）
+  // 先に取得した空き状況があれば追加
+  if (preloadedSlots) {
+    fullMessages.push({
+      role: 'system' as const,
+      content: `【空き状況（既に取得済み）】\n${preloadedSlots}\n\n上記の空き状況を即座にユーザーに伝えてください。「確認します」「お待ちください」は絶対に言わないでください。`,
+    });
+  }
+
+  // ⑤ 最初の呼び出し（ツール判定用、ストリーミングなし）
   const model = new ChatOpenAI({
     model: 'gpt-4o-mini',
     temperature: 0.7,

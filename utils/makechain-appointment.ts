@@ -52,11 +52,77 @@ export async function runAppointmentChat(
   // 最初に設定を取得してプロンプトに埋め込む（AIがget_clinic_infoを呼ばなくても設定を知れるように）
   const settings = await getClinicSettings(spreadsheetId);
 
+  // ユーザーの最新メッセージを取得
+  const lastUserMessage = [...messages].reverse().find(m => m.role === 'user');
+  const query = lastUserMessage?.content || '';
+
+  // 日付が含まれていたら先に空き状況を取得（AIの判断を待たない）
+  let preloadedSlots: string | null = null;
+  const datePatterns = [
+    /(\d{1,2})月(\d{1,2})日/,
+    /(\d{1,2})日/,
+    /明日/,
+    /明後日/,
+    /来週/,
+    /(\d{1,2})時/,
+  ];
+  const hasDateMention = datePatterns.some(p => p.test(query));
+
+  if (hasDateMention) {
+    console.log('[Appointment] Date mentioned, preloading slots for:', query);
+    try {
+      // 日付を抽出
+      const today = new Date();
+      let targetDate: string | null = null;
+
+      const fullDateMatch = query.match(/(\d{1,2})月(\d{1,2})日/);
+      const dayOnlyMatch = query.match(/(\d{1,2})日/);
+
+      if (fullDateMatch) {
+        const month = parseInt(fullDateMatch[1]);
+        const day = parseInt(fullDateMatch[2]);
+        const year = today.getFullYear();
+        targetDate = `${year}/${month}/${day}`;
+      } else if (dayOnlyMatch) {
+        const day = parseInt(dayOnlyMatch[1]);
+        const month = today.getMonth() + 1;
+        const year = today.getFullYear();
+        targetDate = `${year}/${month}/${day}`;
+      } else if (query.includes('明日')) {
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+        targetDate = `${tomorrow.getFullYear()}/${tomorrow.getMonth() + 1}/${tomorrow.getDate()}`;
+      } else if (query.includes('明後日')) {
+        const dayAfter = new Date(today);
+        dayAfter.setDate(dayAfter.getDate() + 2);
+        targetDate = `${dayAfter.getFullYear()}/${dayAfter.getMonth() + 1}/${dayAfter.getDate()}`;
+      }
+
+      if (targetDate) {
+        preloadedSlots = await executeToolCall(spreadsheetId, {
+          name: 'get_available_slots',
+          args: { date: targetDate },
+        });
+        console.log('[Appointment] Preloaded slots:', preloadedSlots);
+      }
+    } catch (error) {
+      console.error('[Appointment] Preload slots failed:', error);
+    }
+  }
+
   // システムプロンプトを追加（今日の日付情報 + 医院設定を含む）
-  const fullMessages = [
+  const fullMessages: AppointmentChatMessage[] = [
     { role: 'system' as const, content: getMedicalSystemPromptWithSettings(settings) },
     ...messages,
   ];
+
+  // 先に取得した空き状況があれば追加
+  if (preloadedSlots) {
+    fullMessages.push({
+      role: 'system' as const,
+      content: `【空き状況（既に取得済み）】\n${preloadedSlots}\n\n上記の空き状況を即座にユーザーに伝えてください。「確認します」「お待ちください」は絶対に言わないでください。`,
+    });
+  }
 
   // 最初の呼び出し（ツール判定用、ストリーミングなし）
   const model = new ChatOpenAI({

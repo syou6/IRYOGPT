@@ -78,8 +78,7 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string, isAppointmentMo
   // 変数を安全にエスケープ
   const escapedSiteId = JSON.stringify(siteId);
   const escapedApiBaseUrl = JSON.stringify(apiBaseUrl);
-  const iconUrl = `${apiBaseUrl}/icons/bee-icon.png?v=2`;
-  const escapedIconUrl = JSON.stringify(iconUrl);
+  // bee-icon.pngは不要になった（インラインSVGに変更済み）
   // バッククォートを含む正規表現パターンをエスケープ
   const backtick3 = '```';
   const backtick1 = '`';
@@ -102,14 +101,17 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string, isAppointmentMo
 
   const siteId = ${escapedSiteId};
   const apiBaseUrl = ${escapedApiBaseUrl};
-  const iconUrl = ${escapedIconUrl};
   const isAppointmentMode = ${isAppointmentMode};
   const welcomeMessage = ${escapedWelcomeMessage};
 
   const styles = [
     '.sgpt-widget{position:fixed;right:24px;bottom:24px;z-index:9999;font-family:Inter,-apple-system,BlinkMacSystemFont,sans-serif;color:#e2e8f0}',
     '.sgpt-widget *{box-sizing:border-box;font-family:inherit}',
-    '.sgpt-fab{width:60px;height:60px;border-radius:999px;background:linear-gradient(135deg,#34d399,#6ee7b7,#22d3ee);color:#0f172a;border:none;box-shadow:0 20px 40px rgba(15,23,42,.3);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .3s ease}',
+    '.sgpt-fab-wrap{display:flex;align-items:center;gap:10px;cursor:pointer}',
+    '.sgpt-fab-label{background:rgba(3,7,18,.85);color:#fff;font-size:.85rem;font-weight:600;padding:8px 16px;border-radius:24px;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.25);backdrop-filter:blur(10px);border:1px solid rgba(52,211,153,.3);transition:all .3s ease;animation:sgpt-label-pulse 3s ease-in-out infinite}',
+    '@keyframes sgpt-label-pulse{0%,100%{opacity:1}50%{opacity:.7}}',
+    '.sgpt-widget.is-open .sgpt-fab-label{display:none}',
+    '.sgpt-fab{width:60px;height:60px;border-radius:999px;background:linear-gradient(135deg,#34d399,#6ee7b7,#22d3ee);color:#0f172a;border:none;box-shadow:0 20px 40px rgba(15,23,42,.3);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .3s ease;flex-shrink:0}',
     '.sgpt-fab:hover{transform:translateY(-4px)}',
     '.sgpt-chat-panel{position:absolute;right:0;bottom:80px;width:min(360px,90vw);height:520px;border-radius:28px;border:1px solid rgba(255,255,255,.08);background:rgba(3,7,18,.92);box-shadow:0 45px 120px rgba(1,3,6,.75);backdrop-filter:blur(30px);display:flex;flex-direction:column;opacity:0;pointer-events:none;transform:translateY(20px);transition:all .35s cubic-bezier(.21,1.02,.73,1)}',
     '.sgpt-widget.is-open .sgpt-chat-panel{opacity:1;pointer-events:auto;transform:translateY(0)}',
@@ -177,7 +179,10 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string, isAppointmentMo
     '    <div class="sgpt-disclaimer">本チャットは医師の診断に代わるものではありません</div>',
     '    <div class="sgpt-footer">Powered by よやくらく</div>',
     '  </div>',
-    '  <button class="sgpt-fab" id="webgpt-toggle-btn"></button>',
+    '  <div class="sgpt-fab-wrap" id="webgpt-fab-wrap">',
+    '    <span class="sgpt-fab-label" id="webgpt-fab-label">予約はこちら</span>',
+    '    <button class="sgpt-fab" id="webgpt-toggle-btn"></button>',
+    '  </div>',
     '</div>'
   ].join('');
 
@@ -189,18 +194,18 @@ function generateEmbedScript(siteId: string, apiBaseUrl: string, isAppointmentMo
   const chatContainer = document.getElementById('webgpt-chat-container');
   const toggleBtn = document.getElementById('webgpt-toggle-btn');
   
-  // アイコンを設定（bee-icon.pngを使用）
+  // アイコンを設定（カレンダー予約SVG）
   if (toggleBtn) {
-    const iconImg = document.createElement('img');
-    iconImg.src = iconUrl;
-    iconImg.alt = 'よやくらく';
-    iconImg.style.width = '36px';
-    iconImg.style.height = '36px';
-    iconImg.style.objectFit = 'contain';
-    iconImg.onerror = function() {
-      toggleBtn.innerHTML = '💬';
-    };
-    toggleBtn.appendChild(iconImg);
+    toggleBtn.innerHTML = '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#0f172a" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01M16 18h.01"/></svg>';
+  }
+
+  // ラベルクリックでもトグル
+  const fabLabel = document.getElementById('webgpt-fab-label');
+  const fabWrap = document.getElementById('webgpt-fab-wrap');
+  if (fabLabel && widget) {
+    fabLabel.addEventListener('click', function() {
+      widget.classList.toggle('is-open');
+    });
   }
   
   const closeBtn = document.getElementById('webgpt-close-btn');

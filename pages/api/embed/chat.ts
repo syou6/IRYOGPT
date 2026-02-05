@@ -84,9 +84,13 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
-  // OPTIONSリクエスト（プリフライト）はリクエストのOriginを許可
-  if (handlePreflight(req, res)) {
-    return;
+  // OPTIONSリクエスト（プリフライト）は全オリジン許可
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    return res.status(204).end();
   }
 
   if (req.method !== 'POST') {
@@ -119,11 +123,10 @@ export default async function handler(
       return res.status(404).json({ message: 'Site not found' });
     }
 
-    // CORS検証（サイトのbase_urlと一致するOriginのみ許可）
-    const corsAllowed = setCorsHeaders(req, res, site.base_url);
-    if (!corsAllowed) {
-      return res.status(403).json({ message: 'Origin not allowed' });
-    }
+    // CORS設定（全オリジン許可 - site_idがセキュリティキーの役割を果たす）
+    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
 
     // is_embed_enabled が false の場合はエラー
     if (!site.is_embed_enabled) {

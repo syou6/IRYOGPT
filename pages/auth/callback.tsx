@@ -12,10 +12,10 @@ const ALLOWED_EMAILS = (process.env.NEXT_PUBLIC_ALLOWED_EMAILS || '')
 export default function AuthCallback() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
-  const supabase = createSupabaseClient();
 
   useEffect(() => {
     const checkAuth = async () => {
+      const supabase = createSupabaseClient();
       const { data: { user } } = await supabase.auth.getUser();
 
       if (!user) {
@@ -27,7 +27,6 @@ export default function AuthCallback() {
 
       // 許可リストが設定されていて、ユーザーが含まれていない場合
       if (ALLOWED_EMAILS.length > 0 && !ALLOWED_EMAILS.includes(userEmail)) {
-        // ログアウトさせる
         await supabase.auth.signOut();
         setError('このアカウントではログインできません。');
         return;
@@ -38,7 +37,7 @@ export default function AuthCallback() {
     };
 
     checkAuth();
-  }, [router, supabase.auth]);
+  }, [router]);
 
   if (error) {
     return (

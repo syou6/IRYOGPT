@@ -18,7 +18,6 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const supabase = createSupabaseClient();
   const onboardingSteps = [
     { label: 'アカウント登録', helper: 'URLを登録するだけで準備完了' },
     { label: 'よやくらくが学習', helper: '運営が内容を確認しオペレーション' },
@@ -31,6 +30,7 @@ export default function Login() {
     setError(null);
 
     try {
+      const supabase = createSupabaseClient();
       if (isSignUp) {
         // サインアップ
         const { data, error } = await supabase.auth.signUp({
@@ -75,6 +75,7 @@ export default function Login() {
     setError(null);
 
     try {
+      const supabase = createSupabaseClient();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {

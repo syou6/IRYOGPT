@@ -4,16 +4,17 @@ import type { NextApiRequest } from 'next';
 // フロントエンド用のSupabaseクライアント（anon key使用）
 let supabaseClientInstance: any = null;
 
+// ビルド時（prerender）用のダミーURL
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://placeholder.supabase.co';
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || 'placeholder-key';
+
 export const createSupabaseClient = () => {
   if (supabaseClientInstance) {
     return supabaseClientInstance;
   }
-  
-  supabaseClientInstance = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
-  );
-  
+
+  supabaseClientInstance = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
   return supabaseClientInstance;
 };
 
@@ -24,10 +25,12 @@ const getSupabaseAdmin = () => {
   if (supabaseAdminInstance) {
     return supabaseAdminInstance;
   }
-  
+
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'placeholder-key';
+
   supabaseAdminInstance = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-    process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+    SUPABASE_URL,
+    serviceRoleKey,
     {
       auth: {
         autoRefreshToken: false,

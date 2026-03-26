@@ -16,7 +16,7 @@ const ContactCTA = ({ variant = "default" }: ContactCTAProps) => {
             viewport={{ once: true }}
           >
             <p className="text-[18px] lg:text-[24px] text-white/95 mb-6 tracking-wide font-medium">
-              予約対応でお困りの方、お気軽にご相談ください
+              受付スタッフの負担を減らしたい院長先生、まずはご相談ください
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
@@ -51,12 +51,12 @@ const ContactCTA = ({ variant = "default" }: ContactCTAProps) => {
           className="rounded-3xl bg-gradient-to-r from-emerald-500 to-emerald-600 p-10 lg:p-20 text-center text-white"
         >
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-8">
-            まずは無料相談から
+            今日から受付業務を変える
           </h2>
           <p className="text-xl lg:text-2xl opacity-90 mb-12 max-w-3xl mx-auto leading-relaxed">
-            導入についてのご質問、お見積もりなど、お気軽にご相談ください。
+            最短10日で稼働開始。導入費用・月額の詳細、他院での活用事例など、
             <br className="hidden lg:block" />
-            専門スタッフが丁寧にご説明いたします。
+            担当者が丁寧にご説明いたします。費用は一切かかりません。
           </p>
 
           <div className="flex flex-col sm:flex-row gap-6 justify-center mb-12">
@@ -64,7 +64,7 @@ const ContactCTA = ({ variant = "default" }: ContactCTAProps) => {
               href="/contact"
               className="px-12 py-6 bg-white text-emerald-600 rounded-full font-bold text-xl lg:text-2xl hover:shadow-xl transition-shadow flex items-center justify-center gap-3"
             >
-              無料で相談する
+              無料相談を予約する
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>

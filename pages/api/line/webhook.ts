@@ -11,6 +11,7 @@ import crypto from 'crypto';
 import { WebhookEvent } from '@line/bot-sdk';
 import { supabaseClient } from '@/utils/supabase-client';
 import { SiteLineConfig } from '@/types/line';
+import { checkRateLimit } from '@/utils/rate-limit';
 import {
   createLineClient,
   handleLineMessage,
@@ -49,7 +50,12 @@ function validateSignature(
     .createHmac('sha256', channelSecret)
     .update(body)
     .digest('base64');
-  return hash === signature;
+  // タイミング攻撃を防ぐため定数時間比較を使用
+  try {
+    return crypto.timingSafeEqual(Buffer.from(hash, 'base64'), Buffer.from(signature, 'base64'));
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -103,6 +109,10 @@ export default async function handler(
     console.error('[LINE Webhook] Missing site_id');
     return res.status(400).json({ message: 'site_id is required' });
   }
+
+  // レートリミットチェック（1分間に30リクエストまで）
+  const rateLimitAllowed = await checkRateLimit(req, res, 'standard');
+  if (!rateLimitAllowed) return;
 
   try {
     // 1. サイトの LINE 設定を取得
@@ -181,7 +191,6 @@ export default async function handler(
     if (!res.headersSent) {
       return res.status(500).json({
         message: 'Internal server error',
-        error: error instanceof Error ? error.message : String(error),
       });
     }
   }

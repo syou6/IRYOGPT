@@ -2,7 +2,7 @@ import { Html, Head, Main, NextScript } from "next/document";
 
 export default function Document() {
   return (
-    <Html lang="en">
+    <Html lang="ja">
       <Head>
         <link rel="icon" href="/icons/bee-icon.png" type="image/png" />
         <link rel="shortcut icon" href="/icons/bee-icon.png" type="image/png" />

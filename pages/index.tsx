@@ -9,6 +9,7 @@ import DepartmentsSection from '@/components/lp/DepartmentsSection';
 import BeforeAfterSection from '@/components/lp/BeforeAfterSection';
 import ContactCTA from '@/components/lp/ContactCTA';
 import FeaturesSection from '@/components/lp/FeaturesSection';
+import RoiSection from '@/components/lp/RoiSection';
 import PricingSection from '@/components/lp/PricingSection';
 import SupportSection from '@/components/lp/SupportSection';
 import FlowSection from '@/components/lp/FlowSection';
@@ -30,7 +31,16 @@ export default function Home() {
         <meta property="og:title" content="よやくらく | 医療・美容業界特化 AI予約システム" />
         <meta property="og:description" content="24時間365日AIが予約を自動受付。予約対応の人件費を年間250万円削減。" />
         <meta property="og:type" content="website" />
+        <meta property="og:url" content="https://yoyakuraku.com/" />
+        <meta property="og:image" content="https://yoyakuraku.com/ogp.png" />
         <meta property="og:locale" content="ja_JP" />
+        <meta property="og:site_name" content="よやくらく" />
+
+        {/* Twitter Card */}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="よやくらく | 医療・美容業界特化 AI予約システム" />
+        <meta name="twitter:description" content="24時間365日AIが予約を自動受付。予約対応の人件費を年間250万円削減。" />
+        <meta name="twitter:image" content="https://yoyakuraku.com/ogp.png" />
       </Head>
 
       <div className="min-h-screen bg-white">
@@ -45,6 +55,7 @@ export default function Home() {
           <BeforeAfterSection />
           <ContactCTA variant="simple" />
           <FeaturesSection />
+          <RoiSection />
           <PricingSection />
           <ContactCTA variant="simple" />
           <SupportSection />

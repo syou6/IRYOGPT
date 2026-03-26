@@ -31,19 +31,19 @@ const HeroSection = () => {
               transition={{ delay: 0.1 }}
               className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-5 py-2 text-[14px] font-medium text-emerald-300"
             >
-              医療・美容業界特化
+              医療・歯科・美容クリニック特化
             </motion.p>
 
             <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-[5.5rem] xl:text-[6.5rem] font-bold leading-[1.1] mt-8 mb-6 lg:mb-8">
-              <span className="whitespace-nowrap">もう予約電話に</span>
+              <span className="whitespace-nowrap">受付の電話対応を</span>
               <br />
-              <span className="whitespace-nowrap text-emerald-400">振り回されない</span>
+              <span className="whitespace-nowrap text-emerald-400">AIに任せる時代へ</span>
             </h1>
 
             <p className="text-2xl sm:text-3xl opacity-80 mb-8 lg:mb-10 leading-relaxed">
-              24時間365日、AIが予約を自動受付。
+              24時間365日、AIが会話しながら予約を完結。
               <br />
-              スタッフは本業に集中できます。
+              スタッフは患者様のケアだけに集中できます。
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3">
@@ -51,16 +51,16 @@ const HeroSection = () => {
                 href="/contact"
                 className="px-6 lg:px-8 py-3.5 lg:py-4 bg-white text-emerald-600 rounded-full font-medium text-[14px] lg:text-[15px] flex items-center justify-center gap-3 hover:shadow-lg transition-shadow"
               >
-                <span>無料で相談する</span>
+                <span>導入について相談する（無料）</span>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                 </svg>
               </Link>
               <a
-                href="#features"
+                href="#flow"
                 className="px-6 lg:px-8 py-3.5 lg:py-4 border-2 border-white/30 text-white rounded-full font-medium text-[14px] lg:text-[15px] flex items-center justify-center gap-2 hover:bg-white/10 transition-colors"
               >
-                機能を見る
+                仕組みを見る
               </a>
             </div>
 
@@ -79,8 +79,8 @@ const HeroSection = () => {
                   height={56}
                 />
                 <div>
-                  <p className="text-xl lg:text-2xl font-bold text-white">医療・美容特化</p>
-                  <p className="text-lg text-white/60">業界専門AI</p>
+                  <p className="text-xl lg:text-2xl font-bold text-white">歯科・クリニック特化</p>
+                  <p className="text-lg text-white/60">業界専門AI設計</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -91,8 +91,8 @@ const HeroSection = () => {
                   height={56}
                 />
                 <div>
-                  <p className="text-xl lg:text-2xl font-bold text-white">24時間対応</p>
-                  <p className="text-lg text-white/60">夜間・休日も</p>
+                  <p className="text-xl lg:text-2xl font-bold text-white">夜間・休日も自動対応</p>
+                  <p className="text-lg text-white/60">予約の取りこぼし防止</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -103,8 +103,8 @@ const HeroSection = () => {
                   height={56}
                 />
                 <div>
-                  <p className="text-xl lg:text-2xl font-bold text-white">電話80%削減</p>
-                  <p className="text-lg text-white/60">業務効率化</p>
+                  <p className="text-xl lg:text-2xl font-bold text-white">受付電話 80%削減</p>
+                  <p className="text-lg text-white/60">スタッフ負担を解消</p>
                 </div>
               </div>
             </motion.div>

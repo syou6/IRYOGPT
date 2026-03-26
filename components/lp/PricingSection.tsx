@@ -4,6 +4,7 @@ import Link from "next/link";
 const features = [
   "AIチャットボット構築",
   "予約システム連携",
+  "LINE公式アカウント連携",
   "HP情報の学習・回答",
   "導入サポート",
   "月次レポート",
@@ -25,7 +26,7 @@ const PricingSection = () => {
             シンプルな料金体系
           </h2>
           <p className="mt-6 text-xl lg:text-2xl text-gray-600">
-            追加料金なし。必要な機能がすべて含まれています
+            受付スタッフ1名の年間人件費（約400万円）の半額以下で、24時間対応を実現
           </p>
         </motion.div>
 
@@ -42,7 +43,7 @@ const PricingSection = () => {
                 <span className="px-3 py-1 bg-white/20 rounded text-sm font-medium">おすすめ</span>
               </div>
               <h3 className="text-xl lg:text-2xl font-bold mt-3 tracking-tight">スタンダードプラン</h3>
-              <p className="text-sm opacity-80 mt-2">本格的に活用したい方向け</p>
+              <p className="text-sm opacity-80 mt-2">予約対応の人件費を年間250万円削減したい院長向け</p>
             </div>
             <div className="p-6 lg:p-8">
               <div className="mb-6">
@@ -91,7 +92,7 @@ const PricingSection = () => {
                 href="/contact"
                 className="block w-full py-4 bg-white text-emerald-600 rounded-full font-bold text-base lg:text-lg text-center hover:bg-white/90 transition-colors tracking-wide"
               >
-                お問い合わせ
+                今すぐ無料相談を予約する
               </Link>
             </div>
           </motion.div>
@@ -106,7 +107,7 @@ const PricingSection = () => {
           >
             <div className="bg-gray-100 p-6 lg:p-8">
               <h3 className="text-xl lg:text-2xl font-bold text-gray-900 tracking-tight">カスタムプラン</h3>
-              <p className="text-sm text-gray-600 mt-2">特別なご要望がある方向け</p>
+              <p className="text-sm text-gray-600 mt-2">複数院展開・既存システム連携など特別要件がある方向け</p>
             </div>
             <div className="p-6 lg:p-8">
               <div className="mb-8 lg:mb-10">
@@ -133,7 +134,7 @@ const PricingSection = () => {
                     <svg className="w-4 h-4 flex-shrink-0 mt-0.5 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
                       <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                     </svg>
-                    LINE公式アカウント連携
+                    電子カルテ連携
                   </li>
                   <li className="flex items-start gap-2">
                     <svg className="w-4 h-4 flex-shrink-0 mt-0.5 text-emerald-500" fill="currentColor" viewBox="0 0 20 20">
@@ -148,7 +149,7 @@ const PricingSection = () => {
                 href="/contact"
                 className="block w-full py-4 border-2 border-emerald-500 text-emerald-600 rounded-full font-bold text-base lg:text-lg text-center hover:bg-emerald-500 hover:text-white transition-colors tracking-wide"
               >
-                お問い合わせ
+                要件を相談する
               </Link>
             </div>
           </motion.div>

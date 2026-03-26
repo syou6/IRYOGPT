@@ -132,7 +132,6 @@ export default async function handler(
     console.error('[LINE Config API] Error:', error);
     return res.status(500).json({
       message: 'Failed to process request',
-      error: error instanceof Error ? error.message : String(error),
     });
   }
 }

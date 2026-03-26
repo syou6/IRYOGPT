@@ -5,12 +5,14 @@ import { SupabaseVectorStore } from '@langchain/community/vectorstores/supabase'
 import { openai } from '@/utils/openai-client';
 import { supabaseClient } from '@/utils/supabase-client';
 import { makeChain } from '@/utils/makechain';
-import { runAppointmentChat, AppointmentChatMessage } from '@/utils/makechain-appointment';
-import { runHybridChat, HybridChatMessage } from '@/utils/makechain-hybrid';
 import { checkRateLimit } from '@/utils/rate-limit';
 import { setCorsHeaders, handlePreflight } from '@/utils/cors';
 import { getSafeErrorMessage, getSafeStreamingError } from '@/utils/error-handler';
 import { generateSessionId } from '@/utils/id-generator';
+import {
+  handleAppointmentChat,
+  handleHybridChat,
+} from '@/utils/chat-handlers';
 
 function sanitizeChunk(raw: string) {
   if (!raw) return '';
@@ -84,13 +86,24 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
-  // OPTIONSリクエスト（プリフライト）は全オリジン許可
+  // OPTIONSリクエスト（プリフライト）: site_idのbase_urlで検証
+  // プリフライト時点ではサイト情報が未取得のため、site_idをクエリパラメータから取得して検証する
   if (req.method === 'OPTIONS') {
-    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Max-Age', '86400');
-    return res.status(204).end();
+    const preflightSiteId = req.query.site_id as string | undefined;
+    let preflightBaseUrl: string | null = null;
+
+    if (preflightSiteId) {
+      const { data: preflightSite } = await supabaseClient
+        .from('sites')
+        .select('base_url')
+        .eq('id', preflightSiteId)
+        .single();
+      preflightBaseUrl = preflightSite?.base_url ?? null;
+    }
+
+    if (handlePreflight(req, res, preflightBaseUrl)) {
+      return;
+    }
   }
 
   if (req.method !== 'POST') {
@@ -108,6 +121,15 @@ export default async function handler(
       return res.status(400).json({ message: 'No question in the request' });
     }
 
+    // 入力長バリデーション
+    if (typeof question === 'string' && question.length > 2000) {
+      return res.status(400).json({ message: 'Question exceeds maximum length of 2000 characters' });
+    }
+
+    if (Array.isArray(history) && history.length > 20) {
+      return res.status(400).json({ message: 'History exceeds maximum of 20 entries' });
+    }
+
     if (!site_id) {
       return res.status(400).json({ message: 'site_id is required' });
     }
@@ -123,10 +145,11 @@ export default async function handler(
       return res.status(404).json({ message: 'Site not found' });
     }
 
-    // CORS設定（全オリジン許可 - site_idがセキュリティキーの役割を果たす）
-    res.setHeader('Access-Control-Allow-Origin', req.headers.origin || '*');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    // CORS設定: サイトのbase_urlで検証（セキュリティ強化）
+    const corsAllowed = setCorsHeaders(req, res, site.base_url);
+    if (!corsAllowed) {
+      return res.status(403).json({ message: 'Origin not allowed' });
+    }
 
     // is_embed_enabled が false の場合はエラー
     if (!site.is_embed_enabled) {
@@ -162,14 +185,34 @@ export default async function handler(
     // chat_modeに応じて処理を分岐
     const chatMode = site.chat_mode || 'rag_only';
 
+    // Use the origin already validated and set by setCorsHeaders
+    const corsOrigin = res.getHeader('Access-Control-Allow-Origin') as string || '';
+    const extraStreamHeaders: Record<string, string> = corsOrigin ? { 'Access-Control-Allow-Origin': corsOrigin } : {};
+    const embedOptions = {
+      source: 'embed' as const,
+      sendUnstreamed: true,
+      notifyAppointmentCreated: true,
+      extraStreamHeaders,
+    };
+
     // ハイブリッドモード
     if (chatMode === 'hybrid' && site.spreadsheet_id) {
-      return handleHybridChat(req, res, site, userId, question, history);
+      return handleHybridChat(
+        req,
+        res,
+        { userId, siteId: site.id, spreadsheetId: site.spreadsheet_id, question, history },
+        embedOptions,
+      );
     }
 
     // 予約のみモード
     if (chatMode === 'appointment_only' && site.spreadsheet_id) {
-      return handleAppointmentChat(req, res, site, userId, question, history);
+      return handleAppointmentChat(
+        req,
+        res,
+        { userId, siteId: site.id, spreadsheetId: site.spreadsheet_id, question, history },
+        embedOptions,
+      );
     }
 
     // RAGのみモード（デフォルト）: 通常のドキュメント検索チャット
@@ -301,7 +344,7 @@ export default async function handler(
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache, no-transform',
       Connection: 'keep-alive',
-      'Access-Control-Allow-Origin': req.headers.origin || '*',
+      'Access-Control-Allow-Origin': res.getHeader('Access-Control-Allow-Origin') as string || '*',
     });
 
     const sendData = (data: string) => {
@@ -445,260 +488,3 @@ export default async function handler(
   }
 }
 
-/**
- * 予約チャットモードのハンドラー
- */
-async function handleAppointmentChat(
-  req: NextApiRequest,
-  res: NextApiResponse,
-  site: { id: string; user_id: string; spreadsheet_id: string },
-  userId: string,
-  question: string,
-  history: any[]
-) {
-  // 会話履歴を AppointmentChatMessage 形式に変換
-  const messages: AppointmentChatMessage[] = [];
-
-  if (history && Array.isArray(history)) {
-    for (const item of history) {
-      // history が [question, answer] のタプル形式の場合
-      if (Array.isArray(item) && item.length === 2) {
-        messages.push({ role: 'user', content: item[0] });
-        messages.push({ role: 'assistant', content: item[1] });
-      }
-      // history が { role, content } 形式の場合
-      else if (item.role && item.content) {
-        messages.push({
-          role: item.role as 'user' | 'assistant',
-          content: item.content,
-        });
-      }
-    }
-  }
-
-  // 現在のユーザーメッセージを追加
-  messages.push({ role: 'user', content: question.trim() });
-
-  // ストリーミングレスポンスの開始
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache, no-transform',
-    Connection: 'keep-alive',
-    'Access-Control-Allow-Origin': req.headers.origin || '*',
-  });
-
-  const sendData = (data: string) => {
-    res.write(`data: ${data}\n\n`);
-  };
-
-  sendData(JSON.stringify({ data: '' }));
-
-  let outputText = '';
-  let hasStreamed = false;
-
-  try {
-    const result = await runAppointmentChat(
-      site.spreadsheet_id,
-      messages,
-      (token: string) => {
-        hasStreamed = true;
-        outputText += token;
-        sendData(JSON.stringify({ data: token }));
-      }
-    );
-
-    // ストリーミングされなかった場合のみ結果を送信
-    if (!hasStreamed && result.message) {
-      outputText = result.message;
-      sendData(JSON.stringify({ data: result.message }));
-    }
-
-    // 予約が完了した場合は通知
-    if (result.appointmentCreated) {
-      sendData(JSON.stringify({ appointmentCreated: true }));
-    }
-
-    // usage_logsに記録
-    try {
-      const inputTokens = Math.ceil(question.length / 4);
-      const outputTokens = Math.ceil(outputText.length / 4);
-      // gpt-4o-mini: $0.15 per 1M input, $0.60 per 1M output
-      const costUsd = (inputTokens / 1_000_000) * 0.15 + (outputTokens / 1_000_000) * 0.60;
-
-      await supabaseClient.from('usage_logs').insert({
-        user_id: userId,
-        site_id: site.id,
-        action: 'chat',
-        model_name: 'gpt-4o-mini',
-        tokens_consumed: inputTokens + outputTokens,
-        cost_usd: costUsd,
-        metadata: {
-          input_tokens: inputTokens,
-          output_tokens: outputTokens,
-          question_length: question.length,
-          source: 'embed',
-          mode: 'appointment',
-        },
-      });
-    } catch (logError) {
-      console.error('[Embed Chat API] Failed to log usage:', logError);
-    }
-
-    // chat_logsに記録
-    try {
-      const sessionId =
-        req.body.session_id ||
-        generateSessionId();
-
-      await supabaseClient.from('chat_logs').insert({
-        user_id: userId,
-        site_id: site.id,
-        question: question.trim(),
-        answer: outputText,
-        session_id: sessionId,
-        source: 'embed',
-        user_agent: req.headers['user-agent'] || null,
-        referrer: req.headers['referer'] || null,
-      });
-    } catch (logError) {
-      console.error('[Embed Chat API] Failed to save chat log:', logError);
-    }
-
-  } catch (error: any) {
-    console.error('[Embed Chat API] Appointment chat error:', error);
-    sendData(JSON.stringify({ error: getSafeStreamingError(error) }));
-  } finally {
-    sendData('[DONE]');
-    res.end();
-  }
-}
-
-/**
- * ハイブリッドチャットモードのハンドラー（RAG + 予約機能）
- */
-async function handleHybridChat(
-  req: NextApiRequest,
-  res: NextApiResponse,
-  site: { id: string; user_id: string; spreadsheet_id: string },
-  userId: string,
-  question: string,
-  history: any[]
-) {
-  // 会話履歴を HybridChatMessage 形式に変換
-  const messages: HybridChatMessage[] = [];
-
-  if (history && Array.isArray(history)) {
-    for (const item of history) {
-      // history が [question, answer] のタプル形式の場合
-      if (Array.isArray(item) && item.length === 2) {
-        messages.push({ role: 'user', content: item[0] });
-        messages.push({ role: 'assistant', content: item[1] });
-      }
-      // history が { role, content } 形式の場合
-      else if (item.role && item.content) {
-        messages.push({
-          role: item.role as 'user' | 'assistant',
-          content: item.content,
-        });
-      }
-    }
-  }
-
-  // 現在のユーザーメッセージを追加
-  messages.push({ role: 'user', content: question.trim() });
-
-  // ストリーミングレスポンスの開始
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache, no-transform',
-    Connection: 'keep-alive',
-    'Access-Control-Allow-Origin': req.headers.origin || '*',
-  });
-
-  const sendData = (data: string) => {
-    res.write(`data: ${data}\n\n`);
-  };
-
-  sendData(JSON.stringify({ data: '' }));
-
-  let outputText = '';
-  let hasStreamed = false;
-
-  try {
-    const result = await runHybridChat(
-      site.id,
-      site.spreadsheet_id,
-      messages,
-      (token: string) => {
-        hasStreamed = true;
-        outputText += token;
-        sendData(JSON.stringify({ data: token }));
-      }
-    );
-
-    // ストリーミングされなかった場合のみ結果を送信
-    if (!hasStreamed && result.message) {
-      outputText = result.message;
-      sendData(JSON.stringify({ data: result.message }));
-    }
-
-    // 予約が完了した場合は通知
-    if (result.appointmentCreated) {
-      sendData(JSON.stringify({ appointmentCreated: true }));
-    }
-
-    // usage_logsに記録
-    try {
-      const inputTokens = Math.ceil(question.length / 4);
-      const outputTokens = Math.ceil(outputText.length / 4);
-      // gpt-4o-mini: $0.15 per 1M input, $0.60 per 1M output
-      const costUsd = (inputTokens / 1_000_000) * 0.15 + (outputTokens / 1_000_000) * 0.60;
-
-      await supabaseClient.from('usage_logs').insert({
-        user_id: userId,
-        site_id: site.id,
-        action: 'chat',
-        model_name: 'gpt-4o-mini',
-        tokens_consumed: inputTokens + outputTokens,
-        cost_usd: costUsd,
-        metadata: {
-          input_tokens: inputTokens,
-          output_tokens: outputTokens,
-          question_length: question.length,
-          source: 'embed',
-          mode: 'hybrid',
-          rag_context_found: result.ragContext !== 'WEBサイト情報は見つかりませんでした',
-        },
-      });
-    } catch (logError) {
-      console.error('[Embed Chat API] Failed to log usage:', logError);
-    }
-
-    // chat_logsに記録
-    try {
-      const sessionId =
-        req.body.session_id ||
-        generateSessionId();
-
-      await supabaseClient.from('chat_logs').insert({
-        user_id: userId,
-        site_id: site.id,
-        question: question.trim(),
-        answer: outputText,
-        session_id: sessionId,
-        source: 'embed',
-        user_agent: req.headers['user-agent'] || null,
-        referrer: req.headers['referer'] || null,
-      });
-    } catch (logError) {
-      console.error('[Embed Chat API] Failed to save chat log:', logError);
-    }
-
-  } catch (error: any) {
-    console.error('[Embed Chat API] Hybrid chat error:', error);
-    sendData(JSON.stringify({ error: getSafeStreamingError(error) }));
-  } finally {
-    sendData('[DONE]');
-    res.end();
-  }
-}

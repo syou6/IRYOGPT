@@ -4,23 +4,23 @@ import Image from "next/image";
 const features = [
   {
     icon: "https://img.icons8.com/3d-fluency/94/robot-2.png",
-    title: "24時間自動予約受付",
-    description: "AIが24時間365日、自然な会話で予約を受け付け。夜間や休診日も予約を逃しません。",
+    title: "会話で完結するAI予約受付",
+    description: "フォーム入力不要。患者様が話しかけるだけで、AIが空き状況を確認し予約を完結します。夜間・休診日も自動対応で、予約の取りこぼしをゼロに。",
   },
   {
     icon: "https://img.icons8.com/3d-fluency/94/bar-chart.png",
-    title: "スプレッドシート連携",
-    description: "Googleスプレッドシートで予約を一元管理。既存の業務フローを変えずに導入できます。",
+    title: "既存業務フローをそのまま維持",
+    description: "新しいシステムを覚える必要はゼロ。使い慣れたGoogleスプレッドシートで全予約を一元管理。スタッフの電話予約も同じシートに追加するだけです。",
   },
   {
     icon: "https://img.icons8.com/3d-fluency/94/globe.png",
-    title: "HP情報も自動回答",
-    description: "診療時間、アクセス、料金などのよくある質問にも自動で回答。電話を減らします。",
+    title: "「よくある質問」電話を8割削減",
+    description: "診療時間・アクセス・料金・保険適用など、繰り返しかかってくる問い合わせ電話にも自動回答。スタッフは本当に必要な対応だけに集中できます。",
   },
   {
-    icon: "https://img.icons8.com/3d-fluency/94/stethoscope.png",
-    title: "担当医指名・診察券対応",
-    description: "担当医の指名予約や診察券番号の確認も対応。再診患者にも安心の体験を。",
+    icon: "https://img.icons8.com/3d-fluency/94/line-me.png",
+    title: "LINEから直接予約が完結",
+    description: "患者様が普段使いのLINEで予約できるため、利用率が大幅に向上。アプリ不要で、シニア世代の患者様にも使いやすい導線を実現します。",
   },
 ];
 
@@ -39,7 +39,7 @@ const FeaturesSection = () => {
             よやくらくの機能
           </h2>
           <p className="mt-6 text-xl lg:text-2xl text-gray-600">
-            AI予約システムで業務効率を劇的に改善
+            受付業務の手間を削減し、院内の時間とコストを生み出す4つの機能
           </p>
         </motion.div>
 

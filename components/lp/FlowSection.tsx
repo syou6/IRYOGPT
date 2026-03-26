@@ -4,20 +4,20 @@ import Image from "next/image";
 const steps = [
   {
     step: 1,
-    title: "AIがチャットで対応",
-    description: "患者様がHPのチャットで予約希望を伝えると、AIが空き状況を確認して予約を完了",
+    title: "患者様がチャットで予約",
+    description: "HPまたはLINEのチャットで患者様が希望日時を伝えると、AIが空き状況をリアルタイムで確認。会話しながら1〜2分で予約が完結します。",
     image: "https://images.unsplash.com/photo-1611532736597-de2d4265fba3?w=400&h=300&fit=crop",
   },
   {
     step: 2,
-    title: "スプシに自動記録",
-    description: "予約情報は即座にGoogleスプレッドシートに記録。スタッフの手動入力も反映",
+    title: "予約情報が自動で記録",
+    description: "予約内容はGoogleスプレッドシートに即座に反映。スタッフが電話で受けた予約も同じシートに追加でき、ダブルブッキングを防止します。",
     image: "https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=400&h=300&fit=crop",
   },
   {
     step: 3,
-    title: "スタッフが確認",
-    description: "スタッフはスプシを見るだけで全予約を把握。スマホからも確認できます",
+    title: "スタッフはスマホで確認するだけ",
+    description: "新しいシステムの習得は不要。Googleスプレッドシートを見るだけで当日の全予約を把握。院内でもスマホでも、いつでも確認できます。",
     image: "https://images.unsplash.com/photo-1434494878577-86c23bcb06b9?w=400&h=300&fit=crop",
   },
 ];
@@ -34,10 +34,10 @@ const FlowSection = () => {
         >
           <p className="text-lg lg:text-xl font-semibold text-emerald-600 mb-4 tracking-wide">HOW IT WORKS</p>
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900">
-            シンプルな仕組み
+            たった3ステップで完結
           </h2>
           <p className="mt-6 text-xl lg:text-2xl text-gray-600">
-            患者様とスタッフ、両方にとって使いやすい設計
+            患者様は話すだけ。スタッフは確認するだけ。それだけです。
           </p>
         </motion.div>
 

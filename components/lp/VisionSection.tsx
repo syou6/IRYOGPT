@@ -13,25 +13,27 @@ const VisionSection = () => {
             className="text-center lg:text-left"
           >
             <h2 className="text-3xl sm:text-4xl lg:text-5xl xl:text-6xl font-bold mb-6 lg:mb-10 leading-tight">
-              <span className="whitespace-nowrap"><span className="text-emerald-400">予約対応</span>から解放され、</span>
+              <span className="whitespace-nowrap"><span className="text-emerald-400">電話対応の負担</span>から解放され、</span>
               <br />
-              <span className="whitespace-nowrap"><span className="text-emerald-400">本業</span>に集中できる未来へ</span>
+              <span className="whitespace-nowrap"><span className="text-emerald-400">患者ケア</span>に集中できる医院へ</span>
             </h2>
             <p className="text-xl lg:text-2xl 2xl:text-3xl opacity-80 mb-10 lg:mb-12 leading-relaxed">
-              AIの力で、医療・美容業界の働き方を変える
+              受付スタッフが電話に追われる時代を終わらせる。
+              <br />
+              医療・歯科業界の現場から、働き方を変える。
             </p>
             <div className="flex flex-col sm:flex-row gap-5 justify-center lg:justify-start">
               <Link
                 href="/contact"
                 className="px-12 py-5 bg-white text-emerald-600 rounded-full text-xl font-bold hover:shadow-lg transition-shadow"
               >
-                無料相談する
+                無料相談を予約する
               </Link>
               <Link
                 href="/legal/company"
                 className="px-12 py-5 border-2 border-white text-white rounded-full text-xl font-bold hover:bg-white/10 transition-colors"
               >
-                会社概要
+                運営会社
               </Link>
             </div>
           </motion.div>
@@ -109,7 +111,7 @@ const VisionSection = () => {
                 transition={{ delay: 0.4 }}
                 className="mt-10 bg-gradient-to-r from-emerald-500/20 to-emerald-400/10 rounded-2xl p-8 backdrop-blur-sm text-center border border-emerald-400/20"
               >
-                <p className="text-2xl font-bold text-emerald-300 tracking-wide">患者様もスタッフも、みんなハッピーに</p>
+                <p className="text-2xl font-bold text-emerald-300 tracking-wide">患者様は24時間いつでも予約でき、スタッフは本業に集中できる</p>
               </motion.div>
             </div>
           </motion.div>

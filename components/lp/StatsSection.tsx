@@ -10,15 +10,17 @@ const StatsSection = () => {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
           >
-            <h3 className="text-[12px] lg:text-[14px] text-gray-500 mb-2">導入による効果</h3>
+            <h3 className="text-[12px] lg:text-[14px] text-gray-500 mb-2">スタッフ1名採用との比較</h3>
             <div className="flex items-baseline gap-2 mb-4">
               <span className="text-[56px] lg:text-[80px] font-bold text-emerald-500 leading-none">250</span>
-              <span className="text-[20px] lg:text-[24px] font-bold text-gray-900">万円/年 削減!</span>
+              <span className="text-[20px] lg:text-[24px] font-bold text-gray-900">万円/年 コスト削減</span>
             </div>
             <p className="text-[13px] lg:text-[15px] text-gray-600 leading-relaxed">
-              受付スタッフ1人分の人件費を
+              受付スタッフ年間人件費（約400万円）に対し、
               <br />
-              AI予約システムで削減できます。
+              よやくらくの年間費用は約150万円。
+              <br />
+              差額250万円をそのまま利益に変えられます。
             </p>
           </motion.div>
 
@@ -31,19 +33,19 @@ const StatsSection = () => {
           >
             <div className="bg-emerald-50 rounded-2xl p-5 lg:p-6 text-center">
               <div className="text-[36px] lg:text-[48px] font-bold text-emerald-500 leading-none mb-1">80%</div>
-              <p className="text-[12px] lg:text-[13px] text-gray-600">電話対応削減</p>
+              <p className="text-[12px] lg:text-[13px] text-gray-600">受付電話削減</p>
             </div>
             <div className="bg-emerald-50 rounded-2xl p-5 lg:p-6 text-center">
               <div className="text-[36px] lg:text-[48px] font-bold text-emerald-500 leading-none mb-1">24h</div>
-              <p className="text-[12px] lg:text-[13px] text-gray-600">365日対応</p>
+              <p className="text-[12px] lg:text-[13px] text-gray-600">夜間・休日も対応</p>
             </div>
             <div className="bg-emerald-50 rounded-2xl p-5 lg:p-6 text-center">
               <div className="text-[36px] lg:text-[48px] font-bold text-emerald-500 leading-none mb-1">30%</div>
-              <p className="text-[12px] lg:text-[13px] text-gray-600">予約数アップ</p>
+              <p className="text-[12px] lg:text-[13px] text-gray-600">夜間予約数増加</p>
             </div>
             <div className="bg-emerald-50 rounded-2xl p-5 lg:p-6 text-center">
-              <div className="text-[36px] lg:text-[48px] font-bold text-emerald-500 leading-none mb-1">10日</div>
-              <p className="text-[12px] lg:text-[13px] text-gray-600">で導入可能</p>
+              <div className="text-[36px] lg:text-[48px] font-bold text-emerald-500 leading-none mb-1">最短10日</div>
+              <p className="text-[12px] lg:text-[13px] text-gray-600">で本番稼働</p>
             </div>
           </motion.div>
         </div>

@@ -48,6 +48,23 @@ export async function handleLineMessage(
   console.log(`[LINE Handler] Processing message from ${lineUserId}: ${userMessage.substring(0, 50)}...`);
 
   try {
+    // 0. ローディングアニメーション表示（入力中...）
+    try {
+      await fetch('https://api.line.me/v2/bot/chat/loading', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${siteConfig.lineChannelAccessToken?.replace(/[\r\n\s]/g, '')}`,
+        },
+        body: JSON.stringify({
+          chatId: lineUserId,
+          loadingSeconds: 30,
+        }),
+      });
+    } catch (loadingError) {
+      console.warn('[LINE Handler] Failed to show loading animation:', loadingError);
+    }
+
     // 1. 会話履歴を取得
     const history = await getLineUserChatHistory(siteConfig.id, lineUserId);
 

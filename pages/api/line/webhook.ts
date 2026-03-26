@@ -150,11 +150,8 @@ export default async function handler(
     // 7. LINE クライアントを作成
     const client = createLineClient(siteConfig.lineChannelAccessToken);
 
-    // 8. イベントを非同期で処理（3秒以内に200を返すため）
-    // 重要: LINE は 3 秒以内にレスポンスがないとリトライする
-    res.status(200).end();
-
-    // 9. 各イベントを処理
+    // 8. 各イベントを処理（レスポンス返す前に完了させる）
+    // Vercel Hobbyプランではres.end()後のバックグラウンド処理が打ち切られるため
     for (const event of events) {
       try {
         switch (event.type) {
@@ -174,9 +171,13 @@ export default async function handler(
         console.error(`[LINE Webhook] Error handling event:`, eventError);
       }
     }
+
+    // 9. 処理完了後にレスポンスを返す
+    if (!res.headersSent) {
+      return res.status(200).json({ message: 'OK' });
+    }
   } catch (error) {
     console.error('[LINE Webhook] Error:', error);
-    // すでにレスポンスを返している場合があるため、エラーはログのみ
     if (!res.headersSent) {
       return res.status(500).json({
         message: 'Internal server error',

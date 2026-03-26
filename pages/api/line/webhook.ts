@@ -81,7 +81,7 @@ async function getSiteLineConfig(siteId: string): Promise<SiteLineConfig | null>
     userId: data.user_id,
     lineChannelId: data.line_channel_id,
     lineChannelSecret: data.line_channel_secret,
-    lineChannelAccessToken: data.line_channel_access_token,
+    lineChannelAccessToken: data.line_channel_access_token?.replace(/[\r\n\s]/g, '') || null,
     lineEnabled: data.line_enabled ?? false,
     spreadsheetId: data.spreadsheet_id,
     chatMode: data.chat_mode,

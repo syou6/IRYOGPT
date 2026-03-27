@@ -86,24 +86,17 @@ export default async function handler(
   req: NextApiRequest,
   res: NextApiResponse,
 ) {
-  // OPTIONSリクエスト（プリフライト）: site_idのbase_urlで検証
-  // プリフライト時点ではサイト情報が未取得のため、site_idをクエリパラメータから取得して検証する
+  // OPTIONSプリフライト: site_idはPOST bodyにしかないため、
+  // プリフライトでは全オリジン許可し、POST時にbase_urlで検証する
   if (req.method === 'OPTIONS') {
-    const preflightSiteId = req.query.site_id as string | undefined;
-    let preflightBaseUrl: string | null = null;
-
-    if (preflightSiteId) {
-      const { data: preflightSite } = await supabaseClient
-        .from('sites')
-        .select('base_url')
-        .eq('id', preflightSiteId)
-        .single();
-      preflightBaseUrl = preflightSite?.base_url ?? null;
+    const origin = req.headers.origin;
+    if (origin) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
     }
-
-    if (handlePreflight(req, res, preflightBaseUrl)) {
-      return;
-    }
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    return res.status(204).end();
   }
 
   if (req.method !== 'POST') {

@@ -1,8 +1,5 @@
 # systemdサービスファイル
-# ConoHaサーバーで常時稼働させる場合に使用
-#
-# APIサーバー + スケジューラーを一体で起動する。
-# よやくらく（Vercel）からのリアルタイムチェックリクエストも受け付ける。
+# Xvfb + zendriver（headless=False）で常時稼働
 #
 # 設置:
 #   sudo cp scrapers/yoyakuraku-scraper.service /etc/systemd/system/
@@ -12,9 +9,6 @@
 #
 # ログ確認:
 #   sudo journalctl -u yoyakuraku-scraper -f
-#
-# 再起動:
-#   sudo systemctl restart yoyakuraku-scraper
 
 [Unit]
 Description=Yoyakuraku Reservation Scraper & API
@@ -22,12 +16,18 @@ After=network.target
 
 [Service]
 Type=simple
-User=ubuntu
-WorkingDirectory=/home/ubuntu/IRYOGPT
-ExecStart=/home/ubuntu/IRYOGPT/venv/bin/uvicorn scrapers.api_server:app --host 0.0.0.0 --port 8000
+User=root
+WorkingDirectory=/home/IRYOGPT
+EnvironmentFile=/home/IRYOGPT/scrapers/.env
+Environment=PYTHONUNBUFFERED=1
+Environment=DISPLAY=:99
+
+# Xvfb で仮想ディスプレイを提供し、uvicorn を起動
+ExecStartPre=/usr/bin/bash -c '/usr/bin/Xvfb :99 -screen 0 1920x1080x24 &'
+ExecStart=/home/IRYOGPT/venv/bin/uvicorn scrapers.api_server:app --host 0.0.0.0 --port 8000
+
 Restart=always
 RestartSec=30
-Environment=PYTHONUNBUFFERED=1
 
 # ログ
 StandardOutput=journal

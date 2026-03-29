@@ -1,9 +1,8 @@
 # スクレイパーサービス依存パッケージ
-# ConoHaサーバーにインストール: pip install -r scrapers/requirements.txt
+# pip install -r scrapers/requirements.txt
 
-# ブラウザ自動化（bot検知回避版）
-undetected-chromedriver>=3.5.0
-selenium>=4.15.0
+# ブラウザ自動化（bot検知回避、asyncネイティブ）
+zendriver>=0.15.0
 
 # HTTP クライアント（Supabase API通信）
 httpx>=0.27.0

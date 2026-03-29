@@ -3,16 +3,17 @@
 # よやくらく スクレイパー VPSセットアップスクリプト
 #
 # 対象: ConoHa VPS (Ubuntu 22.04/24.04)
+# ブラウザ自動化: zendriver + Xvfb（headless=False）
 #
 # 使い方:
 #   1. VPSにSSHで入る
-#      ssh ubuntu@YOUR_VPS_IP
+#      ssh root@133.88.120.151
 #
 #   2. このスクリプトを実行
-#      bash <(curl -s https://raw.githubusercontent.com/syou6/IRYOGPT/main/scrapers/setup-vps.sh)
+#      cd /home/IRYOGPT && bash scrapers/setup-vps.sh
 #
 #   3. .env を編集
-#      nano /home/ubuntu/IRYOGPT/scrapers/.env
+#      nano /home/IRYOGPT/scrapers/.env
 #
 #   4. サービス起動
 #      sudo systemctl start yoyakuraku-scraper
@@ -23,6 +24,7 @@ set -e
 
 echo "=========================================="
 echo " よやくらく スクレイパー セットアップ"
+echo " (zendriver + Xvfb)"
 echo "=========================================="
 
 # --- 1. システム更新 & 依存パッケージ ---
@@ -32,11 +34,10 @@ sudo apt update && sudo apt upgrade -y
 sudo apt install -y \
     python3 python3-pip python3-venv \
     git wget curl unzip \
-    chromium-browser \
-    fonts-ipafont fonts-ipaexfont \
-    xvfb
+    xvfb \
+    fonts-ipafont fonts-ipaexfont
 
-# Google Chrome インストール（undetected-chromedriverが必要）
+# Google Chrome インストール（zendriverが使用）
 if ! command -v google-chrome &> /dev/null; then
     echo "[1/6] Google Chrome インストール..."
     wget -q -O /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
@@ -49,7 +50,7 @@ echo "Chrome version: $(google-chrome --version)"
 # --- 2. リポジトリ取得 ---
 echo ""
 echo "[2/6] リポジトリ取得..."
-cd /home/ubuntu
+cd /home
 
 if [ -d "IRYOGPT" ]; then
     echo "IRYOGPT ディレクトリが既に存在。pull..."
@@ -74,9 +75,9 @@ if [ ! -f scrapers/.env ]; then
     cp scrapers/.env.example scrapers/.env
     echo ""
     echo "================================================"
-    echo " ⚠️  scrapers/.env を編集してください！"
+    echo " scrapers/.env を編集してください！"
     echo ""
-    echo "   nano /home/ubuntu/IRYOGPT/scrapers/.env"
+    echo "   nano /home/IRYOGPT/scrapers/.env"
     echo ""
     echo " 必須項目:"
     echo "   - SALONBOARD_ID / PASSWORD"
@@ -102,9 +103,7 @@ echo "サービス登録完了。"
 # --- 6. ファイアウォール設定 ---
 echo ""
 echo "[6/6] ファイアウォール設定..."
-# APIサーバーのポート8000を開放
 sudo ufw allow 8000/tcp 2>/dev/null || true
-# SSH
 sudo ufw allow 22/tcp 2>/dev/null || true
 
 echo ""
@@ -115,7 +114,7 @@ echo ""
 echo " 次のステップ:"
 echo ""
 echo " 1. .env を編集:"
-echo "    nano /home/ubuntu/IRYOGPT/scrapers/.env"
+echo "    nano /home/IRYOGPT/scrapers/.env"
 echo ""
 echo " 2. サービス起動:"
 echo "    sudo systemctl start yoyakuraku-scraper"
@@ -126,10 +125,12 @@ echo ""
 echo " 4. ヘルスチェック:"
 echo "    curl http://localhost:8000/health"
 echo ""
-echo " 5. 手動テスト（ブラウザ表示で確認したい場合）:"
+echo " 5. 手動テスト:"
 echo "    source venv/bin/activate"
-echo "    HEADLESS=false python -m scrapers.main --screenshot salonboard"
+echo "    Xvfb :99 -screen 0 1920x1080x24 &"
+echo "    export DISPLAY=:99"
+echo "    python -m scrapers.main --screenshot salonboard"
 echo ""
 echo " API URL（Vercelに設定）:"
-echo "    http://YOUR_VPS_IP:8000"
+echo "    http://133.88.120.151:8000"
 echo ""

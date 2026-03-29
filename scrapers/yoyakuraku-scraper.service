@@ -1,18 +1,20 @@
 # systemdサービスファイル
-# Xvfb + zendriver（headless=False）で常時稼働
+# Xvfb（別サービス）+ zendriver（headless=False）で常時稼働
 #
 # 設置:
+#   sudo cp scrapers/xvfb.service /etc/systemd/system/
 #   sudo cp scrapers/yoyakuraku-scraper.service /etc/systemd/system/
 #   sudo systemctl daemon-reload
-#   sudo systemctl enable yoyakuraku-scraper
-#   sudo systemctl start yoyakuraku-scraper
+#   sudo systemctl enable xvfb yoyakuraku-scraper
+#   sudo systemctl start xvfb yoyakuraku-scraper
 #
 # ログ確認:
 #   sudo journalctl -u yoyakuraku-scraper -f
 
 [Unit]
 Description=Yoyakuraku Reservation Scraper & API
-After=network.target
+After=network.target xvfb.service
+Requires=xvfb.service
 
 [Service]
 Type=simple
@@ -22,16 +24,19 @@ EnvironmentFile=/home/IRYOGPT/scrapers/.env
 Environment=PYTHONUNBUFFERED=1
 Environment=DISPLAY=:99
 
-# Xvfb で仮想ディスプレイを提供し、uvicorn を起動
-ExecStartPre=/usr/bin/bash -c '/usr/bin/Xvfb :99 -screen 0 1920x1080x24 &'
 ExecStart=/home/IRYOGPT/venv/bin/uvicorn scrapers.api_server:app --host 0.0.0.0 --port 8000
 
 Restart=always
 RestartSec=30
 
+# メモリ制限（暴走防止）
+MemoryMax=2G
+MemoryHigh=1.5G
+
 # ログ
 StandardOutput=journal
 StandardError=journal
+SyslogIdentifier=yoyakuraku-scraper
 
 [Install]
 WantedBy=multi-user.target

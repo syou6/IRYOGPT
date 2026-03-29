@@ -5,11 +5,17 @@ ConoHaサーバーで稼働し、よやくらく（Vercel）からの
 リアルタイムチェックリクエストを受け付ける。
 
 エンドポイント:
-  GET  /health              - ヘルスチェック
+  GET  /health              - ヘルスチェック（詳細版）
   POST /sync                - 手動同期トリガー
   POST /realtime-check      - 予約確定直前の空き確認
   POST /resume/{source}     - 一時停止中のスクレイパーを再開
   GET  /status              - スケジューラー状態
+
+セキュリティ:
+  - Bearer token 認証
+  - レート制限（スライディングウィンドウ）
+  - CORS（Vercelドメインのみ）
+  - リクエストログ
 
 起動:
   uvicorn scrapers.api_server:app --host 0.0.0.0 --port 8000
@@ -18,11 +24,15 @@ ConoHaサーバーで稼働し、よやくらく（Vercel）からの
 import asyncio
 import logging
 import os
+import shutil
+import time
+from collections import defaultdict
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from scrapers.scheduler import ReservationScheduler
@@ -31,20 +41,32 @@ logger = logging.getLogger(__name__)
 
 JST = timezone(timedelta(hours=9))
 
-# --- 認証 ---
+# --- 設定 ---
 API_SECRET = os.getenv("SCRAPER_API_SECRET", "")
+ALLOWED_ORIGINS = os.getenv(
+    "CORS_ORIGINS",
+    "https://yoyakuraku.com,https://*.vercel.app",
+).split(",")
+
+# --- レート制限 ---
+RATE_LIMIT_WINDOW = 60  # 秒
+RATE_LIMIT_MAX = 30     # 1分あたりの最大リクエスト数
+_rate_limit_store: dict[str, list[float]] = defaultdict(list)
 
 # --- グローバル変数 ---
 scheduler: Optional[ReservationScheduler] = None
 scheduler_task: Optional[asyncio.Task] = None
+_start_time: Optional[float] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """起動時にスケジューラーをバックグラウンドで開始"""
-    global scheduler, scheduler_task
+    global scheduler, scheduler_task, _start_time
 
+    _start_time = time.time()
     site_id = os.getenv("SITE_ID", "")
+
     if not site_id:
         logger.error("SITE_ID 環境変数が未設定")
     else:
@@ -54,7 +76,6 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    # シャットダウン
     if scheduler:
         scheduler._running = False
     if scheduler_task:
@@ -68,30 +89,75 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="よやくらく スクレイパーAPI",
-    version="1.0.0",
+    version="2.0.0",
     lifespan=lifespan,
+    docs_url=None,   # Swagger UI 無効化（本番）
+    redoc_url=None,
 )
+
+
+# --- CORS ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Authorization", "Content-Type"],
+)
+
+
+# --- ミドルウェア: リクエストログ + レート制限 ---
+@app.middleware("http")
+async def request_middleware(request: Request, call_next):
+    start = time.time()
+    client_ip = request.client.host if request.client else "unknown"
+
+    # レート制限チェック（/health はスキップ）
+    if request.url.path != "/health":
+        now = time.time()
+        window_start = now - RATE_LIMIT_WINDOW
+        requests = _rate_limit_store[client_ip]
+        # 古いエントリを除去
+        _rate_limit_store[client_ip] = [t for t in requests if t > window_start]
+
+        if len(_rate_limit_store[client_ip]) >= RATE_LIMIT_MAX:
+            logger.warning(f"レート制限超過: {client_ip} {request.url.path}")
+            return Response(
+                content='{"detail":"Rate limit exceeded"}',
+                status_code=429,
+                media_type="application/json",
+                headers={"Retry-After": str(RATE_LIMIT_WINDOW)},
+            )
+
+        _rate_limit_store[client_ip].append(now)
+
+    response = await call_next(request)
+
+    duration_ms = (time.time() - start) * 1000
+    logger.info(
+        f"{request.method} {request.url.path} → {response.status_code} "
+        f"({duration_ms:.0f}ms) [{client_ip}]"
+    )
+
+    return response
 
 
 # --- 認証ヘルパー ---
 def verify_api_key(authorization: str = Header(default="")):
-    """APIキーの検証"""
     if not API_SECRET:
-        return  # 開発時はスキップ
+        return
     if authorization != f"Bearer {API_SECRET}":
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
 # --- リクエスト/レスポンスモデル ---
 class SyncRequest(BaseModel):
-    date: Optional[str] = None  # YYYY-MM-DD
-
+    date: Optional[str] = None
 
 class RealtimeCheckRequest(BaseModel):
-    date: str           # YYYY-MM-DD
+    date: str
     staff_name: str
-    start_time: str     # HH:MM
-
+    start_time: str
 
 class RealtimeCheckResponse(BaseModel):
     available: bool
@@ -103,10 +169,36 @@ class RealtimeCheckResponse(BaseModel):
 
 @app.get("/health")
 async def health():
+    """詳細ヘルスチェック（ブラウザ・ディスク・Xvfb状態も含む）"""
+    now = datetime.now(JST)
+    uptime = time.time() - _start_time if _start_time else 0
+
+    # ディスク使用量チェック
+    disk = shutil.disk_usage("/")
+    disk_free_gb = disk.free / (1024 ** 3)
+    disk_usage_pct = (disk.used / disk.total) * 100
+
+    # Xvfb チェック
+    xvfb_ok = os.path.exists("/tmp/.X99-lock")
+
+    # スクリーンショット数（ディスク圧迫チェック）
+    from scrapers.config import SCREENSHOTS_DIR
+    screenshot_count = len(list(SCREENSHOTS_DIR.glob("*.png"))) if SCREENSHOTS_DIR.exists() else 0
+
+    healthy = (
+        disk_free_gb > 1.0
+        and (scheduler is not None and scheduler._running)
+    )
+
     return {
-        "status": "healthy",
-        "timestamp": datetime.now(JST).isoformat(),
+        "status": "healthy" if healthy else "degraded",
+        "timestamp": now.isoformat(),
+        "uptime_seconds": int(uptime),
         "scheduler_running": scheduler is not None and scheduler._running,
+        "xvfb_active": xvfb_ok,
+        "disk_free_gb": round(disk_free_gb, 2),
+        "disk_usage_pct": round(disk_usage_pct, 1),
+        "screenshots": screenshot_count,
     }
 
 
@@ -133,13 +225,6 @@ async def realtime_check(
     req: RealtimeCheckRequest,
     authorization: str = Header(default=""),
 ):
-    """
-    予約確定直前のリアルタイムチェック
-
-    よやくらくの予約確定APIから呼び出される。
-    サロンボード・ミニモの最新データを取得して
-    指定枠が空いているか確認する。
-    """
     verify_api_key(authorization)
     if not scheduler:
         raise HTTPException(status_code=503, detail="スケジューラー未起動")
@@ -162,5 +247,16 @@ async def resume(source: str, authorization: str = Header(default="")):
     success = await scheduler.resume(source)
     if success:
         return {"message": f"{source} 再開成功"}
-    else:
-        raise HTTPException(status_code=500, detail=f"{source} 再開失敗")
+    raise HTTPException(status_code=500, detail=f"{source} 再開失敗")
+
+
+@app.post("/cleanup-screenshots")
+async def cleanup_screenshots(authorization: str = Header(default="")):
+    """古いスクリーンショットを手動削除"""
+    verify_api_key(authorization)
+
+    from scrapers.config import SCREENSHOTS_DIR
+    from scrapers.disk_manager import cleanup_screenshots as do_cleanup
+
+    deleted = do_cleanup(SCREENSHOTS_DIR, max_age_hours=24)
+    return {"deleted": deleted}

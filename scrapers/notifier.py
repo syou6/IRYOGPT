@@ -4,10 +4,9 @@ CAPTCHA検知・エラー通知
 CAPTCHAが検知された場合やスクレイピングエラーが発生した場合に
 管理者へ通知を送る。
 
-通知チャネル（優先順）:
-1. LINE Messaging API（推奨: LINE Notify は 2025/3/31 に終了済み）
-2. LINE Notify（レガシー: 既存トークンがあれば使用）
-3. ログのみ（通知チャネル未設定時）
+通知チャネル:
+1. LINE Messaging API（推奨）
+2. ログのみ（フォールバック）
 """
 
 import logging
@@ -15,18 +14,18 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
-import httpx
-
-from scrapers.config import NOTIFY_LINE_TOKEN
+from scrapers.config import (
+    LINE_ADMIN_USER_ID,
+    LINE_CHANNEL_ACCESS_TOKEN,
+)
 
 logger = logging.getLogger(__name__)
 
 JST = timezone(timedelta(hours=9))
 
-# LINE Messaging API 設定（.envから読み込み）
-import os
-LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
-LINE_ADMIN_USER_ID = os.getenv("LINE_ADMIN_USER_ID", "")
+# 通知抑制（同じ内容を短時間に連投しない）
+_last_notification: dict[str, float] = {}
+NOTIFICATION_COOLDOWN = 300  # 5分
 
 
 async def notify_captcha(
@@ -38,12 +37,9 @@ async def notify_captcha(
         f"[よやくらく] CAPTCHA検知\n"
         f"スクレイパー: {scraper_name}\n"
         f"時刻: {datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')}\n"
-        f"対応: Cookie再取得が必要です\n"
-        f"手順: POST /resume/{scraper_name}"
+        f"対応: POST /resume/{scraper_name}"
     )
-
-    await _send_notification(message)
-    logger.warning(f"CAPTCHA通知送信: {scraper_name}")
+    await _send_notification(message, key=f"captcha_{scraper_name}")
 
 
 async def notify_error(
@@ -54,29 +50,23 @@ async def notify_error(
     message = (
         f"[よやくらく] スクレイピングエラー\n"
         f"スクレイパー: {scraper_name}\n"
-        f"エラー: {error_message}\n"
+        f"エラー: {error_message[:200]}\n"
         f"時刻: {datetime.now(JST).strftime('%Y-%m-%d %H:%M:%S')}"
     )
-
-    await _send_notification(message)
-    logger.error(f"エラー通知送信: {scraper_name} - {error_message}")
+    await _send_notification(message, key=f"error_{scraper_name}")
 
 
-async def notify_sync_result(
-    results: dict,
-) -> None:
-    """同期結果をログに記録（正常時は通知しない）"""
+async def notify_sync_result(results: dict) -> None:
+    """同期結果をログに記録（エラー時のみ通知）"""
     total_synced = sum(r.get("synced", 0) for r in results.values())
     total_errors = sum(r.get("errors", 0) for r in results.values())
 
     if total_errors > 0:
         message = (
             f"[よやくらく] 同期完了（エラーあり）\n"
-            f"同期: {total_synced}件\n"
-            f"エラー: {total_errors}件\n"
-            f"詳細: {results}"
+            f"同期: {total_synced}件 / エラー: {total_errors}件"
         )
-        await _send_notification(message)
+        await _send_notification(message, key="sync_error")
 
     logger.info(f"同期結果: synced={total_synced}, errors={total_errors}")
 
@@ -85,85 +75,58 @@ async def notify_sync_result(
 # 通知ルーター
 # ------------------------------------------------------------------
 
-async def _send_notification(message: str) -> bool:
-    """利用可能な通知チャネルで送信"""
-    # 1. LINE Messaging API（推奨）
+async def _send_notification(message: str, key: str = "") -> bool:
+    """利用可能な通知チャネルで送信（クールダウン付き）"""
+    import time
+
+    # 同一キーの通知を短時間に繰り返さない
+    if key:
+        now = time.time()
+        last = _last_notification.get(key, 0)
+        if now - last < NOTIFICATION_COOLDOWN:
+            logger.debug(f"通知抑制中（{key}）")
+            return False
+        _last_notification[key] = now
+
     if LINE_CHANNEL_ACCESS_TOKEN and LINE_ADMIN_USER_ID:
         return await _send_line_messaging_api(message)
 
-    # 2. LINE Notify（レガシー）
-    if NOTIFY_LINE_TOKEN:
-        return await _send_line_notify(message)
-
-    # 3. ログのみ
     logger.warning(f"通知チャネル未設定。メッセージ: {message}")
     return False
 
 
 # ------------------------------------------------------------------
-# LINE Messaging API（推奨）
+# LINE Messaging API
 # ------------------------------------------------------------------
 
 async def _send_line_messaging_api(message: str) -> bool:
-    """LINE Messaging API でプッシュメッセージ送信"""
+    """LINE Messaging API でプッシュメッセージ送信（共有HTTPクライアント使用）"""
     try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                "https://api.line.me/v2/bot/message/push",
-                headers={
-                    "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "to": LINE_ADMIN_USER_ID,
-                    "messages": [
-                        {"type": "text", "text": message}
-                    ],
-                },
-                timeout=10,
-            )
+        from scrapers.sync_service import get_http_client
 
-            if resp.status_code == 200:
-                logger.info("LINE Messaging API 送信成功")
-                return True
-            else:
-                logger.error(f"LINE Messaging API 送信失敗: {resp.status_code} {resp.text}")
-                return False
+        client = await get_http_client()
+        resp = await client.post(
+            "https://api.line.me/v2/bot/message/push",
+            headers={
+                "Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "to": LINE_ADMIN_USER_ID,
+                "messages": [
+                    {"type": "text", "text": message}
+                ],
+            },
+            timeout=10,
+        )
 
-    except Exception as e:
-        logger.error(f"LINE Messaging API 送信エラー: {e}")
+        if resp.status_code == 200:
+            logger.info("LINE通知送信成功")
+            return True
+
+        logger.error(f"LINE通知送信失敗: {resp.status_code} {resp.text}")
         return False
 
-
-# ------------------------------------------------------------------
-# LINE Notify（レガシー: 2025/3/31 終了済み）
-# ------------------------------------------------------------------
-
-async def _send_line_notify(message: str) -> bool:
-    """LINE Notifyでメッセージ送信（非推奨: サービス終了済み）"""
-    if not NOTIFY_LINE_TOKEN:
-        logger.debug("LINE Notify未設定、スキップ")
-        return False
-
-    try:
-        async with httpx.AsyncClient() as client:
-            resp = await client.post(
-                "https://notify-api.line.me/api/notify",
-                headers={"Authorization": f"Bearer {NOTIFY_LINE_TOKEN}"},
-                data={"message": message},
-                timeout=10,
-            )
-
-            if resp.status_code == 200:
-                logger.info("LINE Notify送信成功")
-                return True
-            elif resp.status_code == 401:
-                logger.error("LINE Notify認証エラー（サービス終了の可能性）。LINE Messaging APIへの移行を推奨")
-                return False
-            else:
-                logger.error(f"LINE Notify送信失敗: {resp.status_code}")
-                return False
-
     except Exception as e:
-        logger.error(f"LINE Notify送信エラー: {e}")
+        logger.error(f"LINE通知送信エラー: {e}")
         return False

@@ -1,7 +1,8 @@
 """
 スクレイパー設定管理
 
-環境変数から設定を読み込み、各スクレイパー・サービスに提供する。
+全ての環境変数をここで一元管理する。
+各モジュールは config からインポートして使う。
 """
 
 import os
@@ -12,7 +13,7 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).parent
 load_dotenv(BASE_DIR / ".env")
 
-# ディレクトリ
+# --- ディレクトリ ---
 COOKIES_DIR = BASE_DIR / "cookies"
 SCREENSHOTS_DIR = BASE_DIR / "screenshots"
 LOGS_DIR = BASE_DIR / "logs"
@@ -42,9 +43,15 @@ MINIMO_COOKIES_PATH = COOKIES_DIR / "minimo_cookies.dat"
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_SERVICE_KEY = os.getenv("SUPABASE_SERVICE_KEY", "")
 
+# --- よやくらくサイトID ---
+SITE_ID = os.getenv("SITE_ID", "")
+
 # --- 通知（LINE Messaging API）---
-NOTIFY_LINE_TOKEN = os.getenv("NOTIFY_LINE_TOKEN", "")
-NOTIFY_EMAIL = os.getenv("NOTIFY_EMAIL", "")
+LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
+LINE_ADMIN_USER_ID = os.getenv("LINE_ADMIN_USER_ID", "")
+
+# --- APIサーバー ---
+SCRAPER_API_SECRET = os.getenv("SCRAPER_API_SECRET", "")
 
 # --- スケジューラー ---
 SYNC_INTERVAL_MIN = int(os.getenv("SYNC_INTERVAL_MIN", "150"))  # 秒（2.5分）

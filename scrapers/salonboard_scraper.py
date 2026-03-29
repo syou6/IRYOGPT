@@ -202,6 +202,11 @@ class SalonBoardScraper(BaseScraper):
                 return []
 
             await self._hide_karte_widget()
+
+            # 人間的な行動: スクロールして全体を確認するような動き
+            await self.random_scroll()
+            await self.random_idle()
+
             await self.screenshot(f"schedule_{target_date}")
 
             reservations = await self._parse_schedule_page(target_date)

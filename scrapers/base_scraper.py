@@ -6,6 +6,13 @@ zendriver = nodriverのアクティブfork（2026年3月現在も活発にメン
 - 完全async/awaitネイティブ → run_in_executor不要
 - Cookie保存/読込のビルトインサポート
 - VPSでは Xvfb + headless=False で運用（headless=Trueは検知される）
+
+ステルス対策:
+- stealth.py の JS を全ページに自動注入
+- ベジェ曲線マウス移動（テレポートしない）
+- ランダムビューポート
+- 人間的なタイピング速度のばらつき
+- ランダムスクロール・休憩
 """
 
 import asyncio
@@ -22,6 +29,7 @@ from scrapers.config import (
     SCREENSHOTS_DIR,
     USER_AGENTS,
 )
+from scrapers.stealth import STEALTH_JS, bezier_curve, random_viewport
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +37,7 @@ JST = timezone(timedelta(hours=9))
 
 
 class BaseScraper(ABC):
-    """全スクレイパーの基底クラス（zendriver版）"""
+    """全スクレイパーの基底クラス（zendriver + ステルス強化版）"""
 
     SESSION_MAX_AGE_HOURS = 12
 
@@ -43,6 +51,7 @@ class BaseScraper(ABC):
         self._consecutive_failures = 0
         self._max_retries = 3
         self._scrape_count = 0
+        self._viewport = random_viewport()
 
     # ------------------------------------------------------------------
     # ブラウザ起動・終了
@@ -51,26 +60,28 @@ class BaseScraper(ABC):
     async def start_browser(self) -> None:
         """zendriver でブラウザを起動（Xvfb環境前提、headless=False）"""
         user_agent = random.choice(USER_AGENTS)
-        logger.info(f"[{self.name}] UA: {user_agent}")
+        self._viewport = random_viewport()
+        w, h = self._viewport
 
-        # headless=False が必須（headless=True は検知される）
-        # VPSでは Xvfb で仮想ディスプレイを提供
+        logger.info(f"[{self.name}] UA: {user_agent[:60]}... VP: {w}x{h}")
+
         self._browser = await uc.start(
             headless=False,
             lang="ja-JP",
             browser_args=[
                 f"--user-agent={user_agent}",
-                "--window-size=1280,1024",
+                f"--window-size={w},{h}",
                 "--no-sandbox",
                 "--disable-dev-shm-usage",
                 "--disable-infobars",
+                "--disable-blink-features=AutomationControlled",
+                "--disable-features=IsolateOrigins,site-per-process",
+                "--disable-web-security=false",
             ],
         )
 
-        # Cookie読み込み
         await self._load_cookies()
-
-        logger.info(f"[{self.name}] ブラウザ起動完了 (zendriver)")
+        logger.info(f"[{self.name}] ブラウザ起動完了 (zendriver + stealth)")
 
     async def close_browser(self) -> None:
         """ブラウザを安全に終了"""
@@ -93,38 +104,46 @@ class BaseScraper(ABC):
             await self.start_browser()
 
     # ------------------------------------------------------------------
+    # ステルスJS注入
+    # ------------------------------------------------------------------
+
+    async def _inject_stealth(self) -> None:
+        """ステルスJSを現在のページに注入"""
+        try:
+            await self._page.evaluate(STEALTH_JS)
+        except Exception as e:
+            logger.debug(f"[{self.name}] ステルスJS注入エラー（無害）: {e}")
+
+    # ------------------------------------------------------------------
     # Cookie 管理
     # ------------------------------------------------------------------
 
     async def _save_cookies(self) -> None:
-        """Cookieを保存"""
         try:
             self.cookies_path.parent.mkdir(parents=True, exist_ok=True)
             await self._browser.cookies.save(file=str(self.cookies_path))
-            logger.info(f"[{self.name}] Cookie保存: {self.cookies_path}")
+            logger.debug(f"[{self.name}] Cookie保存完了")
         except Exception as e:
             logger.error(f"[{self.name}] Cookie保存失敗: {e}")
 
     async def _load_cookies(self) -> bool:
-        """保存済みCookieを読み込み"""
         if not self.cookies_path.exists():
             return False
         try:
             await self._browser.cookies.load(file=str(self.cookies_path))
-            logger.info(f"[{self.name}] Cookie読込: {self.cookies_path}")
+            logger.debug(f"[{self.name}] Cookie読込完了")
             return True
         except Exception as e:
             logger.error(f"[{self.name}] Cookie読込失敗: {e}")
             return False
 
     def clear_cookies(self) -> None:
-        """Cookie削除（再ログイン強制）"""
         if self.cookies_path.exists():
             self.cookies_path.unlink()
             logger.info(f"[{self.name}] Cookie削除")
 
     # ------------------------------------------------------------------
-    # 人間的な操作の模倣
+    # 人間的な操作の模倣（強化版）
     # ------------------------------------------------------------------
 
     async def human_delay(self, min_sec: float = 0.5, max_sec: float = 2.0) -> None:
@@ -132,24 +151,89 @@ class BaseScraper(ABC):
         await asyncio.sleep(random.uniform(min_sec, max_sec))
 
     async def human_click(self, element) -> None:
-        """要素をクリック（遅延付き）"""
-        await self.human_delay(0.1, 0.4)
+        """ベジェ曲線でマウスを移動してからクリック"""
+        try:
+            # 要素の位置を取得
+            box = await self._page.evaluate("""
+                (el) => {
+                    const rect = el.getBoundingClientRect();
+                    return {
+                        x: rect.x + rect.width / 2,
+                        y: rect.y + rect.height / 2,
+                        width: rect.width,
+                        height: rect.height,
+                    };
+                }
+            """, element)
+
+            if box and box.get("width", 0) > 0:
+                # 現在のマウス位置（ランダムなスタート地点）
+                w, h = self._viewport
+                start_x = random.randint(0, w)
+                start_y = random.randint(0, h)
+
+                # クリック位置に微小なずれ（中心ぴったりは不自然）
+                target_x = box["x"] + random.uniform(-box["width"] * 0.2, box["width"] * 0.2)
+                target_y = box["y"] + random.uniform(-box["height"] * 0.2, box["height"] * 0.2)
+
+                path = bezier_curve((start_x, start_y), (target_x, target_y))
+
+                # マウス移動（全ポイントは送らず間引く）
+                step = max(1, len(path) // 8)
+                for i in range(0, len(path), step):
+                    px, py = path[i]
+                    await self._page.evaluate(
+                        f"document.dispatchEvent(new MouseEvent('mousemove', {{clientX: {px}, clientY: {py}, bubbles: true}}))"
+                    )
+                    await asyncio.sleep(random.uniform(0.01, 0.03))
+
+                await self.human_delay(0.05, 0.15)
+
+        except Exception:
+            pass  # フォールバック: 通常クリック
+
         await element.click()
 
     async def human_type(self, element, text: str) -> None:
-        """1文字ずつタイプ"""
+        """人間的なタイピング（速度にゆらぎ、たまに一瞬止まる）"""
         await element.click()
         await self.human_delay(0.2, 0.5)
         await element.clear_input()
-        for char in text:
+
+        for i, char in enumerate(text):
             await element.send_keys(char)
-            await asyncio.sleep(random.uniform(0.05, 0.15))
+
+            # 基本のタイピング速度
+            delay = random.uniform(0.04, 0.12)
+
+            # たまに少し長めの間（考え中を再現）
+            if random.random() < 0.08:
+                delay += random.uniform(0.2, 0.5)
+
+            # 単語区切りで微妙に遅くなる
+            if char in (" ", "-", "@", "."):
+                delay += random.uniform(0.05, 0.15)
+
+            await asyncio.sleep(delay)
 
     async def random_scroll(self) -> None:
-        """ランダムなスクロール"""
-        scroll_y = random.randint(100, 400)
-        await self._page.evaluate(f"window.scrollBy(0, {scroll_y})")
-        await self.human_delay(0.3, 1.0)
+        """自然なスクロール（速度を変えながら）"""
+        total_scroll = random.randint(100, 500)
+        scrolled = 0
+        while scrolled < total_scroll:
+            chunk = random.randint(30, 120)
+            chunk = min(chunk, total_scroll - scrolled)
+            await self._page.evaluate(f"window.scrollBy(0, {chunk})")
+            await asyncio.sleep(random.uniform(0.02, 0.08))
+            scrolled += chunk
+        await self.human_delay(0.2, 0.6)
+
+    async def random_idle(self) -> None:
+        """たまにある『何もしない時間』を再現"""
+        if random.random() < 0.15:
+            idle_time = random.uniform(1.0, 3.0)
+            logger.debug(f"[{self.name}] アイドル: {idle_time:.1f}秒")
+            await asyncio.sleep(idle_time)
 
     # ------------------------------------------------------------------
     # 要素検索ヘルパー
@@ -158,8 +242,7 @@ class BaseScraper(ABC):
     async def find(self, selector: str, timeout: int = 10):
         """CSS セレクタ or テキストで要素を検索"""
         try:
-            element = await self._page.find(selector, timeout=timeout)
-            return element
+            return await self._page.find(selector, timeout=timeout)
         except Exception:
             return None
 
@@ -192,6 +275,12 @@ class BaseScraper(ABC):
             "[id*='captcha']",
             "img[src*='captcha']",
             "iframe[title*='reCAPTCHA']",
+            # hCaptcha
+            "iframe[src*='hcaptcha']",
+            ".h-captcha",
+            # Cloudflare Turnstile
+            "iframe[src*='challenges.cloudflare']",
+            ".cf-turnstile",
         ]
 
         for selector in captcha_selectors:
@@ -208,7 +297,11 @@ class BaseScraper(ABC):
         # ページテキストからも検知
         try:
             body_text = await self._page.evaluate("document.body.innerText")
-            captcha_keywords = ["画像認証", "captcha", "ロボットではない", "確認してください"]
+            captcha_keywords = [
+                "画像認証", "captcha", "ロボットではない",
+                "確認してください", "I'm not a robot",
+                "セキュリティチェック", "不正なアクセス",
+            ]
             for keyword in captcha_keywords:
                 if keyword.lower() in body_text.lower():
                     self._captcha_detected = True
@@ -233,12 +326,10 @@ class BaseScraper(ABC):
 
     @abstractmethod
     async def login(self) -> bool:
-        """ログイン処理。成功でTrue"""
         ...
 
     @abstractmethod
     async def is_logged_in(self) -> bool:
-        """現在ログイン状態かチェック"""
         ...
 
     async def ensure_logged_in(self) -> bool:
@@ -247,7 +338,7 @@ class BaseScraper(ABC):
             logger.info(f"[{self.name}] セッション期限切れ → 再ログイン")
             self.clear_cookies()
         elif await self.is_logged_in():
-            logger.info(f"[{self.name}] セッション有効")
+            logger.debug(f"[{self.name}] セッション有効")
             await self._save_cookies()
             return True
 
@@ -263,7 +354,6 @@ class BaseScraper(ABC):
         return success
 
     def _is_session_expired(self) -> bool:
-        """セッション有効期限チェック"""
         now = datetime.now(JST)
         if self._last_login_time is None:
             if self.cookies_path.exists():
@@ -280,7 +370,6 @@ class BaseScraper(ABC):
     # ------------------------------------------------------------------
 
     async def detect_session_expired(self) -> bool:
-        """セッション切れを検知"""
         try:
             current_url = self._page.url
             if "/login" in current_url.lower():
@@ -288,7 +377,12 @@ class BaseScraper(ABC):
                 return True
 
             body_text = await self._page.evaluate("document.body.innerText")
-            for keyword in ["ログインの有効期限が切れました", "一定時間操作されなかった", "セッションが切れ", "再度ログイン"]:
+            for keyword in [
+                "ログインの有効期限が切れました",
+                "一定時間操作されなかった",
+                "セッションが切れ",
+                "再度ログイン",
+            ]:
                 if keyword in body_text:
                     logger.warning(f"[{self.name}] セッション切れ: {keyword}")
                     return True
@@ -322,7 +416,6 @@ class BaseScraper(ABC):
 
     @abstractmethod
     async def fetch_reservations(self, target_date: str) -> list[dict]:
-        """指定日の予約一覧を取得。target_date: 'YYYY-MM-DD'"""
         ...
 
     async def fetch_reservations_safe(self, target_date: str) -> list[dict]:
@@ -334,7 +427,9 @@ class BaseScraper(ABC):
                 reservations = await self.fetch_reservations(target_date)
 
                 if await self.detect_session_expired():
-                    logger.warning(f"[{self.name}] セッション切れ → 復旧 ({attempt + 1}/{self._max_retries})")
+                    logger.warning(
+                        f"[{self.name}] セッション切れ → 復旧 ({attempt + 1}/{self._max_retries})"
+                    )
                     if await self.recover_session():
                         continue
                     else:
@@ -345,7 +440,9 @@ class BaseScraper(ABC):
 
             except Exception as e:
                 self._consecutive_failures += 1
-                logger.error(f"[{self.name}] 予約取得エラー ({attempt + 1}/{self._max_retries}): {e}")
+                logger.error(
+                    f"[{self.name}] 予約取得エラー ({attempt + 1}/{self._max_retries}): {e}"
+                )
                 if attempt < self._max_retries - 1:
                     wait = (2 ** attempt) + random.uniform(0, 1)
                     logger.info(f"[{self.name}] {wait:.1f}秒後にリトライ")
@@ -358,7 +455,6 @@ class BaseScraper(ABC):
     # ------------------------------------------------------------------
 
     async def screenshot(self, name: str) -> Path:
-        """スクリーンショット保存"""
         timestamp = datetime.now(JST).strftime("%Y%m%d_%H%M%S")
         filename = f"{self.name}_{name}_{timestamp}.png"
         path = SCREENSHOTS_DIR / filename
@@ -370,10 +466,12 @@ class BaseScraper(ABC):
         return path
 
     async def safe_goto(self, url: str, timeout: int = 30) -> bool:
-        """安全なページ遷移"""
+        """安全なページ遷移（ステルスJS自動注入）"""
         try:
             self._page = await self._browser.get(url, new_tab=False)
+            await self._inject_stealth()
             await self.human_delay(0.5, 1.5)
+            await self.random_idle()
             return True
         except Exception as e:
             logger.error(f"[{self.name}] ページ遷移失敗 {url}: {e}")

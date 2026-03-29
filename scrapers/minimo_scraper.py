@@ -193,6 +193,8 @@ class MinimoScraper(BaseScraper):
                 await self.screenshot("nav_failed")
                 return []
 
+            await self.random_scroll()
+            await self.random_idle()
             await self.screenshot(f"schedule_{target_date}")
 
             if await self.detect_captcha():

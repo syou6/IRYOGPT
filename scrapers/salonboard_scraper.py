@@ -1,5 +1,5 @@
 """
-サロンボード スクレイパー
+サロンボード スクレイパー（undetected-chromedriver版）
 
 確認済みセレクタ情報（GitHub 9リポジトリ調査より）:
 
@@ -53,7 +53,6 @@ URL構造:
 """
 
 import logging
-import re
 from datetime import datetime
 
 from scrapers.base_scraper import BaseScraper
@@ -111,7 +110,7 @@ class SalonBoardScraper(BaseScraper):
             pw_filled = False
             for selector in ['#jsiPwInput', 'input[name="password"]']:
                 try:
-                    element = await self._page.query_selector(selector)
+                    element = await self._query_selector(selector)
                     if element:
                         await self.human_type(selector, SALONBOARD_PASSWORD)
                         pw_filled = True
@@ -127,9 +126,6 @@ class SalonBoardScraper(BaseScraper):
             await self.human_delay(0.5, 1.0)
 
             # ログインボタンクリック
-            # 新: a.common-CNCcommon__primaryBtn.loginBtnSize
-            # 旧: a.input_area_btn_01
-            # 汎用: a:has-text("ログイン"):visible
             clicked = False
             for selector in [
                 'a.common-CNCcommon__primaryBtn.loginBtnSize',
@@ -137,7 +133,7 @@ class SalonBoardScraper(BaseScraper):
                 'a:has-text("ログイン"):visible',
             ]:
                 try:
-                    element = await self._page.query_selector(selector)
+                    element = await self._find_element(selector, timeout=5)
                     if element:
                         await self.human_click(selector)
                         clicked = True
@@ -152,12 +148,11 @@ class SalonBoardScraper(BaseScraper):
                 return False
 
             # ページ遷移を待つ
-            try:
-                await self._page.wait_for_url(
-                    lambda url: "/login" not in url.lower(),
-                    timeout=15000,
-                )
-            except Exception:
+            success = await self.wait_for_url_change(
+                lambda url: "/login" not in url.lower(),
+                timeout=15,
+            )
+            if not success:
                 logger.error("[salonboard] ログイン後の遷移タイムアウト")
                 await self.screenshot("login_timeout")
                 return False
@@ -176,7 +171,7 @@ class SalonBoardScraper(BaseScraper):
             await self._hide_karte_widget()
 
             # ログイン成功判定
-            current_url = self._page.url
+            current_url = await self.get_current_url()
             if "/login" in current_url.lower():
                 logger.error(f"[salonboard] ログイン失敗。URL: {current_url}")
                 await self.screenshot("login_failed")
@@ -193,13 +188,12 @@ class SalonBoardScraper(BaseScraper):
     async def _handle_store_selection(self) -> None:
         """マルチ店舗アカウントの場合、最初の店舗を選択"""
         try:
-            store_table = await self._page.query_selector("#biyouStoreInfoArea")
+            store_table = await self._query_selector("#biyouStoreInfoArea")
             if store_table:
                 logger.info("[salonboard] 店舗選択画面を検知")
-                # 最初の店舗のリンクをクリック
-                first_store = await store_table.query_selector("a")
-                if first_store:
-                    await first_store.click()
+                first_link = await self._query_selector("#biyouStoreInfoArea a")
+                if first_link:
+                    await self.human_click("#biyouStoreInfoArea a")
                     await self.human_delay(1.0, 2.0)
                     logger.info("[salonboard] 店舗を選択しました")
         except Exception:
@@ -208,19 +202,17 @@ class SalonBoardScraper(BaseScraper):
     async def _hide_karte_widget(self) -> None:
         """Karteチャットウィジェットを非表示にする"""
         try:
-            await self._page.evaluate("""
-                () => {
-                    const selectors = [
-                        '.karte-widget__container',
-                        '[class*="_reception-Skin"]',
-                        '[id^="karte-"]'
-                    ];
-                    selectors.forEach(sel => {
-                        document.querySelectorAll(sel).forEach(el => {
-                            el.style.display = 'none';
-                        });
+            await self.execute_script("""
+                const selectors = [
+                    '.karte-widget__container',
+                    '[class*="_reception-Skin"]',
+                    '[id^="karte-"]'
+                ];
+                selectors.forEach(sel => {
+                    document.querySelectorAll(sel).forEach(el => {
+                        el.style.display = 'none';
                     });
-                }
+                });
             """)
         except Exception:
             pass
@@ -231,7 +223,7 @@ class SalonBoardScraper(BaseScraper):
             if not await self.safe_goto(SALONBOARD_TOP_URL, timeout=15000):
                 return False
 
-            current_url = self._page.url
+            current_url = await self.get_current_url()
             if "/login" in current_url.lower():
                 logger.info("[salonboard] セッション切れ")
                 return False
@@ -245,12 +237,7 @@ class SalonBoardScraper(BaseScraper):
     # ------------------------------------------------------------------
 
     async def fetch_reservations(self, target_date: str) -> list[dict]:
-        """
-        指定日の予約一覧を取得
-
-        Args:
-            target_date: 'YYYY-MM-DD' 形式
-        """
+        """指定日の予約一覧を取得。target_date: 'YYYY-MM-DD' 形式"""
         reservations = []
 
         try:
@@ -268,9 +255,7 @@ class SalonBoardScraper(BaseScraper):
 
             # #schedule コンテナの読み込みを待つ
             try:
-                await self._page.wait_for_selector(
-                    "#schedule", timeout=15000
-                )
+                await self._find_element("#schedule", timeout=15)
             except Exception:
                 logger.warning("[salonboard] #schedule が見つからない")
 
@@ -303,38 +288,26 @@ class SalonBoardScraper(BaseScraper):
         return reservations
 
     async def _parse_schedule_page(self, target_date: str) -> list[dict]:
-        """
-        スケジュール画面から予約データを抽出
-
-        サロンボードのスケジュール画面はul/liベースの構造:
-        - .scheduleMainHeadList.isStaff のli要素 = スタッフ名ヘッダー
-        - .scheduleMainTable.isStaff のli.scheduleMainTableLine = スタッフごとの予約列
-        - 両者はインデックスで1対1対応
-
-        各予約ブロック .staffTask 内:
-        - .scheduleReserveName = 顧客名
-        - .scheduleTimeZoneSetting = "開始時間,終了時間"（例: "10:00,11:30"）
-        """
+        """スケジュール画面から予約データを抽出"""
         reservations = []
 
         try:
             # ---- スタッフ名の取得 ----
             staff_names = []
-            staff_elements = await self._page.query_selector_all(
+            staff_elements = await self._find_elements(
                 ".scheduleMainHeadList.isStaff li.scheduleMainHead"
             )
             for el in staff_elements:
-                name_el = await el.query_selector(".scheduleLinkInner")
-                if name_el:
-                    name = (await name_el.inner_text()).strip()
+                try:
+                    name_el = el.find_element("css selector", ".scheduleLinkInner")
+                    name = name_el.text.strip()
                     staff_names.append(name)
-                else:
-                    # フォールバック: リンクテキスト全体
-                    link_el = await el.query_selector("a.scheduleLink")
-                    if link_el:
-                        name = (await link_el.inner_text()).strip()
+                except Exception:
+                    try:
+                        link_el = el.find_element("css selector", "a.scheduleLink")
+                        name = link_el.text.strip()
                         staff_names.append(name)
-                    else:
+                    except Exception:
                         staff_names.append("")
 
             logger.info(f"[salonboard] スタッフ数: {len(staff_names)}, 名前: {staff_names}")
@@ -345,7 +318,7 @@ class SalonBoardScraper(BaseScraper):
                 return []
 
             # ---- 各スタッフの予約を取得 ----
-            schedule_columns = await self._page.query_selector_all(
+            schedule_columns = await self._find_elements(
                 ".scheduleMainTable.isStaff li.scheduleMainTableLine"
             )
 
@@ -353,43 +326,49 @@ class SalonBoardScraper(BaseScraper):
                 staff_name = staff_names[col_idx] if col_idx < len(staff_names) else f"スタッフ{col_idx + 1}"
 
                 # 予約ブロックを取得
-                tasks = await column.query_selector_all(".staffTask")
+                try:
+                    tasks = column.find_elements("css selector", ".staffTask")
+                except Exception:
+                    tasks = []
 
                 for task in tasks:
                     try:
                         # 顧客名を取得
                         customer_name = ""
-                        name_el = await task.query_selector(".scheduleReserveName")
-                        if name_el:
-                            customer_name = (await name_el.inner_text()).strip()
-                        else:
-                            # Todoタイプの予約
-                            todo_el = await task.query_selector(".todoTitle")
-                            if todo_el:
-                                customer_name = (await todo_el.inner_text()).strip()
+                        try:
+                            name_el = task.find_element("css selector", ".scheduleReserveName")
+                            customer_name = name_el.text.strip()
+                        except Exception:
+                            try:
+                                todo_el = task.find_element("css selector", ".todoTitle")
+                                customer_name = todo_el.text.strip()
+                            except Exception:
+                                pass
 
                         # キャンペーン枠は除外
                         if customer_name.startswith("CP "):
                             continue
 
-                        # 顧客名が空なら予約ではない（空きブロック等）
+                        # 顧客名が空なら予約ではない
                         if not customer_name:
                             continue
 
                         # 時間帯を取得（"10:00,11:30" 形式）
                         start_time = ""
                         end_time = ""
-                        time_el = await task.query_selector(".scheduleTimeZoneSetting")
-                        if time_el:
-                            time_text = (await time_el.inner_text()).strip()
+                        try:
+                            time_el = task.find_element("css selector", ".scheduleTimeZoneSetting")
+                            time_text = time_el.text.strip()
                             time_parts = time_text.split(",")
                             if len(time_parts) >= 1:
                                 start_time = time_parts[0].strip()
                             if len(time_parts) >= 2:
                                 end_time = time_parts[1].strip()
+                        except Exception:
+                            pass
 
                         # CSSクラスから予約種別を判定
-                        task_class = await task.get_attribute("class") or ""
+                        task_class = task.get_attribute("class") or ""
 
                         # 予約IDを生成
                         external_id = f"SB-{target_date}-{start_time}-{staff_name}"
@@ -422,23 +401,19 @@ class SalonBoardScraper(BaseScraper):
     async def _dump_page_structure(self) -> None:
         """ページ構造をダンプ（デバッグ・セレクタ修正用）"""
         try:
-            structure = await self._page.evaluate("""
-                () => {
-                    const body = document.body;
-                    const result = {
-                        url: window.location.href,
-                        title: document.title,
-                        scheduleContainer: !!document.querySelector('#schedule'),
-                        staffHeaders: document.querySelectorAll('.scheduleMainHeadList.isStaff li.scheduleMainHead').length,
-                        scheduleColumns: document.querySelectorAll('.scheduleMainTable.isStaff li.scheduleMainTableLine').length,
-                        staffTasks: document.querySelectorAll('.staffTask').length,
-                        reserveNames: document.querySelectorAll('.scheduleReserveName').length,
-                        timeSettings: document.querySelectorAll('.scheduleTimeZoneSetting').length,
-                        tables: document.querySelectorAll('table').length,
-                        divIds: Array.from(document.querySelectorAll('div[id]')).slice(0, 15).map(d => d.id),
-                    };
-                    return result;
-                }
+            structure = await self.execute_script("""
+                return {
+                    url: window.location.href,
+                    title: document.title,
+                    scheduleContainer: !!document.querySelector('#schedule'),
+                    staffHeaders: document.querySelectorAll('.scheduleMainHeadList.isStaff li.scheduleMainHead').length,
+                    scheduleColumns: document.querySelectorAll('.scheduleMainTable.isStaff li.scheduleMainTableLine').length,
+                    staffTasks: document.querySelectorAll('.staffTask').length,
+                    reserveNames: document.querySelectorAll('.scheduleReserveName').length,
+                    timeSettings: document.querySelectorAll('.scheduleTimeZoneSetting').length,
+                    tables: document.querySelectorAll('table').length,
+                    divIds: Array.from(document.querySelectorAll('div[id]')).slice(0, 15).map(d => d.id),
+                };
             """)
             logger.info(f"[salonboard] ページ構造: {structure}")
         except Exception as e:
@@ -449,17 +424,7 @@ class SalonBoardScraper(BaseScraper):
     # ------------------------------------------------------------------
 
     async def fetch_available_slots(self, target_date: str) -> list[dict]:
-        """
-        指定日の空き枠を取得（スタッフ別）
-
-        Returns:
-            [
-                {
-                    "staff_name": "スタイリストA",
-                    "available_times": ["10:00", "11:00", "14:00", "15:00"]
-                },
-            ]
-        """
+        """指定日の空き枠を取得（スタッフ別）"""
         # 予約データから空き枠を逆算
         # TODO: アカウント取得後に実装
         return []

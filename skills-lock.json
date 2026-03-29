@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "playwright-bot-bypass": {
+      "source": "greekr4/playwright-bot-bypass",
+      "sourceType": "github",
+      "computedHash": "14c719f6291e83d71fd26260808e06201deacc542f2bfe551b28b12dbd6a8c02"
+    }
+  }
+}

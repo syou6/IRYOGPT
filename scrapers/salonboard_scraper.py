@@ -142,6 +142,56 @@ class SalonBoardScraper(BaseScraper):
             await self.screenshot("login_error")
             return False
 
+    async def _navigate_to_schedule_naturally(self, date_param: str) -> None:
+        """
+        自然なナビゲーション動線でスケジュールページに到達
+
+        直接URLアクセスはRefererが不自然でAkamaiに検知されやすい。
+        実際のユーザーの動線を再現:
+        1. 現在のページ（トップ or 前回のページ）を確認
+        2. サイドメニューの「スケジュール」リンクをクリック
+        3. 日付指定
+        """
+        current_url = self._page.url if self._page else ""
+        schedule_url = f"{self.schedule_url}?date={date_param}"
+
+        # 既にスケジュールページにいる場合は日付だけ変更
+        if "schedule" in current_url.lower():
+            if not await self.safe_goto(schedule_url):
+                return
+            return
+
+        # トップページにいない場合はまずトップへ
+        if "top" not in current_url.lower() and "schedule" not in current_url.lower():
+            await self.safe_goto(SALONBOARD_TOP_URL)
+            await self.human_delay(1.0, 2.0)
+            await self.random_scroll()
+
+        # サイドメニューからスケジュールリンクを探す
+        schedule_link = None
+        for selector in [
+            'a[href*="schedule"]',
+            'a[href*="salonSchedule"]',
+            'a[href*="calendar"]',
+        ]:
+            schedule_link = await self.query(selector)
+            if schedule_link:
+                break
+
+        if schedule_link:
+            # リンクをクリックして遷移（自然な動線）
+            await self.human_click(schedule_link)
+            await self.human_delay(1.5, 3.0)
+
+            # 日付が違う場合はURLで指定
+            if date_param not in (self._page.url or ""):
+                await self.safe_goto(schedule_url)
+        else:
+            # フォールバック: 直接URLアクセス
+            logger.debug("[salonboard] スケジュールリンク未検出 → 直接アクセス")
+            if not await self.safe_goto(schedule_url):
+                return
+
     async def _handle_store_selection(self) -> None:
         """マルチ店舗アカウント対応"""
         try:
@@ -186,10 +236,11 @@ class SalonBoardScraper(BaseScraper):
 
             date_obj = datetime.strptime(target_date, "%Y-%m-%d")
             date_param = date_obj.strftime("%Y%m%d")
-            schedule_url = f"{self.schedule_url}?date={date_param}"
 
-            if not await self.safe_goto(schedule_url):
-                return []
+            # 自然なナビゲーション動線を再現
+            # いきなりスケジュールURLに飛ぶのは不自然（Akamai行動解析対策）
+            # 実際のユーザー: トップページ → サイドメニュー → スケジュール
+            await self._navigate_to_schedule_naturally(date_param)
 
             # #schedule の読み込み待ち
             await self.find("#schedule", timeout=15)

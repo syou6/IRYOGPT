@@ -17,6 +17,7 @@ zendriver = nodriverのアクティブfork（2026年3月現在も活発にメン
 
 import asyncio
 import logging
+import math
 import random
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, timezone
@@ -30,7 +31,7 @@ from scrapers.config import (
     SCREENSHOTS_DIR,
     USER_AGENTS,
 )
-from scrapers.stealth import bezier_curve, build_stealth_js, random_viewport
+from scrapers.stealth import bezier_curve, build_stealth_js, random_viewport, wind_mouse
 
 logger = logging.getLogger(__name__)
 
@@ -191,7 +192,7 @@ class BaseScraper(ABC):
         await asyncio.sleep(random.uniform(min_sec, max_sec))
 
     async def human_click(self, element) -> None:
-        """ベジェ曲線でマウスを移動してからクリック"""
+        """WindMouseアルゴリズムでマウスを移動してからクリック"""
         try:
             box = await self._page.evaluate("""
                 (el) => {
@@ -210,25 +211,32 @@ class BaseScraper(ABC):
                 start_x = random.randint(int(w * 0.1), int(w * 0.9))
                 start_y = random.randint(int(h * 0.1), int(h * 0.9))
 
+                # クリック位置に微小なずれ（中心ぴったりは不自然）
                 target_x = box["x"] + random.uniform(-box["width"] * 0.15, box["width"] * 0.15)
                 target_y = box["y"] + random.uniform(-box["height"] * 0.15, box["height"] * 0.15)
 
-                path = bezier_curve((start_x, start_y), (target_x, target_y))
+                dist = math.sqrt((target_x - start_x) ** 2 + (target_y - start_y) ** 2)
 
-                # zendriver の mouse_move を使用（CDPネイティブ）
-                step = max(1, len(path) // 6)
+                # 距離が十分あればWindMouse、短距離はベジェ
+                if dist > 50:
+                    path = wind_mouse((start_x, start_y), (target_x, target_y))
+                else:
+                    path = bezier_curve((start_x, start_y), (target_x, target_y))
+
+                # CDPネイティブのmouse_moveでパスを送信（間引き）
+                step = max(1, len(path) // 8)
                 for i in range(0, len(path), step):
                     px, py = path[i]
                     try:
                         await self._page.mouse_move(px, py, steps=1)
                     except Exception:
                         break
-                    await asyncio.sleep(random.uniform(0.01, 0.04))
+                    await asyncio.sleep(random.uniform(0.008, 0.025))
 
-                await self.human_delay(0.05, 0.2)
+                await self.human_delay(0.05, 0.15)
 
         except Exception:
-            pass  # フォールバック: 通常クリック
+            pass
 
         await element.click()
 
@@ -514,22 +522,80 @@ class BaseScraper(ABC):
         return path
 
     async def safe_goto(self, url: str, timeout: int = 30) -> bool:
-        """安全なページ遷移（ステルスフォールバック + Akamaiセンサー待機）"""
+        """安全なページ遷移（ステルス再注入 + Akamai _abck検証待ち）"""
         try:
             self._page = await self._browser.get(url, new_tab=False)
 
-            # CDPメソッドが失敗していた場合のフォールバック
-            await self._inject_stealth_fallback()
+            # 新タブバグ対策: CDPステルスが効いてない可能性があるので再注入
+            await self._reinject_stealth_for_tab()
 
-            # Akamaiセンサーの実行を待つ（_abckクッキーの検証に必要）
-            await self.human_delay(1.0, 2.5)
+            # Akamaiセンサーの実行を待つ
+            # _abck クッキーが -1~-1 → センサー未完了
+            # センサーJS（527KB）のロード+実行+テレメトリ送信に2-4秒かかる
+            await self._wait_for_akamai_sensor()
+
             await self.random_idle()
 
             return True
         except Exception as e:
             logger.error(f"[{self.name}] ページ遷移失敗 {url}: {e}")
-            await self.screenshot("goto_failed")
+            try:
+                await self.screenshot("goto_failed")
+            except Exception:
+                pass
             return False
+
+    async def _reinject_stealth_for_tab(self) -> None:
+        """
+        zendriver既知バグ対策:
+        add_script_to_evaluate_on_new_document は新タブに適用されないことがある。
+        ページ遷移ごとにCDPで再登録 + フォールバックでevaluateも実行。
+        """
+        try:
+            stealth_js = build_stealth_js(self._viewport, self._user_agent)
+
+            # CDPで再登録（冪等: 同じスクリプトが複数回登録されても問題ない）
+            await self._page.send(
+                cdp.page.add_script_to_evaluate_on_new_document(
+                    source=stealth_js
+                )
+            )
+        except Exception:
+            pass
+
+        # フォールバック: evaluate で即時実行（既にページJSが走ってる可能性あり）
+        await self._inject_stealth_fallback()
+
+    async def _wait_for_akamai_sensor(self) -> None:
+        """
+        Akamaiセンサーの完了を待つ。
+
+        _abck クッキーの値が "-1~-1~-1~-1~-1" → 未検証
+        センサーJS実行後 → 値が変わる（検証済み）
+
+        最大5秒待って、検証済みにならなくても続行
+        （Akamaiが無いサイトでもタイムアウトで進める）
+        """
+        for _ in range(10):
+            await asyncio.sleep(0.5)
+            try:
+                abck = await self._page.evaluate("""
+                    document.cookie.split(';')
+                        .map(c => c.trim())
+                        .find(c => c.startsWith('_abck='))
+                """)
+                if abck and "-1~-1~-1~-1~-1" not in abck:
+                    logger.debug(f"[{self.name}] Akamaiセンサー検証完了")
+                    return
+                # _abck がない = Akamai不使用サイト → 即続行
+                if not abck:
+                    await self.human_delay(0.5, 1.5)
+                    return
+            except Exception:
+                break
+
+        # タイムアウト（5秒）: 続行するが警告
+        logger.debug(f"[{self.name}] Akamaiセンサー待ちタイムアウト（続行）")
 
     async def wait_for_url(self, condition, timeout: int = 15) -> bool:
         import time

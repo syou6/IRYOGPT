@@ -22,6 +22,7 @@
     - created_at (timestamptz)
 """
 
+import hashlib
 import json
 import logging
 from datetime import datetime, timedelta, timezone
@@ -58,8 +59,23 @@ async def close_http_client() -> None:
         _http_client = None
 
 
+def _reservation_hash(reservation: dict) -> str:
+    """予約データのコンテンツハッシュを生成（変更検知用）"""
+    key_fields = (
+        reservation.get("external_id", ""),
+        reservation.get("date", ""),
+        reservation.get("start_time", ""),
+        reservation.get("end_time", ""),
+        reservation.get("staff_name", ""),
+        reservation.get("customer_name", ""),
+        reservation.get("menu", ""),
+        reservation.get("status", ""),
+    )
+    return hashlib.md5("|".join(key_fields).encode()).hexdigest()
+
+
 class SyncService:
-    """予約データをSupabaseに同期するサービス"""
+    """予約データをSupabaseに同期するサービス（コンテンツハッシュ差分検知付き）"""
 
     MAX_RETRIES = 3
 
@@ -72,6 +88,8 @@ class SyncService:
             "Prefer": "resolution=merge-duplicates",
         }
         self.base_url = f"{SUPABASE_URL}/rest/v1"
+        # 前回同期時のハッシュキャッシュ {external_id: content_hash}
+        self._last_hashes: dict[str, str] = {}
 
     async def _request_with_retry(
         self, method: str, url: str, **kwargs
@@ -103,33 +121,49 @@ class SyncService:
         self, reservations: list[dict], source: str
     ) -> dict:
         """
-        予約データをSupabaseに同期（upsert）
+        予約データをSupabaseに同期（コンテンツハッシュ差分検知付き）
 
-        バッチ処理: 全予約を1回のリクエストでupsert（パフォーマンス改善）
+        前回と同じデータはスキップし、変更・追加分だけupsert。
+        前回あったが今回無い予約はキャンセル扱いでステータス更新。
 
         Args:
             reservations: スクレイパーから取得した予約リスト
             source: 'salonboard' or 'minimo'
 
         Returns:
-            {"synced": 件数, "errors": 件数}
+            {"synced": 件数, "skipped": 件数, "cancelled": 件数, "errors": 件数}
         """
         if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
             logger.error("Supabase設定が未設定")
-            return {"synced": 0, "errors": 0}
+            return {"synced": 0, "skipped": 0, "cancelled": 0, "errors": 0}
 
         if not reservations:
-            return {"synced": 0, "errors": 0}
+            # 予約0件: 前回あった予約が全てキャンセルされた可能性
+            cancelled = await self._mark_cancelled(source, set(self._last_hashes.keys()))
+            self._last_hashes.clear()
+            return {"synced": 0, "skipped": 0, "cancelled": cancelled, "errors": 0}
 
         now = datetime.now(JST).isoformat()
 
-        # バッチ用の行データを構築
-        rows = []
+        # 差分検知: 変更があった予約だけ抽出
+        current_hashes: dict[str, str] = {}
+        changed_rows = []
+        skipped = 0
+
         for reservation in reservations:
-            rows.append({
+            ext_id = reservation.get("external_id", "")
+            content_hash = _reservation_hash(reservation)
+            current_hashes[ext_id] = content_hash
+
+            # 前回と同じハッシュならスキップ
+            if self._last_hashes.get(ext_id) == content_hash:
+                skipped += 1
+                continue
+
+            changed_rows.append({
                 "site_id": self.site_id,
                 "source": source,
-                "external_id": reservation.get("external_id", ""),
+                "external_id": ext_id,
                 "date": reservation["date"],
                 "start_time": reservation.get("start_time", ""),
                 "end_time": reservation.get("end_time", ""),
@@ -143,30 +177,70 @@ class SyncService:
                 "synced_at": now,
             })
 
-        # バッチupsert
+        # キャンセル検知: 前回あったが今回無い予約
+        disappeared_ids = set(self._last_hashes.keys()) - set(current_hashes.keys())
+        cancelled = await self._mark_cancelled(source, disappeared_ids)
+
+        # ハッシュキャッシュ更新
+        self._last_hashes = current_hashes
+
+        if not changed_rows:
+            logger.info(f"[{source}] 変更なし（{skipped}件スキップ, {cancelled}件キャンセル）")
+            return {"synced": 0, "skipped": skipped, "cancelled": cancelled, "errors": 0}
+
+        # 変更分だけバッチupsert
         try:
             resp = await self._request_with_retry(
                 "post",
                 f"{self.base_url}/external_reservations",
-                json=rows,
+                json=changed_rows,
             )
 
             if resp is None:
-                result = {"synced": 0, "errors": len(reservations)}
+                result = {"synced": 0, "skipped": skipped, "cancelled": cancelled, "errors": len(changed_rows)}
             elif resp.status_code in (200, 201):
-                result = {"synced": len(reservations), "errors": 0}
+                result = {"synced": len(changed_rows), "skipped": skipped, "cancelled": cancelled, "errors": 0}
             else:
                 logger.error(
                     f"Supabaseバッチ書き込みエラー: {resp.status_code} {resp.text}"
                 )
-                result = {"synced": 0, "errors": len(reservations)}
+                result = {"synced": 0, "skipped": skipped, "cancelled": cancelled, "errors": len(changed_rows)}
 
         except Exception as e:
             logger.error(f"同期エラー: {e}")
-            result = {"synced": 0, "errors": len(reservations)}
+            result = {"synced": 0, "skipped": skipped, "cancelled": cancelled, "errors": len(changed_rows)}
 
         logger.info(f"[{source}] 同期結果: {result}")
         return result
+
+    async def _mark_cancelled(self, source: str, external_ids: set[str]) -> int:
+        """消えた予約をキャンセル済みとしてマーク"""
+        if not external_ids:
+            return 0
+
+        cancelled = 0
+        now = datetime.now(JST).isoformat()
+
+        for ext_id in external_ids:
+            try:
+                resp = await self._request_with_retry(
+                    "patch",
+                    f"{self.base_url}/external_reservations",
+                    params={
+                        "site_id": f"eq.{self.site_id}",
+                        "source": f"eq.{source}",
+                        "external_id": f"eq.{ext_id}",
+                        "status": "eq.confirmed",
+                    },
+                    json={"status": "cancelled", "synced_at": now},
+                )
+                if resp and resp.status_code in (200, 204):
+                    cancelled += 1
+                    logger.info(f"[{source}] キャンセル検知: {ext_id}")
+            except Exception as e:
+                logger.debug(f"[{source}] キャンセル更新失敗 {ext_id}: {e}")
+
+        return cancelled
 
     async def get_external_reservations(
         self, date: str, source: Optional[str] = None

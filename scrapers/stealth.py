@@ -439,13 +439,86 @@ def build_stealth_js(viewport: tuple[int, int], user_agent: str) -> str:
 # ベジェ曲線マウス移動
 # ------------------------------------------------------------------
 
+def wind_mouse(
+    start: tuple[float, float],
+    end: tuple[float, float],
+    gravity: float = 9.0,
+    wind: float = 3.0,
+    min_wait: float = 2.0,
+    max_wait: float = 10.0,
+    max_step: float = 10.0,
+    target_area: float = 8.0,
+) -> list[tuple[int, int]]:
+    """
+    WindMouseアルゴリズム — bot検知研究者が使うマウス移動手法
+
+    Ben Johnson (2016) による物理シミュレーション。
+    重力（目標に向かう力）+ 風（ランダムな外力）で
+    人間の手の微小な振動とオーバーシュートを再現。
+
+    ベジェ曲線より検知されにくい理由:
+    - ベジェ曲線は滑らかすぎる（人間はもっとノイジー）
+    - WindMouseは速度変化が不規則（加減速のパターンが自然）
+    - 目標付近でのオーバーシュートと修正動作がある
+    """
+    sx, sy = float(start[0]), float(start[1])
+    ex, ey = float(end[0]), float(end[1])
+
+    points = []
+    wind_x = wind_y = 0.0
+    vx = vy = 0.0
+
+    while True:
+        dist = math.sqrt((ex - sx) ** 2 + (ey - sy) ** 2)
+        if dist < 1:
+            break
+
+        # 風（ランダムな外力）
+        wind_x = wind_x / math.sqrt(3) + (random.random() * (wind * 2 + 1) - wind) / math.sqrt(5)
+        wind_y = wind_y / math.sqrt(3) + (random.random() * (wind * 2 + 1) - wind) / math.sqrt(5)
+
+        # 目標に近づくと重力が強まり、風が弱まる
+        if dist < target_area:
+            step = max_step * (dist / target_area)
+            wind_x /= 2
+            wind_y /= 2
+        else:
+            step = max_step
+
+        step = max(step, min_wait)
+        step = min(step, dist)
+
+        # 重力（目標に向かう力）
+        if dist > 0:
+            vx += wind_x + gravity * (ex - sx) / dist
+            vy += wind_y + gravity * (ey - sy) / dist
+
+        # 速度制限
+        mag = math.sqrt(vx ** 2 + vy ** 2)
+        if mag > step:
+            random_dist = step - min_wait + random.random() * min_wait
+            vx = vx / mag * random_dist
+            vy = vy / mag * random_dist
+
+        sx += vx
+        sy += vy
+        points.append((int(round(sx)), int(round(sy))))
+
+        # 無限ループ防止
+        if len(points) > 500:
+            break
+
+    points.append((int(ex), int(ey)))
+    return points
+
+
 def bezier_curve(
     start: tuple[float, float],
     end: tuple[float, float],
     steps: int = 0,
 ) -> list[tuple[int, int]]:
     """
-    3次ベジェ曲線で自然なマウスパスを生成
+    3次ベジェ曲線マウスパス（WindMouseが使えない短距離用フォールバック）
     """
     sx, sy = start
     ex, ey = end

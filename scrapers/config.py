@@ -25,7 +25,13 @@ SALONBOARD_ID = os.getenv("SALONBOARD_ID", "")
 SALONBOARD_PASSWORD = os.getenv("SALONBOARD_PASSWORD", "")
 SALONBOARD_LOGIN_URL = "https://salonboard.com/login/"
 SALONBOARD_TOP_URL = "https://salonboard.com/KLP/top/"
+# KLP = ヘアサロン向け、KLS = ネイル・リラク・エステ向け
+# 美容サロン（ヘアサロン）の場合は KLP を使用
 SALONBOARD_SCHEDULE_URL = "https://salonboard.com/KLP/schedule/salonSchedule/"
+# ネイル・リラク・エステの場合（環境変数で切替可能）
+SALONBOARD_SCHEDULE_URL_KLS = "https://salonboard.com/KLS/schedule/calendar/"
+# 業種タイプ: "klp"（ヘアサロン） or "kls"（ネイル・リラク・エステ）
+SALONBOARD_TYPE = os.getenv("SALONBOARD_TYPE", "klp").lower()
 SALONBOARD_COOKIES_PATH = COOKIES_DIR / "salonboard_cookies.json"
 
 # --- ミニモ ---

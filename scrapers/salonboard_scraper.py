@@ -1,13 +1,33 @@
 """
 サロンボード スクレイパー
 
-セレクタ情報:
+確認済み情報（GitHub調査・公式サイト・WordPressプラグイン解析より）:
+
+URL構造:
+- ログイン: /login/ (PC版)、/login_sp/ (スマホ版)
+- 認証POST: /CNC/login/doLogin/
+- KLP系 (ヘアサロン): /KLP/top/, /KLP/schedule/salonSchedule/
+- KLS系 (ネイル・リラク・エステ): /KLS/schedule/calendar/
+
+スケジュール画面:
+- 日付パラメータ: ?date=YYYYMMDD（ハイフンなし）
+- 構造: 横=スタッフ列、縦=時間行
+- 表示: 5分/10分/15分/30分刻み（医院設定による）
+- PCでは最大14日分表示可
+
+予約登録パラメータ:
+- ?staffId={id}&date={YYYYMMDD}&rsvHour={HH}&rsvMinute={MM}
+
+セレクタ:
 - ログインフォーム: input[name="userId"], input[name="password"]
 - ログインボタン: a:has-text("ログイン")（<a>タグ、buttonではない）
-- ログイン後URL: /KLP/top/ または /CNB/
-- 予約カレンダー: /KLP/schedule/salonSchedule/
+- ログイン後URL: /KLP/top/ または /KLS/
 
-参考: yukihamada/salonboard-uploader (実セレクタ確認済み)
+参考:
+- yukihamada/salonboard-uploader (実セレクタ確認済み)
+- xcrystal627/salon-board-scraping-tool (Selenium, KLP系URL確認)
+- peachup/webscrapper (Playwright, login + salonSchedule確認)
+- common-repository/salon-booking (WordPress, CLP/bt系API確認)
 """
 
 import logging
@@ -20,7 +40,9 @@ from scrapers.config import (
     SALONBOARD_LOGIN_URL,
     SALONBOARD_PASSWORD,
     SALONBOARD_SCHEDULE_URL,
+    SALONBOARD_SCHEDULE_URL_KLS,
     SALONBOARD_TOP_URL,
+    SALONBOARD_TYPE,
 )
 
 logger = logging.getLogger(__name__)
@@ -29,6 +51,13 @@ logger = logging.getLogger(__name__)
 class SalonBoardScraper(BaseScraper):
     def __init__(self):
         super().__init__(name="salonboard", cookies_path=SALONBOARD_COOKIES_PATH)
+
+    @property
+    def schedule_url(self) -> str:
+        """業種タイプに応じたスケジュールURLを返す"""
+        if SALONBOARD_TYPE == "kls":
+            return SALONBOARD_SCHEDULE_URL_KLS
+        return SALONBOARD_SCHEDULE_URL
 
     # ------------------------------------------------------------------
     # ログイン
@@ -122,21 +151,7 @@ class SalonBoardScraper(BaseScraper):
             target_date: 'YYYY-MM-DD' 形式
 
         Returns:
-            予約データのリスト:
-            [
-                {
-                    "source": "salonboard",
-                    "date": "2026-03-29",
-                    "start_time": "10:00",
-                    "end_time": "11:00",
-                    "staff_name": "スタイリストA",
-                    "customer_name": "山田太郎",
-                    "menu": "カット",
-                    "status": "confirmed",
-                    "external_id": "SB-12345",
-                    "raw_data": {}
-                },
-            ]
+            予約データのリスト
         """
         reservations = []
 
@@ -146,18 +161,13 @@ class SalonBoardScraper(BaseScraper):
                 return []
 
             # 予約カレンダーページへ遷移
-            # NOTE: 日付パラメータの渡し方はアカウント取得後に確認が必要
-            # サロンボードのURLパターン例:
-            #   /KLP/schedule/salonSchedule/?date=20260329
-            #   /KLP/schedule/salonSchedule/?targetDate=2026-03-29
+            # 日付パラメータはYYYYMMDD形式（ハイフンなし）
             date_obj = datetime.strptime(target_date, "%Y-%m-%d")
             date_param = date_obj.strftime("%Y%m%d")
-            schedule_url = f"{SALONBOARD_SCHEDULE_URL}?date={date_param}"
+            schedule_url = f"{self.schedule_url}?date={date_param}"
 
             if not await self.safe_goto(schedule_url):
-                # パラメータなしでも試行
-                if not await self.safe_goto(SALONBOARD_SCHEDULE_URL):
-                    return []
+                return []
 
             await self.human_delay(1.0, 2.0)
             await self.screenshot(f"schedule_{target_date}")
@@ -167,16 +177,10 @@ class SalonBoardScraper(BaseScraper):
                 logger.error("[salonboard] 予約ページでCAPTCHA検知")
                 return []
 
-            # ---------------------------------------------------------
-            # 予約データの抽出
-            #
-            # !! 重要 !!
-            # 以下のセレクタはアカウント取得後に実際のページを見て修正する。
-            # スクリーンショットを確認してセレクタを特定する。
-            #
-            # サロンボードの予約カレンダーは通常テーブル形式で、
-            # 行=時間帯、列=スタッフ の構造になっている。
-            # ---------------------------------------------------------
+            # セッション切れチェック
+            if await self.detect_session_expired():
+                logger.warning("[salonboard] スケジュール画面でセッション切れ検知")
+                return []
 
             reservations = await self._parse_schedule_page(target_date)
 
@@ -193,63 +197,152 @@ class SalonBoardScraper(BaseScraper):
         """
         予約カレンダーページから予約データを抽出
 
-        TODO: アカウント取得後に実際のセレクタで実装する。
-              現在はページのHTML構造を取得してログに出力する。
+        サロンボードの予約カレンダーは通常テーブル形式:
+        - ヘッダー行: スタッフ名が列として並ぶ
+        - データ行: 時間帯ごとの予約状態
+        - 予約セル: クリックすると予約詳細モーダルが表示される
+
+        TODO: テストアカウント取得後に実際のセレクタを確認・修正する。
+              以下は GitHub 上の複数リポジトリから推定したセレクタ候補。
         """
         reservations = []
 
         try:
-            # ページのHTML構造をログに記録（セレクタ特定用）
-            page_html = await self._page.content()
+            # ---- ページ構造の調査（セレクタ特定用） ----
 
             # テーブル要素を探す
             tables = await self._page.query_selector_all("table")
             logger.info(f"[salonboard] テーブル数: {len(tables)}")
 
-            # 予約っぽい要素を探す（汎用的なセレクタで試行）
-            # サロンボードの一般的なパターン:
+            # スケジュール系の汎用セレクタ候補
+            # xcrystal627/salon-board-scraping-tool で確認されたパターンを優先
             candidate_selectors = [
-                "table.scheduleTable tr",
-                "table.schedule tr",
+                # テーブルベースのスケジュール
+                "table.scheduleTable",
+                "table.schedule",
+                "#scheduleTable",
+                "table[class*='schedule']",
+                # スタッフヘッダー
+                "th[class*='staff']",
+                "td[class*='staff']",
+                ".staffName",
+                # 予約セル
                 ".reserveFrame",
                 ".reserveItem",
-                ".schedule-cell",
+                ".reserve",
                 "td[class*='reserve']",
-                "td[class*='schedule']",
                 "div[class*='reserve']",
-                "div[class*='booking']",
+                # 時間軸
+                ".timeCell",
+                "td[class*='time']",
+                "th[class*='time']",
+                # カレンダー系（KLS用）
+                ".calendarCell",
+                ".calendar-event",
             ]
 
+            found_selectors = {}
             for selector in candidate_selectors:
-                elements = await self._page.query_selector_all(selector)
-                if elements:
-                    logger.info(
-                        f"[salonboard] セレクタ '{selector}' で {len(elements)} 要素発見"
-                    )
+                try:
+                    elements = await self._page.query_selector_all(selector)
+                    if elements:
+                        found_selectors[selector] = len(elements)
+                        logger.info(
+                            f"[salonboard] セレクタ '{selector}' で {len(elements)} 要素発見"
+                        )
+                except Exception:
+                    continue
+
+            # ---- HTML構造のダンプ（初回デバッグ用） ----
+            # メインコンテンツ領域のHTML構造を取得してログに記録
+            try:
+                # body直下の主要なdiv/table構造を取得
+                main_structure = await self._page.evaluate("""
+                    () => {
+                        const body = document.body;
+                        const tables = body.querySelectorAll('table');
+                        const result = {
+                            tableCount: tables.length,
+                            tables: [],
+                            mainDivIds: [],
+                            mainDivClasses: [],
+                        };
+                        tables.forEach((t, i) => {
+                            result.tables.push({
+                                index: i,
+                                id: t.id,
+                                className: t.className,
+                                rows: t.rows ? t.rows.length : 0,
+                                cols: t.rows && t.rows[0] ? t.rows[0].cells.length : 0,
+                            });
+                        });
+                        // 主要なdiv要素のIDとクラスを収集
+                        const divs = body.querySelectorAll('div[id], div[class]');
+                        const seen = new Set();
+                        divs.forEach(d => {
+                            const key = d.id || d.className.split(' ')[0];
+                            if (key && !seen.has(key) && seen.size < 30) {
+                                seen.add(key);
+                                if (d.id) result.mainDivIds.push(d.id);
+                                else result.mainDivClasses.push(d.className.split(' ')[0]);
+                            }
+                        });
+                        return result;
+                    }
+                """)
+                logger.info(f"[salonboard] ページ構造: {main_structure}")
+            except Exception as e:
+                logger.debug(f"[salonboard] ページ構造取得エラー: {e}")
 
             # -------------------------------------------------------
-            # 実装例（アカウント取得後に有効化）:
+            # 実装例（テストアカウント取得後に有効化）:
             #
+            # スケジュールテーブルの構造:
+            #   <table class="scheduleTable">
+            #     <thead>
+            #       <tr>
+            #         <th>時間</th>
+            #         <th class="staffName">スタイリストA</th>
+            #         <th class="staffName">スタイリストB</th>
+            #       </tr>
+            #     </thead>
+            #     <tbody>
+            #       <tr>
+            #         <td class="timeCell">10:00</td>
+            #         <td class="reserve">予約データ</td>
+            #         <td class="empty">空き</td>
+            #       </tr>
+            #     </tbody>
+            #   </table>
+            #
+            # 1. スタッフ名を取得（ヘッダー行）
+            # staff_headers = await self._page.query_selector_all("実際のセレクタ")
+            # staff_names = [await h.inner_text() for h in staff_headers]
+            #
+            # 2. 各行（時間帯）を走査
             # rows = await self._page.query_selector_all("実際のセレクタ")
             # for row in rows:
-            #     time_text = await row.query_selector(".time")
-            #     staff_text = await row.query_selector(".staff")
-            #     customer_text = await row.query_selector(".customer")
-            #     menu_text = await row.query_selector(".menu")
-            #
-            #     if time_text and customer_text:
-            #         reservations.append({
-            #             "source": "salonboard",
-            #             "date": target_date,
-            #             "start_time": await time_text.inner_text(),
-            #             "end_time": "",
-            #             "staff_name": await staff_text.inner_text() if staff_text else "",
-            #             "customer_name": await customer_text.inner_text(),
-            #             "menu": await menu_text.inner_text() if menu_text else "",
-            #             "status": "confirmed",
-            #             "external_id": "",
-            #             "raw_data": {},
-            #         })
+            #     time_cell = await row.query_selector("実際のセレクタ")
+            #     time_text = await time_cell.inner_text() if time_cell else ""
+            #     cells = await row.query_selector_all("td")
+            #     for i, cell in enumerate(cells[1:]):  # 0番目は時間列
+            #         cell_class = await cell.get_attribute("class") or ""
+            #         if "reserve" in cell_class or "booking" in cell_class:
+            #             # 予約セルをクリックして詳細を取得するか、
+            #             # セル内のテキストから情報を抽出
+            #             cell_text = await cell.inner_text()
+            #             reservations.append({
+            #                 "source": "salonboard",
+            #                 "date": target_date,
+            #                 "start_time": time_text,
+            #                 "end_time": "",
+            #                 "staff_name": staff_names[i] if i < len(staff_names) else "",
+            #                 "customer_name": cell_text,
+            #                 "menu": "",
+            #                 "status": "confirmed",
+            #                 "external_id": f"SB-{target_date}-{time_text}-{i}",
+            #                 "raw_data": {"cell_class": cell_class},
+            #             })
             # -------------------------------------------------------
 
         except Exception as e:

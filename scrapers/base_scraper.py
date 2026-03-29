@@ -15,7 +15,7 @@ import json
 import logging
 import random
 from abc import ABC, abstractmethod
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -28,6 +28,8 @@ from scrapers.config import (
 )
 
 logger = logging.getLogger(__name__)
+
+JST = timezone(timedelta(hours=9))
 
 
 # navigator.webdriver を隠すスクリプト
@@ -68,6 +70,28 @@ STEALTH_INIT_SCRIPT = """
         get: () => 'Win32'
     });
 
+    // hardwareConcurrency を偽装（ヘッドレスだと異常値になりがち）
+    Object.defineProperty(navigator, 'hardwareConcurrency', {
+        get: () => 8
+    });
+
+    // deviceMemory を偽装
+    Object.defineProperty(navigator, 'deviceMemory', {
+        get: () => 8
+    });
+
+    // connection を偽装（ヘッドレスだと未定義になることがある）
+    if (!navigator.connection) {
+        Object.defineProperty(navigator, 'connection', {
+            get: () => ({
+                effectiveType: '4g',
+                rtt: 50,
+                downlink: 10,
+                saveData: false,
+            })
+        });
+    }
+
     // WebGL vendor/renderer を偽装
     const getParameter = WebGLRenderingContext.prototype.getParameter;
     WebGLRenderingContext.prototype.getParameter = function(parameter) {
@@ -79,6 +103,41 @@ STEALTH_INIT_SCRIPT = """
         }
         return getParameter.call(this, parameter);
     };
+
+    // WebGL2 も同様に偽装
+    if (typeof WebGL2RenderingContext !== 'undefined') {
+        const getParameter2 = WebGL2RenderingContext.prototype.getParameter;
+        WebGL2RenderingContext.prototype.getParameter = function(parameter) {
+            if (parameter === 37445) {
+                return 'Intel Inc.';
+            }
+            if (parameter === 37446) {
+                return 'Intel Iris OpenGL Engine';
+            }
+            return getParameter2.call(this, parameter);
+        };
+    }
+
+    // Canvas fingerprint にノイズを追加
+    const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
+    HTMLCanvasElement.prototype.toDataURL = function(type) {
+        if (type === 'image/png' || type === undefined) {
+            const ctx = this.getContext('2d');
+            if (ctx) {
+                const style = ctx.fillStyle;
+                ctx.fillStyle = 'rgba(255,255,255,0.01)';
+                ctx.fillRect(0, 0, 1, 1);
+                ctx.fillStyle = style;
+            }
+        }
+        return originalToDataURL.apply(this, arguments);
+    };
+
+    // Automation系プロパティを削除
+    delete navigator.__proto__.webdriver;
+    delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array;
+    delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
+    delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
 }
 """
 
@@ -302,7 +361,7 @@ class BaseScraper(ABC):
         success = await self.login()
 
         if success:
-            self._last_login_time = datetime.now()
+            self._last_login_time = datetime.now(JST)
             await self._save_cookies()
 
             # ログイン後にCAPTCHAチェック
@@ -313,15 +372,18 @@ class BaseScraper(ABC):
 
     def _is_session_expired(self) -> bool:
         """セッション有効期限を超過しているか"""
+        now = datetime.now(JST)
         if self._last_login_time is None:
             # Cookie ファイルの更新時刻から判定
             if self.cookies_path.exists():
                 import os
-                mtime = datetime.fromtimestamp(os.path.getmtime(self.cookies_path))
-                age_hours = (datetime.now() - mtime).total_seconds() / 3600
+                mtime = datetime.fromtimestamp(
+                    os.path.getmtime(self.cookies_path), tz=JST
+                )
+                age_hours = (now - mtime).total_seconds() / 3600
                 return age_hours > self.SESSION_MAX_AGE_HOURS
             return False
-        age_hours = (datetime.now() - self._last_login_time).total_seconds() / 3600
+        age_hours = (now - self._last_login_time).total_seconds() / 3600
         return age_hours > self.SESSION_MAX_AGE_HOURS
 
     # ------------------------------------------------------------------
@@ -381,7 +443,7 @@ class BaseScraper(ABC):
             # 再ログイン
             success = await self.login()
             if success:
-                self._last_login_time = datetime.now()
+                self._last_login_time = datetime.now(JST)
                 await self._save_cookies()
                 self._consecutive_failures = 0
                 logger.info(f"[{self.name}] セッション復旧成功")
@@ -444,7 +506,7 @@ class BaseScraper(ABC):
 
     async def screenshot(self, name: str) -> Path:
         """スクリーンショット保存（デバッグ用）"""
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        timestamp = datetime.now(JST).strftime("%Y%m%d_%H%M%S")
         filename = f"{self.name}_{name}_{timestamp}.png"
         path = SCREENSHOTS_DIR / filename
         await self._page.screenshot(path=str(path), full_page=True)

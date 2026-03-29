@@ -8,13 +8,14 @@
 - 通常: 2.5〜4分のランダム間隔で定期取得
 - CAPTCHA検知時: 一時停止 → 管理者に通知 → 手動復旧待ち
 - エラー時: 指数バックオフでリトライ（最大30分）
+- 日次: 古い予約データの自動クリーンアップ
 """
 
 import asyncio
 import logging
 import random
 import signal
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from scrapers.config import SYNC_INTERVAL_MAX, SYNC_INTERVAL_MIN
 from scrapers.minimo_scraper import MinimoScraper
@@ -23,6 +24,8 @@ from scrapers.salonboard_scraper import SalonBoardScraper
 from scrapers.sync_service import SyncService
 
 logger = logging.getLogger(__name__)
+
+JST = timezone(timedelta(hours=9))
 
 
 class ReservationScheduler:
@@ -37,10 +40,14 @@ class ReservationScheduler:
         self._consecutive_errors = {"salonboard": 0, "minimo": 0}
         self._max_consecutive_errors = 5
         self._paused = {"salonboard": False, "minimo": False}
+        self._cycle_count = 0
+        self._last_cleanup: datetime | None = None
+        self._started_at: datetime | None = None
 
     async def start(self) -> None:
         """スケジューラー開始"""
         self._running = True
+        self._started_at = datetime.now(JST)
         logger.info("スケジューラー開始")
 
         # シグナルハンドラー（graceful shutdown）
@@ -54,7 +61,11 @@ class ReservationScheduler:
 
         try:
             while self._running:
+                self._cycle_count += 1
                 await self._run_cycle()
+
+                # 日次クリーンアップ（1日1回、30日前のデータを削除）
+                await self._maybe_cleanup()
 
                 # ランダム間隔で待機
                 interval = random.uniform(SYNC_INTERVAL_MIN, SYNC_INTERVAL_MAX)
@@ -69,8 +80,9 @@ class ReservationScheduler:
     async def _run_cycle(self) -> None:
         """1回の同期サイクル"""
         # 今日と明日の予約を取得（ダブルブッキング防止に重要な範囲）
-        today = datetime.now().strftime("%Y-%m-%d")
-        tomorrow = (datetime.now() + timedelta(days=1)).strftime("%Y-%m-%d")
+        now = datetime.now(JST)
+        today = now.strftime("%Y-%m-%d")
+        tomorrow = (now + timedelta(days=1)).strftime("%Y-%m-%d")
         dates = [today, tomorrow]
 
         results = {}
@@ -139,6 +151,19 @@ class ReservationScheduler:
 
             return {"synced": 0, "errors": 1}
 
+    async def _maybe_cleanup(self) -> None:
+        """日次クリーンアップ（30日以前の古いデータ削除）"""
+        now = datetime.now(JST)
+        if self._last_cleanup and (now - self._last_cleanup).total_seconds() < 86400:
+            return  # 24時間以内にクリーンアップ済み
+
+        try:
+            await self.sync_service.cleanup_old_reservations(days_before=30)
+            self._last_cleanup = now
+            logger.info("日次クリーンアップ完了")
+        except Exception as e:
+            logger.error(f"クリーンアップエラー: {e}")
+
     async def resume(self, source: str) -> bool:
         """一時停止中のスクレイパーを再開"""
         if source not in self._paused:
@@ -162,7 +187,7 @@ class ReservationScheduler:
     async def force_sync(self, target_date: str = None) -> dict:
         """手動で即時同期を実行"""
         if target_date is None:
-            target_date = datetime.now().strftime("%Y-%m-%d")
+            target_date = datetime.now(JST).strftime("%Y-%m-%d")
 
         results = {}
 
@@ -233,7 +258,7 @@ class ReservationScheduler:
         result = {
             "available": len(conflicts) == 0,
             "conflicts": conflicts,
-            "checked_at": datetime.now().isoformat(),
+            "checked_at": datetime.now(JST).isoformat(),
         }
 
         if conflicts:
@@ -251,6 +276,9 @@ class ReservationScheduler:
             "consecutive_errors": dict(self._consecutive_errors),
             "salonboard_captcha": self.salonboard.captcha_detected,
             "minimo_captcha": self.minimo.captcha_detected,
+            "cycle_count": self._cycle_count,
+            "started_at": self._started_at.isoformat() if self._started_at else None,
+            "last_cleanup": self._last_cleanup.isoformat() if self._last_cleanup else None,
         }
 
     def _handle_shutdown(self) -> None:
@@ -263,4 +291,7 @@ class ReservationScheduler:
         logger.info("クリーンアップ中...")
         await self.salonboard.close_browser()
         await self.minimo.close_browser()
+        # HTTP クライアントの解放
+        from scrapers.sync_service import close_http_client
+        await close_http_client()
         logger.info("クリーンアップ完了")

@@ -19,7 +19,7 @@ import asyncio
 import logging
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from fastapi import FastAPI, HTTPException, Header
@@ -28,6 +28,8 @@ from pydantic import BaseModel
 from scrapers.scheduler import ReservationScheduler
 
 logger = logging.getLogger(__name__)
+
+JST = timezone(timedelta(hours=9))
 
 # --- 認証 ---
 API_SECRET = os.getenv("SCRAPER_API_SECRET", "")
@@ -103,7 +105,7 @@ class RealtimeCheckResponse(BaseModel):
 async def health():
     return {
         "status": "healthy",
-        "timestamp": datetime.now().isoformat(),
+        "timestamp": datetime.now(JST).isoformat(),
         "scheduler_running": scheduler is not None and scheduler._running,
     }
 

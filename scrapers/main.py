@@ -27,6 +27,7 @@ ConoHaサーバーでの常時稼働:
 import argparse
 import asyncio
 import logging
+import logging.handlers
 import sys
 from datetime import datetime
 
@@ -38,14 +39,21 @@ from scrapers.sync_service import SyncService
 
 
 def setup_logging() -> None:
-    """ログ設定"""
-    log_file = LOGS_DIR / f"scraper_{datetime.now().strftime('%Y%m%d')}.log"
+    """ログ設定（ローテーション付き: 10MB x 5世代）"""
+    log_file = LOGS_DIR / "scraper.log"
+
+    file_handler = logging.handlers.RotatingFileHandler(
+        log_file,
+        maxBytes=10 * 1024 * 1024,  # 10MB
+        backupCount=5,
+        encoding="utf-8",
+    )
 
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
         handlers=[
-            logging.FileHandler(log_file, encoding="utf-8"),
+            file_handler,
             logging.StreamHandler(sys.stdout),
         ],
     )

@@ -9,3 +9,7 @@ logs/
 
 # 環境変数（認証情報を含む）
 .env
+
+# Pythonキャッシュ
+__pycache__/
+*.pyc

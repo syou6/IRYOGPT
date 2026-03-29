@@ -7,12 +7,12 @@ zendriver = nodriverのアクティブfork（2026年3月現在も活発にメン
 - Cookie保存/読込のビルトインサポート
 - VPSでは Xvfb + headless=False で運用（headless=Trueは検知される）
 
-ステルス対策:
-- stealth.py の JS を全ページに自動注入
-- ベジェ曲線マウス移動（テレポートしない）
-- ランダムビューポート
-- 人間的なタイピング速度のばらつき
-- ランダムスクロール・休憩
+ステルス対策（Akamai Bot Manager対応）:
+- cdp.page.add_script_to_evaluate_on_new_document でページJSより先に注入
+  （page.evaluate は遅すぎてAkamaiセンサーに間に合わない）
+- puppeteer-extra-plugin-stealth 全17モジュール互換
+- ベジェ曲線マウス移動
+- ランダムビューポート + screen/outerWidth/outerHeight 一貫性
 """
 
 import asyncio
@@ -24,12 +24,13 @@ from pathlib import Path
 from typing import Optional
 
 import zendriver as uc
+import zendriver.cdp as cdp
 
 from scrapers.config import (
     SCREENSHOTS_DIR,
     USER_AGENTS,
 )
-from scrapers.stealth import STEALTH_JS, bezier_curve, random_viewport
+from scrapers.stealth import bezier_curve, build_stealth_js, random_viewport
 
 logger = logging.getLogger(__name__)
 
@@ -37,9 +38,9 @@ JST = timezone(timedelta(hours=9))
 
 
 class BaseScraper(ABC):
-    """全スクレイパーの基底クラス（zendriver + ステルス強化版）"""
+    """全スクレイパーの基底クラス（zendriver + Akamai対策版）"""
 
-    SESSION_MAX_AGE_HOURS = 12
+    SESSION_MAX_AGE_HOURS = 10  # 80%プリエンプティブ再ログイン考慮
 
     def __init__(self, name: str, cookies_path: Path):
         self.name = name
@@ -52,6 +53,8 @@ class BaseScraper(ABC):
         self._max_retries = 3
         self._scrape_count = 0
         self._viewport = random_viewport()
+        self._user_agent = ""
+        self._stealth_injected = False
 
     # ------------------------------------------------------------------
     # ブラウザ起動・終了
@@ -59,32 +62,80 @@ class BaseScraper(ABC):
 
     async def start_browser(self) -> None:
         """zendriver でブラウザを起動（Xvfb環境前提、headless=False）"""
-        user_agent = random.choice(USER_AGENTS)
+        self._user_agent = random.choice(USER_AGENTS)
         self._viewport = random_viewport()
         w, h = self._viewport
 
-        logger.info(f"[{self.name}] UA: {user_agent[:60]}... VP: {w}x{h}")
+        logger.info(f"[{self.name}] UA: {self._user_agent[:60]}... VP: {w}x{h}")
 
         self._browser = await uc.start(
             headless=False,
             lang="ja-JP",
             browser_args=[
-                f"--user-agent={user_agent}",
+                f"--user-agent={self._user_agent}",
                 f"--window-size={w},{h}",
                 "--no-sandbox",
                 "--disable-dev-shm-usage",
                 "--disable-infobars",
+                # Akamai対策: 自動化フラグを無効化
                 "--disable-blink-features=AutomationControlled",
                 "--disable-features=IsolateOrigins,site-per-process",
-                "--disable-web-security=false",
             ],
         )
 
+        # ステルスJSをページ読み込み前に注入（最重要）
+        await self._register_stealth_scripts()
+
+        # Cookie読み込み
         await self._load_cookies()
+
         logger.info(f"[{self.name}] ブラウザ起動完了 (zendriver + stealth)")
 
+    async def _register_stealth_scripts(self) -> None:
+        """
+        cdp.page.add_script_to_evaluate_on_new_document で
+        ステルスJSを登録（全ページで自動実行される）
+
+        重要: page.evaluate() ではなくこのCDPメソッドを使う。
+        page.evaluate() はページJSの後に実行されるため、
+        Akamaiセンサーが先に走って検知される。
+        このCDPメソッドはページJSより先に実行される。
+        """
+        try:
+            stealth_js = build_stealth_js(self._viewport, self._user_agent)
+
+            # メインのタブに対してCDPコマンドを送信
+            main_tab = self._browser.main_tab
+            if main_tab:
+                await main_tab.send(
+                    cdp.page.add_script_to_evaluate_on_new_document(
+                        source=stealth_js
+                    )
+                )
+                self._stealth_injected = True
+                logger.info(f"[{self.name}] ステルスJS登録完了（add_script_to_evaluate_on_new_document）")
+            else:
+                logger.warning(f"[{self.name}] main_tab取得失敗。safe_gotoでフォールバック注入")
+
+        except Exception as e:
+            logger.warning(f"[{self.name}] ステルスJS CDP登録失敗（フォールバック使用）: {e}")
+            self._stealth_injected = False
+
+    async def _inject_stealth_fallback(self) -> None:
+        """
+        CDPメソッドが使えない場合のフォールバック。
+        page.evaluate() で注入（タイミングは遅いが無いよりマシ）
+        """
+        if self._stealth_injected:
+            return
+        try:
+            stealth_js = build_stealth_js(self._viewport, self._user_agent)
+            await self._page.evaluate(stealth_js)
+            logger.debug(f"[{self.name}] ステルスJS フォールバック注入完了")
+        except Exception as e:
+            logger.debug(f"[{self.name}] ステルスJS フォールバック失敗（無害）: {e}")
+
     async def close_browser(self) -> None:
-        """ブラウザを安全に終了"""
         try:
             if self._browser:
                 await self._save_cookies()
@@ -94,6 +145,7 @@ class BaseScraper(ABC):
         finally:
             self._page = None
             self._browser = None
+            self._stealth_injected = False
 
     async def maybe_restart_browser(self) -> None:
         """メモリリーク対策: 20回に1回ブラウザを再起動"""
@@ -102,17 +154,6 @@ class BaseScraper(ABC):
             logger.info(f"[{self.name}] 定期再起動（{self._scrape_count}回目）")
             await self.close_browser()
             await self.start_browser()
-
-    # ------------------------------------------------------------------
-    # ステルスJS注入
-    # ------------------------------------------------------------------
-
-    async def _inject_stealth(self) -> None:
-        """ステルスJSを現在のページに注入"""
-        try:
-            await self._page.evaluate(STEALTH_JS)
-        except Exception as e:
-            logger.debug(f"[{self.name}] ステルスJS注入エラー（無害）: {e}")
 
     # ------------------------------------------------------------------
     # Cookie 管理
@@ -143,17 +184,15 @@ class BaseScraper(ABC):
             logger.info(f"[{self.name}] Cookie削除")
 
     # ------------------------------------------------------------------
-    # 人間的な操作の模倣（強化版）
+    # 人間的な操作の模倣（Akamai行動解析対策）
     # ------------------------------------------------------------------
 
     async def human_delay(self, min_sec: float = 0.5, max_sec: float = 2.0) -> None:
-        """ランダムな待機時間"""
         await asyncio.sleep(random.uniform(min_sec, max_sec))
 
     async def human_click(self, element) -> None:
         """ベジェ曲線でマウスを移動してからクリック"""
         try:
-            # 要素の位置を取得
             box = await self._page.evaluate("""
                 (el) => {
                     const rect = el.getBoundingClientRect();
@@ -167,27 +206,26 @@ class BaseScraper(ABC):
             """, element)
 
             if box and box.get("width", 0) > 0:
-                # 現在のマウス位置（ランダムなスタート地点）
                 w, h = self._viewport
-                start_x = random.randint(0, w)
-                start_y = random.randint(0, h)
+                start_x = random.randint(int(w * 0.1), int(w * 0.9))
+                start_y = random.randint(int(h * 0.1), int(h * 0.9))
 
-                # クリック位置に微小なずれ（中心ぴったりは不自然）
-                target_x = box["x"] + random.uniform(-box["width"] * 0.2, box["width"] * 0.2)
-                target_y = box["y"] + random.uniform(-box["height"] * 0.2, box["height"] * 0.2)
+                target_x = box["x"] + random.uniform(-box["width"] * 0.15, box["width"] * 0.15)
+                target_y = box["y"] + random.uniform(-box["height"] * 0.15, box["height"] * 0.15)
 
                 path = bezier_curve((start_x, start_y), (target_x, target_y))
 
-                # マウス移動（全ポイントは送らず間引く）
-                step = max(1, len(path) // 8)
+                # zendriver の mouse_move を使用（CDPネイティブ）
+                step = max(1, len(path) // 6)
                 for i in range(0, len(path), step):
                     px, py = path[i]
-                    await self._page.evaluate(
-                        f"document.dispatchEvent(new MouseEvent('mousemove', {{clientX: {px}, clientY: {py}, bubbles: true}}))"
-                    )
-                    await asyncio.sleep(random.uniform(0.01, 0.03))
+                    try:
+                        await self._page.mouse_move(px, py, steps=1)
+                    except Exception:
+                        break
+                    await asyncio.sleep(random.uniform(0.01, 0.04))
 
-                await self.human_delay(0.05, 0.15)
+                await self.human_delay(0.05, 0.2)
 
         except Exception:
             pass  # フォールバック: 通常クリック
@@ -200,17 +238,16 @@ class BaseScraper(ABC):
         await self.human_delay(0.2, 0.5)
         await element.clear_input()
 
-        for i, char in enumerate(text):
+        for char in text:
             await element.send_keys(char)
 
-            # 基本のタイピング速度
             delay = random.uniform(0.04, 0.12)
 
             # たまに少し長めの間（考え中を再現）
             if random.random() < 0.08:
                 delay += random.uniform(0.2, 0.5)
 
-            # 単語区切りで微妙に遅くなる
+            # 記号区切りで微妙に遅くなる
             if char in (" ", "-", "@", "."):
                 delay += random.uniform(0.05, 0.15)
 
@@ -240,21 +277,18 @@ class BaseScraper(ABC):
     # ------------------------------------------------------------------
 
     async def find(self, selector: str, timeout: int = 10):
-        """CSS セレクタ or テキストで要素を検索"""
         try:
             return await self._page.find(selector, timeout=timeout)
         except Exception:
             return None
 
     async def find_all(self, selector: str) -> list:
-        """CSSセレクタで複数要素を検索"""
         try:
             return await self._page.select_all(selector)
         except Exception:
             return []
 
     async def query(self, selector: str):
-        """CSSセレクタで要素を検索（見つからなければNone、タイムアウトなし）"""
         try:
             return await self._page.query_selector(selector)
         except Exception:
@@ -265,7 +299,6 @@ class BaseScraper(ABC):
     # ------------------------------------------------------------------
 
     async def detect_captcha(self) -> bool:
-        """CAPTCHAが表示されているか検知"""
         captcha_selectors = [
             "iframe[src*='recaptcha']",
             "iframe[src*='captcha']",
@@ -275,12 +308,13 @@ class BaseScraper(ABC):
             "[id*='captcha']",
             "img[src*='captcha']",
             "iframe[title*='reCAPTCHA']",
-            # hCaptcha
             "iframe[src*='hcaptcha']",
             ".h-captcha",
-            # Cloudflare Turnstile
             "iframe[src*='challenges.cloudflare']",
             ".cf-turnstile",
+            # Akamai Bot Manager の画像チャレンジ
+            "#sec-cpt-if",
+            "iframe[src*='akamaihd']",
         ]
 
         for selector in captcha_selectors:
@@ -294,13 +328,13 @@ class BaseScraper(ABC):
             except Exception:
                 continue
 
-        # ページテキストからも検知
         try:
             body_text = await self._page.evaluate("document.body.innerText")
             captcha_keywords = [
                 "画像認証", "captcha", "ロボットではない",
                 "確認してください", "I'm not a robot",
                 "セキュリティチェック", "不正なアクセス",
+                "Access Denied", "Request blocked",
             ]
             for keyword in captcha_keywords:
                 if keyword.lower() in body_text.lower():
@@ -321,7 +355,7 @@ class BaseScraper(ABC):
         self._captcha_detected = False
 
     # ------------------------------------------------------------------
-    # ログイン（サブクラスで実装）
+    # ログイン
     # ------------------------------------------------------------------
 
     @abstractmethod
@@ -333,10 +367,18 @@ class BaseScraper(ABC):
         ...
 
     async def ensure_logged_in(self) -> bool:
-        """ログイン状態を保証"""
+        """ログイン状態を保証（80% TTLでプリエンプティブ再ログイン）"""
         if self._is_session_expired():
             logger.info(f"[{self.name}] セッション期限切れ → 再ログイン")
             self.clear_cookies()
+        elif self._should_preemptive_relogin():
+            logger.info(f"[{self.name}] プリエンプティブ再ログイン（80% TTL）")
+            # Cookie は残してまずログイン状態を確認
+            if await self.is_logged_in():
+                logger.debug(f"[{self.name}] まだ有効だがCookie更新")
+                await self._save_cookies()
+                self._last_login_time = datetime.now(JST)
+                return True
         elif await self.is_logged_in():
             logger.debug(f"[{self.name}] セッション有効")
             await self._save_cookies()
@@ -352,6 +394,13 @@ class BaseScraper(ABC):
                 return False
 
         return success
+
+    def _should_preemptive_relogin(self) -> bool:
+        """80% TTLに達したか"""
+        if self._last_login_time is None:
+            return False
+        age_hours = (datetime.now(JST) - self._last_login_time).total_seconds() / 3600
+        return age_hours > (self.SESSION_MAX_AGE_HOURS * 0.8)
 
     def _is_session_expired(self) -> bool:
         now = datetime.now(JST)
@@ -391,7 +440,6 @@ class BaseScraper(ABC):
         return False
 
     async def recover_session(self) -> bool:
-        """セッション切れからの自動復旧"""
         logger.info(f"[{self.name}] セッション復旧開始...")
         self.clear_cookies()
 
@@ -411,7 +459,7 @@ class BaseScraper(ABC):
             return False
 
     # ------------------------------------------------------------------
-    # データ取得（サブクラスで実装）
+    # データ取得
     # ------------------------------------------------------------------
 
     @abstractmethod
@@ -466,12 +514,17 @@ class BaseScraper(ABC):
         return path
 
     async def safe_goto(self, url: str, timeout: int = 30) -> bool:
-        """安全なページ遷移（ステルスJS自動注入）"""
+        """安全なページ遷移（ステルスフォールバック + Akamaiセンサー待機）"""
         try:
             self._page = await self._browser.get(url, new_tab=False)
-            await self._inject_stealth()
-            await self.human_delay(0.5, 1.5)
+
+            # CDPメソッドが失敗していた場合のフォールバック
+            await self._inject_stealth_fallback()
+
+            # Akamaiセンサーの実行を待つ（_abckクッキーの検証に必要）
+            await self.human_delay(1.0, 2.5)
             await self.random_idle()
+
             return True
         except Exception as e:
             logger.error(f"[{self.name}] ページ遷移失敗 {url}: {e}")
@@ -479,7 +532,6 @@ class BaseScraper(ABC):
             return False
 
     async def wait_for_url(self, condition, timeout: int = 15) -> bool:
-        """URLが条件を満たすまで待つ"""
         import time
         end_time = time.time() + timeout
         while time.time() < end_time:

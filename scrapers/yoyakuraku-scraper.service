@@ -13,8 +13,12 @@
 
 [Unit]
 Description=Yoyakuraku Reservation Scraper & API
-After=network.target xvfb.service
+After=network-online.target xvfb.service
 Requires=xvfb.service
+Wants=network-online.target
+# 5分以内に5回再起動失敗 → 停止
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 Type=simple
@@ -22,21 +26,34 @@ User=root
 WorkingDirectory=/home/IRYOGPT
 EnvironmentFile=/home/IRYOGPT/scrapers/.env
 Environment=PYTHONUNBUFFERED=1
+Environment=PYTHONFAULTHANDLER=1
 Environment=DISPLAY=:99
 
 ExecStart=/home/IRYOGPT/venv/bin/uvicorn scrapers.api_server:app --host 0.0.0.0 --port 8000
 
-Restart=always
-RestartSec=30
+Restart=on-failure
+RestartSec=15
+TimeoutStartSec=60
+TimeoutStopSec=30
 
-# メモリ制限（暴走防止）
-MemoryMax=2G
+# --- リソース制限 ---
+# Chrome はメモリとfdを大量消費する
 MemoryHigh=1.5G
+MemoryMax=2G
+LimitNOFILE=65536
+LimitNPROC=4096
 
-# ログ
+# --- セキュリティ ---
+NoNewPrivileges=yes
+PrivateTmp=yes
+
+# --- ログ ---
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=yoyakuraku-scraper
+# ログレート制限（暴走防止）
+LogRateLimitIntervalSec=30
+LogRateLimitBurst=500
 
 [Install]
 WantedBy=multi-user.target

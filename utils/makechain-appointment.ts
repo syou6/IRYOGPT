@@ -47,7 +47,8 @@ export interface AppointmentChatResult {
 export async function runAppointmentChat(
   spreadsheetId: string,
   messages: AppointmentChatMessage[],
-  onToken?: (token: string) => void
+  onToken?: (token: string) => void,
+  siteId?: string
 ): Promise<AppointmentChatResult> {
   // 最初に設定を取得してプロンプトに埋め込む（AIがget_clinic_infoを呼ばなくても設定を知れるように）
   const settings = await getClinicSettings(spreadsheetId);
@@ -102,7 +103,7 @@ export async function runAppointmentChat(
         preloadedSlots = await executeToolCall(spreadsheetId, {
           name: 'get_available_slots',
           args: { date: targetDate },
-        });
+        }, siteId);
         console.log('[Appointment] Preloaded slots:', preloadedSlots);
       }
     } catch (error) {
@@ -154,7 +155,7 @@ export async function runAppointmentChat(
     let appointmentCreated = false;
 
     for (const toolCall of otherToolCalls) {
-      const result = await executeToolCall(spreadsheetId, toolCall);
+      const result = await executeToolCall(spreadsheetId, toolCall, siteId);
 
       if (toolCall.name === 'create_appointment' && result.startsWith('予約が完了しました')) {
         appointmentCreated = true;
@@ -237,7 +238,7 @@ export async function runAppointmentChat(
       const toolResult = await executeToolCall(spreadsheetId, {
         name: 'get_available_slots',
         args: { date: targetDate },
-      });
+      }, siteId);
 
       // 結果を含めて再度LLM呼び出し
       const retryMessages = [
@@ -294,7 +295,8 @@ export async function runAppointmentChat(
  */
 async function executeToolCall(
   spreadsheetId: string,
-  toolCall: { name: string; args: any }
+  toolCall: { name: string; args: any },
+  siteId?: string
 ): Promise<string> {
   const { name, args } = toolCall;
 
@@ -353,7 +355,7 @@ async function executeToolCall(
         return `${args.date}は予約可能期間外です。${settings.maxAdvanceDays}日先（${maxDateStr}）までの日付をお選びください。`;
       }
 
-      const slots = await getAvailableSlots(spreadsheetId, args.date);
+      const slots = await getAvailableSlots(spreadsheetId, args.date, siteId);
       console.log(`[Tool] get_available_slots for ${args.date}:`, JSON.stringify(slots, null, 2));
 
       // 曜日を計算（AIが間違えないように結果に含める）
@@ -449,7 +451,7 @@ async function executeToolCall(
         return `診察券番号の確認が必要です。「診察券番号をお持ちでしたらお伝えください。初診の方や番号がわからない場合は『なし』で大丈夫です」と確認してください。`;
       }
 
-      // サニタイズしてから保存
+      // サニタイズしてから保存（siteId渡して外部予約もチェック）
       const result = await createAppointment(spreadsheetId, {
         date: dateVal.normalized!,
         time: timeVal.normalized!,
@@ -460,7 +462,7 @@ async function executeToolCall(
         doctor: normalizedDoctor,
         symptom: args.symptom ? sanitizeForSheet(args.symptom) : '',
         bookedVia: 'ChatBot',
-      });
+      }, siteId);
 
       if (result.success) {
         // メール送信（患者にメールアドレスがある場合）

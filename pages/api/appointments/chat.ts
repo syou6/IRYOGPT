@@ -99,7 +99,8 @@ export default async function handler(
         (token: string) => {
           hasStreamed = true;
           sendData(JSON.stringify({ data: token }));
-        }
+        },
+        site_id,
       );
 
       // ストリーミングされなかった場合のみ結果を送信

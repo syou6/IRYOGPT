@@ -252,6 +252,7 @@ export async function handleAppointmentChat(
         outputText += token;
         sendData(JSON.stringify({ data: token }));
       },
+      siteId,
     );
 
     if (sendUnstreamed && !hasStreamed && result.message) {
@@ -319,6 +320,7 @@ export async function handleHybridChat(
         outputText += token;
         sendData(JSON.stringify({ data: token }));
       },
+      { siteId },
     );
 
     if (sendUnstreamed && !hasStreamed && result.message) {

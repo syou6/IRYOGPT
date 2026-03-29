@@ -29,6 +29,7 @@ import { supabaseClient } from '../supabase-client';
 export interface ToolExecutorContext {
   lineUserId?: string;
   source?: string;
+  siteId?: string;
 }
 
 /**
@@ -46,7 +47,7 @@ export async function executeToolCall(
       return executeDateInfo(args);
 
     case 'get_available_slots':
-      return executeGetAvailableSlots(spreadsheetId, args);
+      return executeGetAvailableSlots(spreadsheetId, args, context?.siteId);
 
     case 'create_appointment':
       return executeCreateAppointment(spreadsheetId, args, context);
@@ -87,7 +88,7 @@ function executeDateInfo(args: any): string {
   }
 }
 
-async function executeGetAvailableSlots(spreadsheetId: string, args: any): Promise<string> {
+async function executeGetAvailableSlots(spreadsheetId: string, args: any, siteId?: string): Promise<string> {
   const dateValidation = validateDateFormat(args.date);
   if (!dateValidation.valid) {
     return dateValidation.error || '日付の形式が正しくありません。';
@@ -111,7 +112,7 @@ async function executeGetAvailableSlots(spreadsheetId: string, args: any): Promi
     return `${args.date}は予約可能期間外です。${settings.maxAdvanceDays}日先（${formatDateJP(maxDate)}）までの日付をお選びください。`;
   }
 
-  const slots = await getAvailableSlots(spreadsheetId, args.date);
+  const slots = await getAvailableSlots(spreadsheetId, args.date, siteId);
   console.log(`[Tool] get_available_slots for ${args.date}:`, JSON.stringify(slots, null, 2));
 
   const dayNames = ['日', '月', '火', '水', '木', '金', '土'];
@@ -216,7 +217,7 @@ async function executeCreateAppointment(
     symptom: args.symptom ? sanitizeForSheet(args.symptom) : '',
     bookedVia,
     lineUserId: context?.lineUserId,
-  });
+  }, context?.siteId);
 
   if (result.success) {
     // LINE予約の場合、phone_numberをline_usersテーブルにupsert（リマインド用）

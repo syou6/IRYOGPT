@@ -66,7 +66,7 @@ export default async function handler(
     }
 
     const settings = await getClinicSettings(site.spreadsheet_id);
-    const slots = await getAvailableSlots(site.spreadsheet_id, date);
+    const slots = await getAvailableSlots(site.spreadsheet_id, date, site_id as string);
 
     return res.status(200).json({
       date,

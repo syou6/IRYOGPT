@@ -40,7 +40,7 @@ export async function runHybridChat(
   const systemPrompt = getHybridSystemPrompt(ragContext, settings);
 
   // ④ 日付が含まれていたら先に空き状況を取得（AIの判断を待たない）
-  const preloadedSlots = await preloadSlotsIfDateMentioned(spreadsheetId, query);
+  const preloadedSlots = await preloadSlotsIfDateMentioned(spreadsheetId, query, context);
 
   const fullMessages = [
     { role: 'system' as const, content: systemPrompt },
@@ -113,7 +113,8 @@ export async function runHybridChat(
  */
 async function preloadSlotsIfDateMentioned(
   spreadsheetId: string,
-  query: string
+  query: string,
+  context?: ToolExecutorContext
 ): Promise<string | null> {
   const datePatterns = [
     /(\d{1,2})月(\d{1,2})日/,
@@ -136,7 +137,7 @@ async function preloadSlotsIfDateMentioned(
     const slots = await executeToolCall(spreadsheetId, {
       name: 'get_available_slots',
       args: { date: targetDate },
-    });
+    }, context);
     console.log('[Hybrid] Preloaded slots:', slots);
     return slots;
   } catch (error) {

@@ -2,6 +2,7 @@ import { readSheet, appendToSheet, updateSheet } from './google-sheets';
 import { format, parse, addMinutes, isAfter, isBefore, isSameDay } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { TIMEZONE, DEFAULT_SETTINGS, SHEET_NAMES, SHEET_RANGES, CACHE_CONFIG } from './constants';
+import { supabaseClient } from './supabase-client';
 
 // 設定キャッシュ（スプレッドシートIDごと）
 interface CacheEntry {
@@ -293,15 +294,67 @@ export async function getAllAppointments(
 }
 
 /**
+ * 外部予約（サロンボード・ミニモ）を取得
+ *
+ * external_reservationsテーブルから指定サイト・指定日の確定済み予約を取得し、
+ * スプレッドシートの予約と同じ形式のオブジェクトに変換して返す。
+ * ダブルブッキング防止のために、空き枠計算時にスプレッドシートの予約とマージする。
+ */
+export async function getExternalReservations(
+  siteId: string,
+  targetDate: string
+): Promise<{ time: string; staffName: string; source: string }[]> {
+  try {
+    // targetDate: "2026/1/29" → "2026-01-29" に変換
+    const parts = targetDate.split('/');
+    const isoDate = `${parts[0]}-${parts[1].padStart(2, '0')}-${parts[2].padStart(2, '0')}`;
+
+    const { data, error } = await supabaseClient
+      .from('external_reservations')
+      .select('start_time, end_time, staff_name, source')
+      .eq('site_id', siteId)
+      .eq('date', isoDate)
+      .eq('status', 'confirmed');
+
+    if (error) {
+      console.error('[getExternalReservations] Supabase error:', error);
+      return [];
+    }
+
+    return (data || []).map((r: any) => ({
+      time: r.start_time,
+      staffName: r.staff_name || '',
+      source: r.source,
+    }));
+  } catch (err) {
+    console.error('[getExternalReservations] Error:', err);
+    return [];
+  }
+}
+
+/**
  * 指定日の空き枠を取得
+ *
+ * siteId が指定された場合、external_reservations テーブル（サロンボード・ミニモ）の
+ * 予約もマージして空き枠を計算する（ダブルブッキング防止）。
  */
 export async function getAvailableSlots(
   spreadsheetId: string,
-  targetDate: string
+  targetDate: string,
+  siteId?: string
 ): Promise<TimeSlot[]> {
   const settings = await getClinicSettings(spreadsheetId);
   const holidays = await getHolidays(spreadsheetId);
   const existingAppointments = await getAppointmentsByDate(spreadsheetId, targetDate);
+
+  // 外部予約（サロンボード・ミニモ）を取得
+  let externalReservations: { time: string; staffName: string; source: string }[] = [];
+  if (siteId) {
+    externalReservations = await getExternalReservations(siteId, targetDate);
+    if (externalReservations.length > 0) {
+      console.log(`[getAvailableSlots] 外部予約 ${externalReservations.length}件 (${targetDate})`);
+    }
+  }
 
   // 日付をパース
   const date = parse(targetDate, 'yyyy/M/d', new Date());
@@ -333,10 +386,16 @@ export async function getAvailableSlots(
     return `${hour}:${minute}`;
   };
 
-  // 各時間帯の予約数をカウント
+  // 各時間帯の予約数をカウント（スプレッドシート + 外部予約を統合）
   const bookingCountByTime = new Map<string, number>();
   for (const appointment of existingAppointments) {
     const normalizedTime = normalizeTime(appointment.time);
+    const currentCount = bookingCountByTime.get(normalizedTime) || 0;
+    bookingCountByTime.set(normalizedTime, currentCount + 1);
+  }
+  // 外部予約（サロンボード・ミニモ）もカウントに加算
+  for (const ext of externalReservations) {
+    const normalizedTime = normalizeTime(ext.time);
     const currentCount = bookingCountByTime.get(normalizedTime) || 0;
     bookingCountByTime.set(normalizedTime, currentCount + 1);
   }
@@ -404,10 +463,11 @@ export async function getAvailableSlots(
  */
 export async function createAppointment(
   spreadsheetId: string,
-  appointment: Omit<Appointment, 'status'> & { bookedVia?: string }
+  appointment: Omit<Appointment, 'status'> & { bookedVia?: string },
+  siteId?: string
 ): Promise<{ success: boolean; message: string }> {
-  // 空き枠を再確認（競合防止）
-  const slots = await getAvailableSlots(spreadsheetId, appointment.date);
+  // 空き枠を再確認（外部予約も含めた競合防止）
+  const slots = await getAvailableSlots(spreadsheetId, appointment.date, siteId);
   const targetSlot = slots.find(s => s.time === appointment.time);
 
   if (!targetSlot) {

@@ -105,7 +105,7 @@ export default async function handler(
       patientEmail: patient_email,
       symptom,
       bookedVia: booked_via || 'Bot',
-    });
+    }, site_id);
 
     if (!result.success) {
       return res.status(409).json({

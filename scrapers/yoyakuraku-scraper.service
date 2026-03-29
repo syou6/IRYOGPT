@@ -1,6 +1,9 @@
 # systemdサービスファイル
 # ConoHaサーバーで常時稼働させる場合に使用
 #
+# APIサーバー + スケジューラーを一体で起動する。
+# よやくらく（Vercel）からのリアルタイムチェックリクエストも受け付ける。
+#
 # 設置:
 #   sudo cp scrapers/yoyakuraku-scraper.service /etc/systemd/system/
 #   sudo systemctl daemon-reload
@@ -14,14 +17,14 @@
 #   sudo systemctl restart yoyakuraku-scraper
 
 [Unit]
-Description=Yoyakuraku Reservation Scraper
+Description=Yoyakuraku Reservation Scraper & API
 After=network.target
 
 [Service]
 Type=simple
 User=ubuntu
 WorkingDirectory=/home/ubuntu/IRYOGPT
-ExecStart=/home/ubuntu/IRYOGPT/venv/bin/python -m scrapers.main --site-id YOUR_SITE_ID_HERE
+ExecStart=/home/ubuntu/IRYOGPT/venv/bin/uvicorn scrapers.api_server:app --host 0.0.0.0 --port 8000
 Restart=always
 RestartSec=30
 Environment=PYTHONUNBUFFERED=1

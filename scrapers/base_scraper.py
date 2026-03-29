@@ -86,6 +86,9 @@ STEALTH_INIT_SCRIPT = """
 class BaseScraper(ABC):
     """全スクレイパーの基底クラス"""
 
+    # セッション有効期限（サロンボード: 15時間、安全マージンで12時間）
+    SESSION_MAX_AGE_HOURS = 12
+
     def __init__(self, name: str, cookies_path: Path):
         self.name = name
         self.cookies_path = cookies_path
@@ -94,6 +97,9 @@ class BaseScraper(ABC):
         self._context: Optional[BrowserContext] = None
         self._page: Optional[Page] = None
         self._captcha_detected = False
+        self._last_login_time: Optional[datetime] = None
+        self._consecutive_failures = 0
+        self._max_retries = 3
 
     # ------------------------------------------------------------------
     # ブラウザ起動・終了
@@ -282,14 +288,21 @@ class BaseScraper(ABC):
 
     async def ensure_logged_in(self) -> bool:
         """ログイン状態を保証。必要ならログインする"""
-        if await self.is_logged_in():
+        # セッション有効期限チェック（サロンボードは15時間で自動ログアウト）
+        if self._is_session_expired():
+            logger.info(f"[{self.name}] セッション期限切れ（{self.SESSION_MAX_AGE_HOURS}時間超過）→ 再ログイン")
+            self.clear_cookies()
+        elif await self.is_logged_in():
             logger.info(f"[{self.name}] セッション有効（Cookie再利用）")
+            # Cookieを定期的に再保存（セッションCookieの永続化対策）
+            await self._save_cookies()
             return True
 
         logger.info(f"[{self.name}] ログイン実行...")
         success = await self.login()
 
         if success:
+            self._last_login_time = datetime.now()
             await self._save_cookies()
 
             # ログイン後にCAPTCHAチェック
@@ -297,6 +310,86 @@ class BaseScraper(ABC):
                 return False
 
         return success
+
+    def _is_session_expired(self) -> bool:
+        """セッション有効期限を超過しているか"""
+        if self._last_login_time is None:
+            # Cookie ファイルの更新時刻から判定
+            if self.cookies_path.exists():
+                import os
+                mtime = datetime.fromtimestamp(os.path.getmtime(self.cookies_path))
+                age_hours = (datetime.now() - mtime).total_seconds() / 3600
+                return age_hours > self.SESSION_MAX_AGE_HOURS
+            return False
+        age_hours = (datetime.now() - self._last_login_time).total_seconds() / 3600
+        return age_hours > self.SESSION_MAX_AGE_HOURS
+
+    # ------------------------------------------------------------------
+    # セッション切れ検知と自動復旧
+    # ------------------------------------------------------------------
+
+    async def detect_session_expired(self) -> bool:
+        """ページ遷移後にセッション切れを検知"""
+        try:
+            current_url = self._page.url
+            # ログインページにリダイレクトされた
+            if "/login" in current_url.lower():
+                logger.warning(f"[{self.name}] セッション切れ検知（ログインページにリダイレクト）")
+                return True
+
+            # サロンボード特有のセッション切れメッセージ
+            body_text = await self._page.inner_text("body")
+            expired_keywords = [
+                "ログインの有効期限が切れました",
+                "一定時間操作されなかった",
+                "セッションが切れ",
+                "再度ログイン",
+            ]
+            for keyword in expired_keywords:
+                if keyword in body_text:
+                    logger.warning(f"[{self.name}] セッション切れ検知: {keyword}")
+                    return True
+
+        except Exception:
+            pass
+        return False
+
+    async def recover_session(self) -> bool:
+        """セッション切れからの自動復旧"""
+        logger.info(f"[{self.name}] セッション復旧開始...")
+        self.clear_cookies()
+
+        # ブラウザコンテキストを再作成
+        try:
+            if self._page:
+                await self._page.close()
+            if self._context:
+                await self._context.close()
+
+            context_options = {
+                "viewport": {"width": 1280, "height": 1024},
+                "user_agent": random.choice(USER_AGENTS),
+                "locale": "ja-JP",
+                "timezone_id": "Asia/Tokyo",
+                "color_scheme": "light",
+            }
+            self._context = await self._browser.new_context(**context_options)
+            await self._context.add_init_script(STEALTH_INIT_SCRIPT)
+            self._page = await self._context.new_page()
+            self._page.on("console", self._on_console)
+
+            # 再ログイン
+            success = await self.login()
+            if success:
+                self._last_login_time = datetime.now()
+                await self._save_cookies()
+                self._consecutive_failures = 0
+                logger.info(f"[{self.name}] セッション復旧成功")
+            return success
+
+        except Exception as e:
+            logger.error(f"[{self.name}] セッション復旧失敗: {e}")
+            return False
 
     # ------------------------------------------------------------------
     # データ取得（サブクラスで実装）
@@ -306,6 +399,44 @@ class BaseScraper(ABC):
     async def fetch_reservations(self, target_date: str) -> list[dict]:
         """指定日の予約一覧を取得。target_date: 'YYYY-MM-DD'"""
         ...
+
+    async def fetch_reservations_safe(self, target_date: str) -> list[dict]:
+        """
+        予約取得（セッション切れ自動復旧付き）
+
+        セッション切れを検知した場合、自動で再ログインしてリトライする。
+        """
+        for attempt in range(self._max_retries):
+            try:
+                reservations = await self.fetch_reservations(target_date)
+
+                # セッション切れチェック
+                if await self.detect_session_expired():
+                    logger.warning(
+                        f"[{self.name}] セッション切れ → 復旧試行 "
+                        f"({attempt + 1}/{self._max_retries})"
+                    )
+                    if await self.recover_session():
+                        continue  # リトライ
+                    else:
+                        break  # 復旧失敗
+
+                self._consecutive_failures = 0
+                return reservations
+
+            except Exception as e:
+                self._consecutive_failures += 1
+                logger.error(
+                    f"[{self.name}] 予約取得エラー "
+                    f"({attempt + 1}/{self._max_retries}): {e}"
+                )
+                if attempt < self._max_retries - 1:
+                    # 指数バックオフ
+                    wait = (2 ** attempt) + random.uniform(0, 1)
+                    logger.info(f"[{self.name}] {wait:.1f}秒後にリトライ")
+                    await asyncio.sleep(wait)
+
+        return []
 
     # ------------------------------------------------------------------
     # ユーティリティ

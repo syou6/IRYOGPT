@@ -1,0 +1,34 @@
+# systemdサービスファイル
+# ConoHaサーバーで常時稼働させる場合に使用
+#
+# 設置:
+#   sudo cp scrapers/yoyakuraku-scraper.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable yoyakuraku-scraper
+#   sudo systemctl start yoyakuraku-scraper
+#
+# ログ確認:
+#   sudo journalctl -u yoyakuraku-scraper -f
+#
+# 再起動:
+#   sudo systemctl restart yoyakuraku-scraper
+
+[Unit]
+Description=Yoyakuraku Reservation Scraper
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/IRYOGPT
+ExecStart=/home/ubuntu/IRYOGPT/venv/bin/python -m scrapers.main --site-id YOUR_SITE_ID_HERE
+Restart=always
+RestartSec=30
+Environment=PYTHONUNBUFFERED=1
+
+# ログ
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

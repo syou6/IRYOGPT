@@ -1,0 +1,14 @@
+# スクレイパーサービス依存パッケージ
+# ConoHaサーバーにインストール: pip install -r scrapers/requirements.txt
+
+# ブラウザ自動化
+playwright>=1.42.0
+
+# HTTP クライアント（Supabase API通信）
+httpx>=0.27.0
+
+# 環境変数
+python-dotenv>=1.0.0
+
+# ログ（標準ライブラリで十分だが、カラー出力が欲しい場合）
+# rich>=13.0.0

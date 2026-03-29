@@ -83,7 +83,8 @@ export async function handleLineMessage(
         siteConfig.id,
         siteConfig.spreadsheetId,
         messages,
-        undefined // ストリーミングコールバックなし
+        undefined, // ストリーミングコールバックなし
+        { lineUserId, source: 'line' }
       );
       responseText = result.message;
     } else {

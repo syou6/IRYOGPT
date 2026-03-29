@@ -48,6 +48,7 @@ export interface Appointment {
   symptom?: string;
   status: string;         // "確定" | "キャンセル"
   bookedVia: string;      // "Bot" | "電話" | "Web"
+  lineUserId?: string;    // LINE予約の場合のLINEユーザーID（column K）
 }
 
 /**
@@ -215,6 +216,7 @@ export async function getAppointmentsByDate(
         symptom: row[7] || '',
         status: row[8] || '確定',
         bookedVia: row[9] || '',
+        lineUserId: row[10] || undefined,
       });
     }
   }
@@ -251,6 +253,7 @@ export async function getAllAppointments(
       symptom: row[7] || '',
       status: row[8] || '確定',
       bookedVia: row[9] || '',
+      lineUserId: row[10] || undefined,
     };
 
     // キャンセル済みをフィルタ
@@ -401,7 +404,7 @@ export async function getAvailableSlots(
  */
 export async function createAppointment(
   spreadsheetId: string,
-  appointment: Omit<Appointment, 'status' | 'bookedVia'> & { bookedVia?: string }
+  appointment: Omit<Appointment, 'status'> & { bookedVia?: string }
 ): Promise<{ success: boolean; message: string }> {
   // 空き枠を再確認（競合防止）
   const slots = await getAvailableSlots(spreadsheetId, appointment.date);
@@ -415,7 +418,7 @@ export async function createAppointment(
     return { success: false, message: 'この枠は既に予約されています' };
   }
 
-  // 予約を追加（カラム: 日付, 時間, 患者名, 電話番号, メール, 診察券番号, 担当医, 症状, ステータス, 予約経由）
+  // 予約を追加（カラム: 日付, 時間, 患者名, 電話番号, メール, 診察券番号, 担当医, 症状, ステータス, 予約経由, LINE user ID）
   await appendToSheet(spreadsheetId, SHEET_RANGES.APPOINTMENTS_APPEND, [
     [
       appointment.date,
@@ -428,6 +431,7 @@ export async function createAppointment(
       appointment.symptom || '',
       '確定',
       appointment.bookedVia || 'Bot',
+      appointment.lineUserId || '',
     ],
   ]);
 

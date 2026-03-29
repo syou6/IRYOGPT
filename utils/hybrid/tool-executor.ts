@@ -24,13 +24,20 @@ import {
   normalizeOptionalValue,
 } from '../sanitizers';
 import { formatDateJP } from './prompt-builder';
+import { supabaseClient } from '../supabase-client';
+
+export interface ToolExecutorContext {
+  lineUserId?: string;
+  source?: string;
+}
 
 /**
  * ツール呼び出しを実行
  */
 export async function executeToolCall(
   spreadsheetId: string,
-  toolCall: { name: string; args: any }
+  toolCall: { name: string; args: any },
+  context?: ToolExecutorContext
 ): Promise<string> {
   const { name, args } = toolCall;
 
@@ -42,7 +49,7 @@ export async function executeToolCall(
       return executeGetAvailableSlots(spreadsheetId, args);
 
     case 'create_appointment':
-      return executeCreateAppointment(spreadsheetId, args);
+      return executeCreateAppointment(spreadsheetId, args, context);
 
     case 'get_clinic_info':
       return executeGetClinicInfo(spreadsheetId);
@@ -135,7 +142,11 @@ async function executeGetAvailableSlots(spreadsheetId: string, args: any): Promi
   return `【${dateWithDay}の予約状況】\n空き枠: ${timeListWithSlots}\n予約済み: なし`;
 }
 
-async function executeCreateAppointment(spreadsheetId: string, args: any): Promise<string> {
+async function executeCreateAppointment(
+  spreadsheetId: string,
+  args: any,
+  context?: ToolExecutorContext
+): Promise<string> {
   const settings = await getClinicSettings(spreadsheetId);
 
   const dateVal = validateDateFormat(args.date);
@@ -191,6 +202,9 @@ async function executeCreateAppointment(spreadsheetId: string, args: any): Promi
     return `診察券番号の確認が必要です。「診察券番号をお持ちでしたらお伝えください。初診の方や番号がわからない場合は『なし』で大丈夫です」と確認してください。`;
   }
 
+  const isLineSource = context?.source === 'line' && Boolean(context?.lineUserId);
+  const bookedVia = isLineSource ? 'LINE' : 'ChatBot';
+
   const result = await createAppointment(spreadsheetId, {
     date: dateVal.normalized!,
     time: timeVal.normalized!,
@@ -200,10 +214,24 @@ async function executeCreateAppointment(spreadsheetId: string, args: any): Promi
     patientCardNumber: normalizedCardNumber,
     doctor: normalizedDoctor,
     symptom: args.symptom ? sanitizeForSheet(args.symptom) : '',
-    bookedVia: 'ChatBot',
+    bookedVia,
+    lineUserId: context?.lineUserId,
   });
 
   if (result.success) {
+    // LINE予約の場合、phone_numberをline_usersテーブルにupsert（リマインド用）
+    if (isLineSource && context?.lineUserId) {
+      try {
+        // siteIdをspreadsheetIdから取得する代わりに、line_usersをline_user_idで検索してupsert
+        await supabaseClient
+          .from('line_users')
+          .update({ phone_number: phoneDigits, updated_at: new Date().toISOString() })
+          .eq('line_user_id', context.lineUserId);
+      } catch (upsertErr) {
+        console.error('[Hybrid] Failed to update line_users phone_number:', upsertErr);
+      }
+    }
+
     let emailSent = false;
     if (args.patient_email) {
       try {

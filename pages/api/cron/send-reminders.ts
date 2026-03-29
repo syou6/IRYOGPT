@@ -7,6 +7,7 @@ import type { NextApiRequest, NextApiResponse } from 'next';
 import { supabaseClient } from '@/utils/supabase-client';
 import { getAppointmentsByDate, getClinicSettings } from '@/utils/appointment';
 import { sendAppointmentReminderEmail } from '@/utils/email';
+import { findLineUserForAppointment, sendAppointmentReminder } from '@/utils/line-notification';
 
 // Vercel Cron の認証トークン
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -38,7 +39,7 @@ export default async function handler(
     // スプレッドシートが設定されているサイトを取得
     const { data: sites, error: sitesError } = await supabaseClient
       .from('sites')
-      .select('id, spreadsheet_id, name')
+      .select('id, spreadsheet_id, name, line_enabled, line_channel_access_token')
       .not('spreadsheet_id', 'is', null)
       .neq('spreadsheet_id', '');
 
@@ -54,7 +55,9 @@ export default async function handler(
 
     let totalSent = 0;
     let totalFailed = 0;
-    const results: { site: string; sent: number; failed: number }[] = [];
+    let totalLineSent = 0;
+    let totalLineFailed = 0;
+    const results: { site: string; sent: number; failed: number; lineSent: number; lineFailed: number }[] = [];
 
     // 各サイトの予約を処理
     for (const site of sites) {
@@ -69,45 +72,83 @@ export default async function handler(
 
         let sent = 0;
         let failed = 0;
+        let lineSent = 0;
+        let lineFailed = 0;
 
         for (const apt of appointments) {
-          // メールアドレスがない予約はスキップ
-          if (!apt.patientEmail) continue;
+          // メールリマインド
+          if (apt.patientEmail) {
+            const result = await sendAppointmentReminderEmail({
+              patientName: apt.patientName,
+              patientEmail: apt.patientEmail,
+              date: apt.date,
+              time: apt.time,
+              clinicName: settings.clinicName,
+              symptom: apt.symptom,
+            });
 
-          const result = await sendAppointmentReminderEmail({
-            patientName: apt.patientName,
-            patientEmail: apt.patientEmail,
-            date: apt.date,
-            time: apt.time,
-            clinicName: settings.clinicName,
-            symptom: apt.symptom,
-          });
+            if (result.success && result.id) {
+              sent++;
+              totalSent++;
+            } else if (!result.success) {
+              failed++;
+              totalFailed++;
+              console.error(`[Cron] Failed to send email to ${apt.patientEmail}:`, result.message);
+            }
+          }
 
-          if (result.success && result.id) {
-            sent++;
-            totalSent++;
-          } else if (!result.success) {
-            failed++;
-            totalFailed++;
-            console.error(`[Cron] Failed to send to ${apt.patientEmail}:`, result.message);
+          // LINEリマインド（LINE連携が有効なサイトのみ）
+          if (site.line_enabled && site.line_channel_access_token) {
+            try {
+              const lineUserId = await findLineUserForAppointment(site.id, {
+                date: apt.date,
+                time: apt.time,
+                patientName: apt.patientName,
+                patientPhone: apt.patientPhone,
+                lineUserId: apt.lineUserId,
+              });
+
+              if (lineUserId) {
+                const lineResult = await sendAppointmentReminder(site.id, lineUserId, {
+                  date: apt.date,
+                  time: apt.time,
+                  patientName: apt.patientName,
+                  clinicName: settings.clinicName,
+                });
+
+                if (lineResult) {
+                  lineSent++;
+                  totalLineSent++;
+                } else {
+                  lineFailed++;
+                  totalLineFailed++;
+                }
+              }
+            } catch (lineErr) {
+              console.error(`[Cron] LINE reminder error for ${apt.patientName}:`, lineErr);
+              lineFailed++;
+              totalLineFailed++;
+            }
           }
         }
 
-        results.push({ site: site.name || site.id, sent, failed });
-        console.log(`[Cron] Site ${site.name}: ${sent} sent, ${failed} failed`);
+        results.push({ site: site.name || site.id, sent, failed, lineSent, lineFailed });
+        console.log(`[Cron] Site ${site.name}: email ${sent} sent, ${failed} failed | LINE ${lineSent} sent, ${lineFailed} failed`);
       } catch (siteError) {
         console.error(`[Cron] Error processing site ${site.id}:`, siteError);
-        results.push({ site: site.name || site.id, sent: 0, failed: -1 });
+        results.push({ site: site.name || site.id, sent: 0, failed: -1, lineSent: 0, lineFailed: 0 });
       }
     }
 
-    console.log(`[Cron] Completed: ${totalSent} sent, ${totalFailed} failed`);
+    console.log(`[Cron] Completed: email ${totalSent} sent, ${totalFailed} failed | LINE ${totalLineSent} sent, ${totalLineFailed} failed`);
 
     return res.status(200).json({
       message: 'Reminders processed',
       date: tomorrowStr,
       totalSent,
       totalFailed,
+      totalLineSent,
+      totalLineFailed,
       results,
     });
   } catch (error) {

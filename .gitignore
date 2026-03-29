@@ -44,3 +44,8 @@ franknotion.json
 
 # Test files
 public/index.html
+
+# Salonboard scraper
+salonboard/cookies.json
+salonboard/screenshots/
+salonboard/__pycache__/

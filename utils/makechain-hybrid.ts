@@ -7,7 +7,7 @@ import { ChatOpenAI } from '@langchain/openai';
 import { getClinicSettings } from './appointment';
 import { APPOINTMENT_TOOLS } from './prompts/medical-appointment';
 import { searchRAG, getHybridSystemPrompt } from './hybrid/prompt-builder';
-import { executeToolCall } from './hybrid/tool-executor';
+import { executeToolCall, ToolExecutorContext } from './hybrid/tool-executor';
 
 // Re-export types for backward compatibility
 export type { HybridChatMessage, HybridChatResult } from './hybrid/types';
@@ -19,7 +19,8 @@ export async function runHybridChat(
   siteId: string,
   spreadsheetId: string,
   messages: import('./hybrid/types').HybridChatMessage[],
-  onToken?: (token: string) => void
+  onToken?: (token: string) => void,
+  context?: ToolExecutorContext
 ): Promise<import('./hybrid/types').HybridChatResult> {
   // ① 設定を取得（AIがget_clinic_infoを呼ばなくても設定を知れるように）
   const settings = await getClinicSettings(spreadsheetId);
@@ -91,7 +92,8 @@ export async function runHybridChat(
       sendMessageCall,
       spreadsheetId,
       ragContext,
-      onToken
+      onToken,
+      context
     );
   }
 
@@ -188,7 +190,8 @@ async function handleToolExecution(
   sendMessageCall: any,
   spreadsheetId: string,
   ragContext: string,
-  onToken?: (token: string) => void
+  onToken?: (token: string) => void,
+  context?: ToolExecutorContext
 ): Promise<import('./hybrid/types').HybridChatResult> {
   const toolResults: any[] = [];
   let appointmentCreated = false;
@@ -196,7 +199,7 @@ async function handleToolExecution(
   for (const toolCall of otherToolCalls) {
     let result: string;
     try {
-      result = await executeToolCall(spreadsheetId, toolCall);
+      result = await executeToolCall(spreadsheetId, toolCall, context);
     } catch (error) {
       console.error('[Hybrid] Tool call failed:', error);
       result = 'ツールの実行に失敗しました。しばらくしてからお試しください。';

@@ -7,6 +7,46 @@
 import { messagingApi } from '@line/bot-sdk';
 import { supabaseClient } from './supabase-client';
 
+interface AppointmentForReminder {
+  date: string;
+  time: string;
+  patientName: string;
+  patientPhone?: string;
+  lineUserId?: string;
+}
+
+/**
+ * 予約に紐づくLINEユーザーIDを検索
+ * 1. スプレッドシートのcolumn KにlineUserIdがある場合は直接使用
+ * 2. 電話番号でline_usersテーブルを検索
+ */
+export async function findLineUserForAppointment(
+  siteId: string,
+  appointment: AppointmentForReminder
+): Promise<string | null> {
+  // 1. 直接マッチ（スプレッドシートのcolumn KにlineUserIdがある場合）
+  if (appointment.lineUserId) {
+    return appointment.lineUserId;
+  }
+
+  // 2. 電話番号マッチ
+  if (appointment.patientPhone) {
+    const normalizedPhone = appointment.patientPhone.replace(/[-\s+]/g, '');
+    const { data } = await supabaseClient
+      .from('line_users')
+      .select('line_user_id')
+      .eq('site_id', siteId)
+      .eq('phone_number', normalizedPhone)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (data) return data.line_user_id;
+  }
+
+  return null;
+}
+
 interface AppointmentNotificationData {
   date: string;
   time: string;

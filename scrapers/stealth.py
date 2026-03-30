@@ -334,27 +334,58 @@ def build_stealth_js(viewport: tuple[int, int], user_agent: str) -> str:
     });
 
     // ================================================================
-    // 18. Canvas指紋ノイズ
+    // 17b. screen 追加プロパティ（Xvfb矛盾解消）
     // ================================================================
-    const origToDataURL = HTMLCanvasElement.prototype.toDataURL;
-    const origToBlob = HTMLCanvasElement.prototype.toBlob;
+    Object.defineProperty(window, 'devicePixelRatio', {
+        get: () => 1.0, configurable: true,
+    });
+    Object.defineProperty(screen, 'colorDepth', {
+        get: () => 24, configurable: true,
+    });
+    Object.defineProperty(screen, 'pixelDepth', {
+        get: () => 24, configurable: true,
+    });
 
-    // セッション固定のシード
-    const seed = """ + str(random.randint(1, 255)) + """;
+    // ================================================================
+    // 18. Canvas指紋ノイズ（Proxyベース session-stable）
+    //     重要: 毎回違うノイズはむしろ検知される（castle.io研究）
+    //     セッション内で同一ハッシュを返すことが必須
+    // ================================================================
+    const CANVAS_NOISE_SEED = """ + str(random.randint(1, 255)) + """;
 
-    HTMLCanvasElement.prototype.toDataURL = function() {
-        const ctx = this.getContext('2d');
-        if (ctx && this.width > 0 && this.height > 0) {
-            try {
-                const img = ctx.getImageData(0, 0, Math.min(this.width, 3), Math.min(this.height, 3));
-                for (let i = 0; i < img.data.length; i += 4) {
-                    img.data[i] = (img.data[i] + seed) % 256;
-                }
-                ctx.putImageData(img, 0, 0);
-            } catch(e) {}
+    HTMLCanvasElement.prototype.toDataURL = new Proxy(
+        HTMLCanvasElement.prototype.toDataURL, {
+        apply(target, thisArg, args) {
+            const ctx = thisArg.getContext('2d');
+            if (ctx && thisArg.width > 0 && thisArg.height > 0) {
+                try {
+                    const img = ctx.getImageData(0, 0, Math.min(thisArg.width, 3), Math.min(thisArg.height, 3));
+                    for (let i = 0; i < img.data.length; i += 4) {
+                        img.data[i] = (img.data[i] + CANVAS_NOISE_SEED) % 256;
+                    }
+                    ctx.putImageData(img, 0, 0);
+                } catch(e) {}
+            }
+            return target.apply(thisArg, args);
         }
-        return origToDataURL.apply(this, arguments);
-    };
+    });
+
+    HTMLCanvasElement.prototype.toBlob = new Proxy(
+        HTMLCanvasElement.prototype.toBlob, {
+        apply(target, thisArg, args) {
+            const ctx = thisArg.getContext('2d');
+            if (ctx && thisArg.width > 0 && thisArg.height > 0) {
+                try {
+                    const img = ctx.getImageData(0, 0, Math.min(thisArg.width, 3), Math.min(thisArg.height, 3));
+                    for (let i = 0; i < img.data.length; i += 4) {
+                        img.data[i] = (img.data[i] + CANVAS_NOISE_SEED) % 256;
+                    }
+                    ctx.putImageData(img, 0, 0);
+                } catch(e) {}
+            }
+            return target.apply(thisArg, args);
+        }
+    });
 
     // ================================================================
     // 19. Battery API
@@ -427,9 +458,81 @@ def build_stealth_js(viewport: tuple[int, int], user_agent: str) -> str:
         Function.prototype.toString = new Proxy(Function.prototype.toString, handler);
     }
 
-    // 主要な偽装関数をnativeに見せる
+    // 主要な偽装関数をnativeに見せる（全パッチ関数をカバー）
     if (navigator.permissions?.query) makeNative(navigator.permissions.query, 'query');
     if (navigator.getBattery) makeNative(navigator.getBattery, 'getBattery');
+    makeNative(WebGLRenderingContext.prototype.getParameter, 'getParameter');
+    if (typeof WebGL2RenderingContext !== 'undefined') {
+        makeNative(WebGL2RenderingContext.prototype.getParameter, 'getParameter');
+    }
+    makeNative(HTMLMediaElement.prototype.canPlayType, 'canPlayType');
+    makeNative(HTMLCanvasElement.prototype.toDataURL, 'toDataURL');
+    makeNative(HTMLCanvasElement.prototype.toBlob, 'toBlob');
+
+    // ================================================================
+    // 25. AudioContext指紋ノイズ（session-stable）
+    //     OfflineAudioContext + OscillatorNode のハッシュをAkamaiが収集
+    //     VPSのソフトウェアオーディオは実機と異なるハッシュを出す
+    //     セッション固定ノイズで一貫性を保つ（変動すると検知される）
+    // ================================================================
+    const AUDIO_NOISE = CANVAS_NOISE_SEED * 1e-7;
+    const OrigAudioBuffer_getChannelData = AudioBuffer.prototype.getChannelData;
+    AudioBuffer.prototype.getChannelData = new Proxy(
+        OrigAudioBuffer_getChannelData, {
+        apply(target, thisArg, args) {
+            const data = target.apply(thisArg, args);
+            for (let i = 0; i < data.length; i += 100) {
+                data[i] += AUDIO_NOISE;
+            }
+            return data;
+        }
+    });
+    makeNative(AudioBuffer.prototype.getChannelData, 'getChannelData');
+
+    // ================================================================
+    // 26. WebRTC IPリーク防止（JS層フォールバック）
+    //     browser_argsでも制御するが二重防御
+    //     ConoHaの実IPがUDP経由でAkamaiに漏れるのを防止
+    // ================================================================
+    if (window.RTCPeerConnection) {
+        const OrigRTCPC = window.RTCPeerConnection;
+        window.RTCPeerConnection = new Proxy(OrigRTCPC, {
+            construct(target, args) {
+                const config = args[0] || {};
+                config.iceServers = [];
+                config.iceTransportPolicy = 'relay';
+                return new target(config);
+            }
+        });
+        window.RTCPeerConnection.prototype = OrigRTCPC.prototype;
+        makeNative(window.RTCPeerConnection, 'RTCPeerConnection');
+    }
+    if (window.webkitRTCPeerConnection) {
+        window.webkitRTCPeerConnection = window.RTCPeerConnection;
+    }
+
+    // ================================================================
+    // 27. SpeechSynthesis 音声リスト（Windows偽装との一貫性）
+    //     Linux VPSは空リストを返す → Windows UAと矛盾
+    // ================================================================
+    if (window.speechSynthesis) {
+        const fakeVoices = [
+            { voiceURI: 'Microsoft Haruka - Japanese (Japan)', name: 'Microsoft Haruka - Japanese (Japan)',
+              lang: 'ja-JP', localService: true, default: true },
+            { voiceURI: 'Microsoft Ayumi - Japanese (Japan)', name: 'Microsoft Ayumi - Japanese (Japan)',
+              lang: 'ja-JP', localService: true, default: false },
+            { voiceURI: 'Google 日本語', name: 'Google 日本語',
+              lang: 'ja-JP', localService: false, default: false },
+            { voiceURI: 'Microsoft David - English (United States)', name: 'Microsoft David - English (United States)',
+              lang: 'en-US', localService: true, default: false },
+        ].map(v => Object.assign(Object.create(SpeechSynthesisVoice?.prototype || {}), v));
+
+        window.speechSynthesis.getVoices = new Proxy(
+            window.speechSynthesis.getVoices, {
+            apply() { return fakeVoices; }
+        });
+        makeNative(window.speechSynthesis.getVoices, 'getVoices');
+    }
 
 })();
 """

@@ -69,22 +69,20 @@ class BaseScraper(ABC):
 
         logger.info(f"[{self.name}] UA: {self._user_agent[:60]}... VP: {w}x{h}")
 
-        self._browser = await uc.start(
-            headless=False,
-            lang="ja-JP",
-            browser_args=[
-                f"--user-agent={self._user_agent}",
-                f"--window-size={w},{h}",
-                "--no-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-infobars",
-                # Akamai対策: 自動化フラグを無効化
-                "--disable-blink-features=AutomationControlled",
-                "--disable-features=IsolateOrigins,site-per-process",
-                # WebRTC IPリーク防止（ConoHa実IPの漏洩を阻止）
-                "--enforce-webrtc-ip-handling-policy=disable_non_proxied_udp",
-            ],
-        )
+        config = uc.Config()
+        config.headless = False
+        config.add_argument(f"--user-agent={self._user_agent}")
+        config.add_argument(f"--window-size={w},{h}")
+        config.add_argument("--no-sandbox")
+        config.add_argument("--disable-dev-shm-usage")
+        config.add_argument("--disable-infobars")
+        # Akamai対策: 自動化フラグを無効化
+        config.add_argument("--disable-blink-features=AutomationControlled")
+        config.add_argument("--disable-features=IsolateOrigins,site-per-process")
+        # WebRTC IPリーク防止（ConoHa実IPの漏洩を阻止）
+        config.add_argument("--enforce-webrtc-ip-handling-policy=disable_non_proxied_udp")
+
+        self._browser = await uc.start(config=config)
 
         # ステルスJSをページ読み込み前に注入（最重要）
         await self._register_stealth_scripts()

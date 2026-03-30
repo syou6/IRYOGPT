@@ -223,20 +223,18 @@ async def main() -> None:
     logger.info(f"Viewport: {w}x{h}")
     logger.info(f"スクリーンショット保存先: {DEMO_DIR}")
 
-    browser = await uc.start(
-        headless=False,
-        lang="ja-JP",
-        browser_args=[
-            f"--user-agent={user_agent}",
-            f"--window-size={w},{h}",
-            "--no-sandbox",
-            "--disable-dev-shm-usage",
-            "--disable-infobars",
-            "--disable-blink-features=AutomationControlled",
-            "--disable-features=IsolateOrigins,site-per-process",
-            "--enforce-webrtc-ip-handling-policy=disable_non_proxied_udp",
-        ],
-    )
+    config = uc.Config()
+    config.headless = False
+    config.add_argument(f"--user-agent={user_agent}")
+    config.add_argument(f"--window-size={w},{h}")
+    config.add_argument("--no-sandbox")
+    config.add_argument("--disable-dev-shm-usage")
+    config.add_argument("--disable-infobars")
+    config.add_argument("--disable-blink-features=AutomationControlled")
+    config.add_argument("--disable-features=IsolateOrigins,site-per-process")
+    config.add_argument("--enforce-webrtc-ip-handling-policy=disable_non_proxied_udp")
+
+    browser = await uc.start(config=config)
 
     try:
         await _register_stealth(browser, viewport, user_agent)

@@ -226,10 +226,11 @@ async def main() -> None:
     config = uc.Config(
         headless=False,
         sandbox=False,
-        lang="ja-JP",
         user_agent=user_agent,
         disable_webrtc=True,
     )
+    # lang属性はzendriver内部バグでadd_argumentが自己ブロックするため直接追加
+    config._browser_args.append("--lang=ja-JP")
     config.add_argument(f"--window-size={w},{h}")
     config.add_argument("--disable-blink-features=AutomationControlled")
 

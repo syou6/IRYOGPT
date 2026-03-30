@@ -72,10 +72,11 @@ class BaseScraper(ABC):
         config = uc.Config(
             headless=False,
             sandbox=False,
-            lang="ja-JP",
             user_agent=self._user_agent,
             disable_webrtc=True,
         )
+        # lang属性はzendriver内部バグでadd_argumentが自己ブロックするため直接追加
+        config._browser_args.append("--lang=ja-JP")
         config.add_argument(f"--window-size={w},{h}")
         # Akamai対策: 自動化フラグを無効化
         config.add_argument("--disable-blink-features=AutomationControlled")

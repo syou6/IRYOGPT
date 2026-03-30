@@ -69,18 +69,16 @@ class BaseScraper(ABC):
 
         logger.info(f"[{self.name}] UA: {self._user_agent[:60]}... VP: {w}x{h}")
 
-        config = uc.Config()
-        config.headless = False
-        config.add_argument(f"--user-agent={self._user_agent}")
+        config = uc.Config(
+            headless=False,
+            sandbox=False,
+            lang="ja-JP",
+            user_agent=self._user_agent,
+            disable_webrtc=True,
+        )
         config.add_argument(f"--window-size={w},{h}")
-        config.add_argument("--no-sandbox")
-        config.add_argument("--disable-dev-shm-usage")
-        config.add_argument("--disable-infobars")
         # Akamai対策: 自動化フラグを無効化
         config.add_argument("--disable-blink-features=AutomationControlled")
-        config.add_argument("--disable-features=IsolateOrigins,site-per-process")
-        # WebRTC IPリーク防止（ConoHa実IPの漏洩を阻止）
-        config.add_argument("--enforce-webrtc-ip-handling-policy=disable_non_proxied_udp")
 
         self._browser = await uc.start(config=config)
 

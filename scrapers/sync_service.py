@@ -22,6 +22,7 @@
     - created_at (timestamptz)
 """
 
+import asyncio
 import hashlib
 import json
 import logging
@@ -107,7 +108,6 @@ class SyncService:
             except (httpx.ConnectError, httpx.ReadTimeout, httpx.WriteTimeout) as e:
                 last_error = e
                 if attempt < self.MAX_RETRIES - 1:
-                    import asyncio
                     wait = (2 ** attempt) * 0.5
                     logger.warning(
                         f"Supabaseリクエストリトライ ({attempt + 1}/{self.MAX_RETRIES}): {e}"
@@ -214,33 +214,44 @@ class SyncService:
         return result
 
     async def _mark_cancelled(self, source: str, external_ids: set[str]) -> int:
-        """消えた予約をキャンセル済みとしてマーク"""
+        """
+        消えた予約をキャンセル済みとしてバッチマーク。
+
+        PostgREST の in. フィルタを使って1リクエストで一括更新する。
+        """
         if not external_ids:
             return 0
 
-        cancelled = 0
         now = datetime.now(JST).isoformat()
+        ids_csv = ",".join(external_ids)
 
-        for ext_id in external_ids:
-            try:
-                resp = await self._request_with_retry(
-                    "patch",
-                    f"{self.base_url}/external_reservations",
-                    params={
-                        "site_id": f"eq.{self.site_id}",
-                        "source": f"eq.{source}",
-                        "external_id": f"eq.{ext_id}",
-                        "status": "eq.confirmed",
-                    },
-                    json={"status": "cancelled", "synced_at": now},
+        try:
+            resp = await self._request_with_retry(
+                "patch",
+                f"{self.base_url}/external_reservations",
+                params={
+                    "site_id": f"eq.{self.site_id}",
+                    "source": f"eq.{source}",
+                    "external_id": f"in.({ids_csv})",
+                    "status": "eq.confirmed",
+                },
+                json={"status": "cancelled", "synced_at": now},
+            )
+
+            if resp and resp.status_code in (200, 204):
+                logger.info(
+                    f"[{source}] キャンセル検知: {len(external_ids)}件 "
+                    f"({', '.join(list(external_ids)[:5])}{'...' if len(external_ids) > 5 else ''})"
                 )
-                if resp and resp.status_code in (200, 204):
-                    cancelled += 1
-                    logger.info(f"[{source}] キャンセル検知: {ext_id}")
-            except Exception as e:
-                logger.debug(f"[{source}] キャンセル更新失敗 {ext_id}: {e}")
+                return len(external_ids)
+            else:
+                status = resp.status_code if resp else "N/A"
+                logger.warning(f"[{source}] キャンセルバッチ更新失敗: {status}")
+                return 0
 
-        return cancelled
+        except Exception as e:
+            logger.error(f"[{source}] キャンセルバッチ更新エラー: {e}")
+            return 0
 
     async def get_external_reservations(
         self, date: str, source: Optional[str] = None

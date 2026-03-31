@@ -84,7 +84,7 @@ export async function handleLineMessage(
         siteConfig.spreadsheetId,
         messages,
         undefined, // ストリーミングコールバックなし
-        { lineUserId, source: 'line' }
+        { lineUserId, source: 'line', siteId: siteConfig.id }
       );
       responseText = result.message;
     } else {

@@ -31,11 +31,12 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Header, Request, Response
+from fastapi import FastAPI, HTTPException, Header, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from scrapers.scheduler import ReservationScheduler
+from scrapers.sync_service import SyncService
 
 logger = logging.getLogger(__name__)
 
@@ -154,10 +155,12 @@ def verify_api_key(authorization: str = Header(default="")):
 class SyncRequest(BaseModel):
     date: Optional[str] = None
 
+
 class RealtimeCheckRequest(BaseModel):
     date: str
     staff_name: str
     start_time: str
+
 
 class RealtimeCheckResponse(BaseModel):
     available: bool
@@ -248,6 +251,41 @@ async def resume(source: str, authorization: str = Header(default="")):
     if success:
         return {"message": f"{source} 再開成功"}
     raise HTTPException(status_code=500, detail=f"{source} 再開失敗")
+
+
+@app.get("/reservations")
+async def get_reservations(
+    date: str = Query(..., description="対象日 (YYYY-MM-DD)"),
+    source: Optional[str] = Query(None, description="salonboard or minimo"),
+    authorization: str = Header(default=""),
+):
+    """
+    指定日の外部予約一覧を返す。
+
+    Vercel側からリアルタイムに予約済みスロットを参照するためのエンドポイント。
+    スクレイパーが最後にSupabaseに書き込んだデータをそのまま返す。
+    """
+    verify_api_key(authorization)
+
+    site_id = os.getenv("SITE_ID", "")
+    if not site_id:
+        raise HTTPException(status_code=503, detail="SITE_ID 未設定")
+
+    if source and source not in ("salonboard", "minimo"):
+        raise HTTPException(status_code=400, detail="source は salonboard or minimo")
+
+    sync_service = SyncService(site_id)
+    try:
+        reservations = await sync_service.get_external_reservations(date, source)
+        return {
+            "date": date,
+            "source": source,
+            "count": len(reservations),
+            "reservations": reservations,
+        }
+    except Exception as e:
+        logger.error(f"予約取得エラー: {e}")
+        raise HTTPException(status_code=500, detail="予約データの取得に失敗しました")
 
 
 @app.post("/cleanup-screenshots")

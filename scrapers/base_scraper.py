@@ -19,6 +19,7 @@ import asyncio
 import logging
 import math
 import random
+import time
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -627,7 +628,6 @@ class BaseScraper(ABC):
         logger.debug(f"[{self.name}] Akamaiセンサー待ちタイムアウト（続行）")
 
     async def wait_for_url(self, condition, timeout: int = 15) -> bool:
-        import time
         end_time = time.time() + timeout
         while time.time() < end_time:
             try:

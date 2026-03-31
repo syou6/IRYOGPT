@@ -395,5 +395,72 @@ class SalonBoardScraper(BaseScraper):
             logger.debug(f"[salonboard] ページ構造取得エラー: {e}")
 
     async def fetch_available_slots(self, target_date: str) -> list[dict]:
-        # TODO: アカウント取得後に実装
-        return []
+        """
+        指定日の空き枠一覧を返す。
+
+        スケジュール画面から「予約が入っていない時間帯」を計算する。
+        営業時間・スタッフ情報は取得できている予約から逆算する。
+
+        Returns:
+            [{"staff_name": str, "date": str, "start_time": str, "end_time": str}]
+        """
+        try:
+            reservations = await self.fetch_reservations(target_date)
+
+            # スタッフ別に予約済み時間帯を集める
+            busy_by_staff: dict[str, list[tuple[str, str]]] = {}
+            for r in reservations:
+                name = r.get("staff_name", "")
+                s = r.get("start_time", "")
+                e = r.get("end_time", "")
+                if name and s:
+                    busy_by_staff.setdefault(name, []).append((s, e))
+
+            if not busy_by_staff:
+                return []
+
+            # 営業時間内の空き枠を 30 分刻みで列挙
+            slots = []
+            business_start = "09:00"
+            business_end = "20:00"
+
+            for staff_name, busy_slots in busy_by_staff.items():
+                busy_set = set()
+                for s, e in busy_slots:
+                    # 30 分グリッドで埋まっているスロットを記録
+                    sh, sm = map(int, s.split(":")) if ":" in s else (0, 0)
+                    if e and ":" in e:
+                        eh, em = map(int, e.split(":"))
+                    else:
+                        eh, em = sh + 1, sm  # デフォルト 1 時間
+                    t = sh * 60 + sm
+                    end_t = eh * 60 + em
+                    while t < end_t:
+                        busy_set.add(t)
+                        t += 30
+
+                bsh, bsm = map(int, business_start.split(":"))
+                beh, bem = map(int, business_end.split(":"))
+                t = bsh * 60 + bsm
+                end_t = beh * 60 + bem
+
+                while t < end_t:
+                    if t not in busy_set:
+                        hh = t // 60
+                        mm = t % 60
+                        slot_start = f"{hh:02d}:{mm:02d}"
+                        slot_end_t = t + 30
+                        slot_end = f"{slot_end_t // 60:02d}:{slot_end_t % 60:02d}"
+                        slots.append({
+                            "staff_name": staff_name,
+                            "date": target_date,
+                            "start_time": slot_start,
+                            "end_time": slot_end,
+                        })
+                    t += 30
+
+            return slots
+
+        except Exception as e:
+            logger.error(f"[salonboard] 空き枠取得エラー: {e}")
+            return []

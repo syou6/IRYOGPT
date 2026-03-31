@@ -40,6 +40,20 @@ import math
 import random
 
 
+def _extract_chrome_major(user_agent: str) -> str:
+    """User-Agent文字列からChromeメジャーバージョンを抽出する。"""
+    if "Chrome/" in user_agent:
+        return user_agent.split("Chrome/")[1].split(".")[0]
+    return "146"
+
+
+def _extract_chrome_full(user_agent: str) -> str:
+    """User-Agent文字列からChromeフルバージョンを抽出する。"""
+    if "Chrome/" in user_agent:
+        return user_agent.split("Chrome/")[1].split(" ")[0]
+    return "146.0.0.0"
+
+
 def build_stealth_js(viewport: tuple[int, int], user_agent: str) -> str:
     """
     ステルスJSを生成（ビューポートとUA情報を埋め込む）
@@ -48,6 +62,8 @@ def build_stealth_js(viewport: tuple[int, int], user_agent: str) -> str:
     page.evaluate() は使わない（タイミングが遅すぎる）。
     """
     w, h = viewport
+    chrome_major = _extract_chrome_major(user_agent)
+    chrome_full = _extract_chrome_full(user_agent)
 
     return """
 (() => {
@@ -258,8 +274,8 @@ def build_stealth_js(viewport: tuple[int, int], user_agent: str) -> str:
     // ================================================================
     if (navigator.userAgentData) {
         const brands = [
-            { brand: 'Google Chrome', version: '""" + user_agent.split("Chrome/")[1].split(".")[0] if "Chrome/" in user_agent else "146" + """' },
-            { brand: 'Chromium', version: '""" + user_agent.split("Chrome/")[1].split(".")[0] if "Chrome/" in user_agent else "146" + """' },
+            { brand: 'Google Chrome', version: '""" + chrome_major + """' },
+            { brand: 'Chromium', version: '""" + chrome_major + """' },
             { brand: 'Not_A Brand', version: '24' },
         ];
         Object.defineProperty(navigator, 'userAgentData', {
@@ -276,7 +292,7 @@ def build_stealth_js(viewport: tuple[int, int], user_agent: str) -> str:
                     model: '',
                     platform: 'Windows',
                     platformVersion: '15.0.0',
-                    uaFullVersion: '""" + (user_agent.split("Chrome/")[1].split(" ")[0] if "Chrome/" in user_agent else "146.0.0.0") + """',
+                    uaFullVersion: '""" + chrome_full + """',
                     wow64: false,
                 }),
             }),

@@ -104,7 +104,8 @@ export async function runHybridChat(
     spreadsheetId,
     query,
     ragContext,
-    onToken
+    onToken,
+    context
   );
 }
 
@@ -248,8 +249,14 @@ async function handleToolExecution(
       : undefined,
   });
 
+  // tool_callsが含まれていてcontentが空の場合（モデルが再度ツールを呼ぼうとした）は
+  // フォールバックメッセージを返す
+  const responseContent = typeof finalResponse.content === 'string' && finalResponse.content.trim()
+    ? finalResponse.content
+    : 'ご予約の処理が完了しました。ご不明な点がございましたらお申し付けください。';
+
   return {
-    message: finalResponse.content as string,
+    message: responseContent,
     toolCalls: otherToolCalls,
     appointmentCreated,
     ragContext,
@@ -266,7 +273,8 @@ async function handleSendMessageOnly(
   spreadsheetId: string,
   query: string,
   ragContext: string,
-  onToken?: (token: string) => void
+  onToken?: (token: string) => void,
+  context?: ToolExecutorContext
 ): Promise<import('./hybrid/types').HybridChatResult> {
   const messageText = sendMessageCall.args?.message || '';
 
@@ -286,7 +294,7 @@ async function handleSendMessageOnly(
       const toolResult = await executeToolCall(spreadsheetId, {
         name: 'get_available_slots',
         args: { date: targetDate },
-      });
+      }, context);
 
       const retryMessages = [
         ...fullMessages,
@@ -314,8 +322,12 @@ async function handleSendMessageOnly(
           : undefined,
       });
 
+      const retryContent = typeof retryResponse.content === 'string' && retryResponse.content.trim()
+        ? retryResponse.content
+        : messageText;
+
       return {
-        message: retryResponse.content as string,
+        message: retryContent,
         toolCalls: [{ name: 'get_available_slots', args: { date: targetDate } }],
         ragContext,
       };

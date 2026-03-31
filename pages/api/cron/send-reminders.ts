@@ -29,10 +29,12 @@ export default async function handler(
   }
 
   try {
-    // 明日の日付を計算
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    const tomorrowStr = `${tomorrow.getFullYear()}/${tomorrow.getMonth() + 1}/${tomorrow.getDate()}`;
+    // 明日の日付を計算（日本時間 JST: UTC+9 で計算）
+    const nowUtcMs = Date.now();
+    const jstOffsetMs = 9 * 60 * 60 * 1000;
+    const tomorrowJst = new Date(nowUtcMs + jstOffsetMs);
+    tomorrowJst.setUTCDate(tomorrowJst.getUTCDate() + 1);
+    const tomorrowStr = `${tomorrowJst.getUTCFullYear()}/${tomorrowJst.getUTCMonth() + 1}/${tomorrowJst.getUTCDate()}`;
 
     console.log(`[Cron] Sending reminders for ${tomorrowStr}`);
 

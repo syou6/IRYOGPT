@@ -288,8 +288,8 @@ def _chatbot_reply(message: str, state: dict) -> tuple[str, dict, list[dict] | N
                 f"予約が完了しました！\n\n"
                 f"日時: {date_display} {selected_time}〜\n"
                 f"担当: {selected_staff}\n\n"
-                "ご来店をお待ちしております。\n"
-                "変更・キャンセルのご連絡はお電話にてお願いいたします。"
+                "ご来院をお待ちしております。\n"
+                "変更・キャンセルは診療時間内にお電話にてご連絡ください。"
             )
             new_state = {"step": "done"}
             return reply, new_state, None, True
@@ -318,7 +318,7 @@ def _chatbot_reply(message: str, state: dict) -> tuple[str, dict, list[dict] | N
         new_state = {"step": "greeting"}
         return (
             "他にご不明な点はございますか？\n"
-            "新たに予約のご希望がございましたら、いつでもお申し付けください。",
+            "追加のご予約や診療内容のご確認など、いつでもお申し付けください。",
             new_state,
             None,
             False,
@@ -327,7 +327,8 @@ def _chatbot_reply(message: str, state: dict) -> tuple[str, dict, list[dict] | N
     # ---- フォールバック ----
     return (
         "ご予約のご希望でしょうか？\n"
-        "「明日の午後に予約したい」のようにお気軽にお申し付けください。",
+        "「明日の午後に予約したい」のようにお気軽にお申し付けください。\n"
+        "急なお痛みなど緊急の場合はお電話でもご対応いたします。",
         {"step": "greeting"},
         None,
         False,
@@ -413,414 +414,643 @@ DEMO_HTML = """<!DOCTYPE html>
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>よやくらく デモ - サロン予約AIチャット</title>
+  <title>よやくらく AIデモ - 〇〇歯科クリニック</title>
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-    body {
-      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Kaku Gothic Pro", sans-serif;
-      background: #f5f6fa;
-      color: #2d3436;
-      min-height: 100vh;
+    :root {
+      --brand-blue:    #2a7fc1;
+      --brand-teal:    #1a9f8a;
+      --brand-light:   #e8f4fb;
+      --available-bg:  #e6f7f4;
+      --available-fg:  #0e7b68;
+      --available-bd:  #9fd8ce;
+      --booked-bg:     #fce9e9;
+      --booked-fg:     #b83232;
+      --booked-bd:     #f0b8b8;
+      --lunch-bg:      #fef9ec;
+      --lunch-fg:      #c27a00;
+      --lunch-bd:      #f5d98a;
+      --sidebar-w:     400px;
+      --header-h:      64px;
+      --footer-h:      36px;
+      --radius:        10px;
+      --shadow-sm:     0 1px 4px rgba(0,0,0,.08);
+      --shadow-md:     0 4px 16px rgba(0,0,0,.10);
     }
 
-    header {
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI",
+                   "Meiryo", sans-serif;
+      background: #f0f4f8;
+      color: #1e2e3d;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ===== TOP HEADER ===== */
+    .top-header {
+      height: var(--header-h);
+      background: linear-gradient(100deg, var(--brand-blue) 0%, var(--brand-teal) 100%);
       color: white;
-      padding: 16px 24px;
+      padding: 0 28px;
       display: flex;
       align-items: center;
       justify-content: space-between;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+      box-shadow: 0 2px 10px rgba(0,0,0,.18);
+      flex-shrink: 0;
+      position: relative;
+      z-index: 10;
     }
 
-    header h1 { font-size: 20px; font-weight: 700; letter-spacing: 0.05em; }
-    header .badge {
-      background: rgba(255,255,255,0.2);
-      border: 1px solid rgba(255,255,255,0.4);
-      border-radius: 12px;
-      padding: 4px 12px;
-      font-size: 12px;
-    }
-
-    .container {
-      display: grid;
-      grid-template-columns: 1fr 380px;
-      gap: 0;
-      height: calc(100vh - 60px);
-    }
-
-    /* --- Schedule Panel --- */
-    .schedule-panel {
-      overflow-y: auto;
-      padding: 20px;
-      background: white;
-      border-right: 1px solid #e0e0e0;
-    }
-
-    .schedule-header {
+    .header-left {
       display: flex;
       align-items: center;
-      gap: 12px;
-      margin-bottom: 16px;
+      gap: 14px;
     }
 
-    .schedule-header h2 { font-size: 16px; font-weight: 600; }
-
-    .date-nav {
+    .header-logo {
+      width: 38px;
+      height: 38px;
+      background: rgba(255,255,255,.18);
+      border-radius: 10px;
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin-left: auto;
+      justify-content: center;
+      font-size: 20px;
     }
 
-    .date-nav button {
-      background: #f0f0f0;
-      border: none;
-      border-radius: 6px;
-      padding: 6px 12px;
-      cursor: pointer;
-      font-size: 13px;
-      transition: background 0.2s;
-    }
-    .date-nav button:hover { background: #ddd; }
+    .header-titles { display: flex; flex-direction: column; }
 
-    .date-display {
-      font-weight: 600;
-      font-size: 14px;
-      min-width: 100px;
-      text-align: center;
-    }
-
-    .legend {
-      display: flex;
-      gap: 16px;
-      margin-bottom: 12px;
-      font-size: 12px;
-    }
-
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .legend-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 3px;
-    }
-
-    /* --- Schedule Table --- */
-    .schedule-table-wrapper { overflow-x: auto; }
-
-    .schedule-table {
-      border-collapse: collapse;
-      min-width: 600px;
-      font-size: 12px;
-    }
-
-    .schedule-table th {
-      padding: 8px 12px;
-      background: #f8f9fa;
-      border: 1px solid #e0e0e0;
-      font-weight: 600;
-      white-space: nowrap;
-      position: sticky;
-      top: 0;
-      z-index: 1;
-    }
-
-    .schedule-table td {
-      padding: 0;
-      border: 1px solid #e8e8e8;
-      height: 28px;
-      min-width: 120px;
-    }
-
-    .time-cell {
-      padding: 4px 8px;
-      background: #f8f9fa;
-      font-weight: 500;
-      color: #666;
-      white-space: nowrap;
-      min-width: 60px;
-      position: sticky;
-      left: 0;
-      z-index: 1;
-    }
-
-    .slot {
-      display: block;
-      width: 100%;
-      height: 100%;
-      padding: 3px 6px;
+    .header-brand {
       font-size: 11px;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      transition: opacity 0.15s;
+      font-weight: 500;
+      letter-spacing: .12em;
+      opacity: .85;
+      text-transform: uppercase;
     }
 
-    .slot.available {
-      background: #e8f8f0;
-      color: #2d7a4f;
-      cursor: pointer;
-    }
-    .slot.available:hover { background: #c8f0d8; opacity: 0.9; }
-
-    .slot.booked {
-      background: #ffeaea;
-      color: #c0392b;
-      cursor: default;
+    .header-clinic {
+      font-size: 18px;
+      font-weight: 700;
+      letter-spacing: .04em;
+      line-height: 1.2;
     }
 
-    .slot.booked-continuation {
-      background: #ffeaea;
-      opacity: 0.5;
-    }
-
-    .slot.lunch {
-      background: #fff8e1;
-      color: #f39c12;
-      font-size: 10px;
-    }
-
-    /* --- Chat Panel --- */
-    .chat-panel {
-      display: flex;
-      flex-direction: column;
-      background: #fafafa;
-    }
-
-    .chat-header {
-      padding: 14px 16px;
-      background: white;
-      border-bottom: 1px solid #e0e0e0;
+    .header-right {
       display: flex;
       align-items: center;
       gap: 10px;
     }
 
-    .chat-avatar {
-      width: 36px;
-      height: 36px;
+    .demo-badge {
+      background: rgba(255,255,255,.18);
+      border: 1px solid rgba(255,255,255,.35);
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .08em;
+    }
+
+    .status-pill {
+      background: rgba(255,255,255,.15);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #667eea, #764ba2);
+      background: #6ef079;
+      box-shadow: 0 0 6px #6ef079;
+    }
+
+    /* ===== MAIN LAYOUT ===== */
+    .main-layout {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr var(--sidebar-w);
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* ===== SCHEDULE PANEL ===== */
+    .schedule-panel {
+      background: white;
+      border-right: 1px solid #d8e4ee;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .schedule-toolbar {
+      padding: 14px 20px 10px;
+      border-bottom: 1px solid #e8eef4;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+      background: #f7fafd;
+    }
+
+    .schedule-title {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--brand-blue);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .date-nav-block {
+      margin-left: auto;
+      display: flex;
+      align-items: center;
+      gap: 0;
+      border: 1px solid #c8d8e8;
+      border-radius: 8px;
+      overflow: hidden;
+      background: white;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .date-nav-btn {
+      background: transparent;
+      border: none;
+      padding: 7px 14px;
+      cursor: pointer;
+      font-size: 15px;
+      color: var(--brand-blue);
+      transition: background .15s;
+      line-height: 1;
+    }
+    .date-nav-btn:hover { background: var(--brand-light); }
+
+    .date-display-block {
+      padding: 7px 16px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #1e2e3d;
+      border-left: 1px solid #c8d8e8;
+      border-right: 1px solid #c8d8e8;
+      min-width: 130px;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    .legend-row {
+      padding: 8px 20px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      font-size: 11.5px;
+      color: #5a6a7a;
+      flex-shrink: 0;
+      border-bottom: 1px solid #eef2f6;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .legend-swatch {
+      width: 13px;
+      height: 13px;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+
+    .schedule-scroll {
+      flex: 1;
+      overflow: auto;
+      padding: 0 16px 16px;
+    }
+
+    /* --- Grid Table --- */
+    .schedule-table {
+      border-collapse: separate;
+      border-spacing: 0;
+      font-size: 12px;
+      width: 100%;
+      min-width: 560px;
+    }
+
+    .schedule-table thead th {
+      position: sticky;
+      top: 0;
+      z-index: 3;
+      background: #f0f5fb;
+      padding: 10px 10px 8px;
+      text-align: center;
+      font-weight: 700;
+      font-size: 12px;
+      border-bottom: 2px solid #c8d8e8;
+      white-space: nowrap;
+    }
+
+    .th-time {
+      min-width: 58px;
+      color: #7a8fa0;
+      font-weight: 600;
+      text-align: left !important;
+    }
+
+    .schedule-table tbody td {
+      padding: 0;
+      border: 1px solid #edf1f5;
+      height: 30px;
+    }
+
+    .time-label {
+      padding: 0 10px;
+      color: #8aa0b4;
+      font-size: 11.5px;
+      font-weight: 600;
+      background: #f7fafd;
+      white-space: nowrap;
+      position: sticky;
+      left: 0;
+      z-index: 2;
+      border-right: 2px solid #dde8f0 !important;
+    }
+
+    .slot-cell {
+      display: block;
+      width: 100%;
+      height: 100%;
+      padding: 4px 7px;
+      font-size: 11px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: filter .12s, opacity .12s;
+      line-height: 1.5;
+    }
+
+    .slot-cell.available {
+      background: var(--available-bg);
+      color: var(--available-fg);
+      cursor: pointer;
+      font-weight: 600;
+    }
+    .slot-cell.available:hover {
+      filter: brightness(.93);
+    }
+
+    .slot-cell.booked {
+      background: var(--booked-bg);
+      color: var(--booked-fg);
+      cursor: default;
+    }
+
+    .slot-cell.booked-continuation {
+      background: var(--booked-bg);
+      opacity: .45;
+      cursor: default;
+    }
+
+    .slot-cell.lunch {
+      background: var(--lunch-bg);
+      color: var(--lunch-fg);
+      font-size: 10.5px;
+      font-style: italic;
+      cursor: default;
+    }
+
+    /* ===== CHAT SIDEBAR ===== */
+    .chat-panel {
+      display: flex;
+      flex-direction: column;
+      background: #f4f7fa;
+      overflow: hidden;
+    }
+
+    .chat-header {
+      padding: 14px 16px;
+      background: white;
+      border-bottom: 1px solid #dce8f0;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .chat-avatar {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--brand-blue), var(--brand-teal));
       display: flex;
       align-items: center;
       justify-content: center;
       color: white;
-      font-size: 18px;
+      font-size: 20px;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(42,127,193,.35);
     }
 
-    .chat-header-info h3 { font-size: 14px; font-weight: 600; }
-    .chat-header-info p { font-size: 11px; color: #27ae60; }
+    .chat-header-info { flex: 1; }
+    .chat-header-info h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: #1e2e3d;
+    }
+    .chat-header-info p {
+      font-size: 11px;
+      color: var(--brand-teal);
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 1px;
+    }
+
+    .chat-online-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--brand-teal);
+      display: inline-block;
+    }
 
     .chat-messages {
       flex: 1;
       overflow-y: auto;
-      padding: 16px;
+      padding: 16px 14px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 14px;
+      scroll-behavior: smooth;
     }
 
-    .message {
-      display: flex;
-      gap: 8px;
-      max-width: 100%;
-    }
-
+    .message { display: flex; gap: 8px; max-width: 100%; }
     .message.bot { align-items: flex-start; }
     .message.user { flex-direction: row-reverse; }
 
-    .message-bubble {
-      max-width: 78%;
-      padding: 10px 14px;
-      border-radius: 16px;
-      font-size: 13px;
-      line-height: 1.5;
-      white-space: pre-wrap;
-      word-break: break-word;
-    }
-
-    .message.bot .message-bubble {
-      background: white;
-      border: 1px solid #e8e8e8;
-      border-radius: 4px 16px 16px 16px;
-    }
-
-    .message.user .message-bubble {
-      background: linear-gradient(135deg, #667eea, #764ba2);
-      color: white;
-      border-radius: 16px 4px 16px 16px;
-    }
-
-    .message-avatar {
-      width: 28px;
-      height: 28px;
+    .msg-avatar {
+      width: 30px;
+      height: 30px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #667eea, #764ba2);
+      background: linear-gradient(135deg, var(--brand-blue), var(--brand-teal));
       display: flex;
       align-items: center;
       justify-content: center;
       color: white;
-      font-size: 14px;
+      font-size: 15px;
       flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .msg-body { display: flex; flex-direction: column; gap: 4px; max-width: 82%; }
+    .message.user .msg-body { align-items: flex-end; }
+
+    .message-bubble {
+      padding: 10px 14px;
+      border-radius: 4px 16px 16px 16px;
+      font-size: 13px;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+      box-shadow: var(--shadow-sm);
+    }
+
+    .message.bot .message-bubble {
+      background: white;
+      color: #1e2e3d;
+      border: 1px solid #dce8f0;
+    }
+
+    .message.user .message-bubble {
+      background: linear-gradient(135deg, var(--brand-blue), var(--brand-teal));
+      color: white;
+      border-radius: 16px 4px 16px 16px;
+    }
+
+    .confirmed-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: linear-gradient(90deg, #0e9e7e, #16b99b);
+      color: white;
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 11.5px;
+      font-weight: 600;
+      box-shadow: 0 2px 6px rgba(14,158,126,.3);
     }
 
     .slots-chips {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
-      margin-top: 8px;
+      margin-top: 6px;
     }
 
     .slot-chip {
-      background: #e8f8f0;
-      color: #2d7a4f;
-      border: 1px solid #a8d8b8;
+      background: var(--available-bg);
+      color: var(--available-fg);
+      border: 1px solid var(--available-bd);
       border-radius: 20px;
-      padding: 4px 10px;
-      font-size: 11px;
+      padding: 4px 11px;
+      font-size: 11.5px;
+      font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: background .15s, color .15s, transform .1s;
     }
     .slot-chip:hover {
-      background: #2d7a4f;
+      background: var(--brand-teal);
       color: white;
+      border-color: var(--brand-teal);
+      transform: translateY(-1px);
     }
 
+    /* Typing animation */
     .typing-indicator {
-      display: flex;
+      display: inline-flex;
       gap: 4px;
       padding: 10px 14px;
       background: white;
-      border: 1px solid #e8e8e8;
+      border: 1px solid #dce8f0;
       border-radius: 4px 16px 16px 16px;
-      width: fit-content;
+      box-shadow: var(--shadow-sm);
     }
 
     .typing-dot {
       width: 6px;
       height: 6px;
       border-radius: 50%;
-      background: #aaa;
-      animation: typing 1.2s infinite;
+      background: #a0b4c4;
+      animation: typingBounce 1.3s infinite ease-in-out;
     }
-    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
-    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+    .typing-dot:nth-child(2) { animation-delay: .2s; }
+    .typing-dot:nth-child(3) { animation-delay: .4s; }
 
-    @keyframes typing {
-      0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
-      30% { transform: translateY(-6px); opacity: 1; }
+    @keyframes typingBounce {
+      0%, 55%, 100% { transform: translateY(0); opacity: .5; }
+      28% { transform: translateY(-7px); opacity: 1; }
     }
 
-    .chat-input-area {
-      padding: 12px 16px;
+    /* Quick replies */
+    .quick-replies {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      padding: 8px 14px;
+      border-top: 1px solid #e4edf5;
       background: white;
-      border-top: 1px solid #e0e0e0;
+      flex-shrink: 0;
+    }
+
+    .quick-reply {
+      background: var(--brand-light);
+      color: var(--brand-blue);
+      border: 1px solid #b8d4e8;
+      border-radius: 16px;
+      padding: 5px 13px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .15s, color .15s;
+      font-family: inherit;
+    }
+    .quick-reply:hover { background: var(--brand-blue); color: white; border-color: var(--brand-blue); }
+
+    /* Chat input */
+    .chat-input-area {
+      padding: 10px 14px 12px;
+      background: white;
+      border-top: 1px solid #dce8f0;
       display: flex;
       gap: 8px;
+      align-items: center;
+      flex-shrink: 0;
     }
 
     .chat-input {
       flex: 1;
-      border: 1px solid #ddd;
-      border-radius: 20px;
-      padding: 8px 16px;
+      border: 1.5px solid #c8d8e8;
+      border-radius: 22px;
+      padding: 9px 16px;
       font-size: 13px;
       outline: none;
       font-family: inherit;
-      transition: border-color 0.2s;
+      background: #f7fafd;
+      color: #1e2e3d;
+      transition: border-color .2s, box-shadow .2s;
     }
-    .chat-input:focus { border-color: #667eea; }
+    .chat-input:focus {
+      border-color: var(--brand-blue);
+      box-shadow: 0 0 0 3px rgba(42,127,193,.12);
+      background: white;
+    }
+    .chat-input::placeholder { color: #9ab0c0; }
 
     .send-btn {
-      width: 36px;
-      height: 36px;
+      width: 40px;
+      height: 40px;
       border-radius: 50%;
-      background: linear-gradient(135deg, #667eea, #764ba2);
+      background: linear-gradient(135deg, var(--brand-blue), var(--brand-teal));
       border: none;
       color: white;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 16px;
-      transition: transform 0.15s;
+      font-size: 17px;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(42,127,193,.4);
+      transition: transform .15s, box-shadow .15s;
     }
-    .send-btn:hover { transform: scale(1.08); }
+    .send-btn:hover {
+      transform: scale(1.07);
+      box-shadow: 0 4px 12px rgba(42,127,193,.5);
+    }
+    .send-btn:active { transform: scale(.96); }
 
-    .quick-replies {
+    /* ===== FOOTER ===== */
+    .footer {
+      height: var(--footer-h);
+      background: #1a2a3a;
+      color: rgba(255,255,255,.55);
       display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      padding: 8px 16px;
-      border-top: 1px solid #f0f0f0;
-      background: white;
+      align-items: center;
+      justify-content: center;
+      font-size: 11.5px;
+      letter-spacing: .04em;
+      flex-shrink: 0;
     }
 
-    .quick-reply {
-      background: #f0f0f8;
-      color: #667eea;
-      border: 1px solid #d0d0f0;
-      border-radius: 16px;
-      padding: 4px 12px;
-      font-size: 12px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .quick-reply:hover { background: #667eea; color: white; }
+    .footer strong { color: rgba(255,255,255,.85); font-weight: 600; }
 
-    .confirmed-badge {
-      display: inline-block;
-      background: #27ae60;
-      color: white;
-      border-radius: 12px;
-      padding: 3px 10px;
-      font-size: 11px;
-      margin-top: 6px;
-    }
+    /* ===== SCROLLBAR ===== */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #c0d0dc; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #a0b4c4; }
   </style>
 </head>
 <body>
 
-<header>
-  <h1>よやくらく ── サロン予約AIデモ</h1>
-  <span class="badge">DEMO MODE</span>
+<!-- ===== TOP HEADER ===== -->
+<header class="top-header">
+  <div class="header-left">
+    <div class="header-logo">&#x1F9B7;</div>
+    <div class="header-titles">
+      <span class="header-brand">よやくらく AI Demo</span>
+      <span class="header-clinic">〇〇歯科クリニック</span>
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill">
+      <span class="status-dot"></span>
+      <span>24時間対応中</span>
+    </div>
+    <span class="demo-badge">DEMO</span>
+  </div>
 </header>
 
-<div class="container">
+<!-- ===== MAIN LAYOUT ===== -->
+<div class="main-layout">
 
-  <!-- Schedule Panel -->
+  <!-- ===== SCHEDULE PANEL ===== -->
   <div class="schedule-panel">
-    <div class="schedule-header">
-      <h2>スタッフスケジュール</h2>
-      <div class="date-nav">
-        <button onclick="changeDate(-1)">&#8249; 前日</button>
-        <span class="date-display" id="dateDisplay">読み込み中...</span>
-        <button onclick="changeDate(1)">翌日 &#8250;</button>
+    <div class="schedule-toolbar">
+      <div class="schedule-title">
+        <span>&#x1F4C5;</span>
+        <span>診療スケジュール</span>
+      </div>
+      <div class="date-nav-block">
+        <button class="date-nav-btn" onclick="changeDate(-1)" title="前日">&#8249;</button>
+        <div class="date-display-block" id="dateDisplay">読み込み中...</div>
+        <button class="date-nav-btn" onclick="changeDate(1)" title="翌日">&#8250;</button>
       </div>
     </div>
 
-    <div class="legend">
+    <div class="legend-row">
       <div class="legend-item">
-        <div class="legend-dot" style="background:#e8f8f0;border:1px solid #a8d8b8;"></div>
-        <span>空き</span>
+        <div class="legend-swatch" style="background:var(--available-bg);border:1px solid var(--available-bd);"></div>
+        <span>空き枠（クリックで予約）</span>
       </div>
       <div class="legend-item">
-        <div class="legend-dot" style="background:#ffeaea;border:1px solid #f5c6c6;"></div>
+        <div class="legend-swatch" style="background:var(--booked-bg);border:1px solid var(--booked-bd);"></div>
         <span>予約済み</span>
       </div>
       <div class="legend-item">
-        <div class="legend-dot" style="background:#fff8e1;border:1px solid #ffe082;"></div>
+        <div class="legend-swatch" style="background:var(--lunch-bg);border:1px solid var(--lunch-bd);"></div>
         <span>昼休み</span>
       </div>
     </div>
 
-    <div class="schedule-table-wrapper">
+    <div class="schedule-scroll">
       <table class="schedule-table" id="scheduleTable">
         <thead id="scheduleHead"></thead>
         <tbody id="scheduleBody"></tbody>
@@ -828,22 +1058,22 @@ DEMO_HTML = """<!DOCTYPE html>
     </div>
   </div>
 
-  <!-- Chat Panel -->
+  <!-- ===== CHAT SIDEBAR ===== -->
   <div class="chat-panel">
     <div class="chat-header">
-      <div class="chat-avatar">&#x1F916;</div>
+      <div class="chat-avatar">&#x1FA7A;</div>
       <div class="chat-header-info">
-        <h3>よやくらく AI</h3>
-        <p>● オンライン</p>
+        <h3>〇〇歯科 AI 受付</h3>
+        <p><span class="chat-online-dot"></span> オンライン対応中</p>
       </div>
     </div>
 
     <div class="chat-messages" id="chatMessages"></div>
 
     <div class="quick-replies" id="quickReplies">
-      <button class="quick-reply" onclick="sendQuick('今日の空きを教えて')">今日の空きを見る</button>
+      <button class="quick-reply" onclick="sendQuick('今日の空きを教えてください')">今日の空きを確認</button>
       <button class="quick-reply" onclick="sendQuick('明日予約したい')">明日予約したい</button>
-      <button class="quick-reply" onclick="sendQuick('田中さんの空き時間は？')">田中さんの空き</button>
+      <button class="quick-reply" onclick="sendQuick('田中さんの空き時間は？')">田中先生の空き</button>
       <button class="quick-reply" onclick="sendQuick('10時に予約したい')">10時に予約</button>
     </div>
 
@@ -852,14 +1082,20 @@ DEMO_HTML = """<!DOCTYPE html>
         type="text"
         class="chat-input"
         id="chatInput"
-        placeholder="メッセージを入力..."
+        placeholder="ご希望の日時をお知らせください…"
         onkeydown="if(event.key==='Enter')sendMessage()"
+        autocomplete="off"
       >
-      <button class="send-btn" onclick="sendMessage()">&#10148;</button>
+      <button class="send-btn" onclick="sendMessage()" title="送信">&#10148;</button>
     </div>
   </div>
 
 </div>
+
+<!-- ===== FOOTER ===== -->
+<footer class="footer">
+  Powered by <strong>&nbsp;よやくらく&nbsp;</strong> ── 医療機関向け AI 予約システム
+</footer>
 
 <script>
   const API_BASE = '';
@@ -867,7 +1103,7 @@ DEMO_HTML = """<!DOCTYPE html>
   let sessionState = { step: 'greeting' };
   let isTyping = false;
 
-  // --- Date navigation ---
+  // --- Date helpers ---
   function changeDate(delta) {
     const d = new Date(currentDate);
     d.setDate(d.getDate() + delta);
@@ -878,18 +1114,24 @@ DEMO_HTML = """<!DOCTYPE html>
   function formatDateJP(dateStr) {
     const d = new Date(dateStr + 'T00:00:00');
     const days = ['日', '月', '火', '水', '木', '金', '土'];
-    return `${d.getMonth() + 1}月${d.getDate()}日（${days[d.getDay()]}）`;
+    const dayColors = { 0: '#e05050', 6: '#3a7fcc' };
+    const day = d.getDay();
+    const dayLabel = days[day];
+    const color = dayColors[day] || '';
+    const colorAttr = color ? ` style="color:${color}"` : '';
+    return `${d.getMonth() + 1}月${d.getDate()}日<span${colorAttr}>（${dayLabel}）</span>`;
   }
 
-  // --- Schedule table ---
+  // --- Schedule ---
   async function loadSchedule(date) {
-    document.getElementById('dateDisplay').textContent = formatDateJP(date);
+    document.getElementById('dateDisplay').innerHTML = formatDateJP(date);
     try {
       const res = await fetch(`${API_BASE}/demo/schedule-grid/${date}`);
       const data = await res.json();
       renderSchedule(data);
     } catch (e) {
-      console.error('スケジュール取得失敗', e);
+      document.getElementById('scheduleBody').innerHTML =
+        '<tr><td colspan="99" style="text-align:center;padding:20px;color:#a0b4c4;">読み込みに失敗しました</td></tr>';
     }
   }
 
@@ -897,84 +1139,97 @@ DEMO_HTML = """<!DOCTYPE html>
     const head = document.getElementById('scheduleHead');
     const body = document.getElementById('scheduleBody');
 
-    // Header
+    // Header row
     head.innerHTML = '<tr>' +
-      '<th>時刻</th>' +
-      data.staff.map(s => `<th style="color:${s.color}">${s.name}</th>`).join('') +
+      '<th class="th-time">時刻</th>' +
+      data.staff.map(s =>
+        `<th style="color:${s.color}">${s.name.replace(' ', '<br>')}</th>`
+      ).join('') +
       '</tr>';
 
-    // Body
+    // Data rows
     body.innerHTML = data.time_slots.map(slot => {
       const cells = data.staff.map(s => {
-        const cell = data.grid[s.id][slot];
+        const cell = data.grid[s.id] && data.grid[s.id][slot];
         if (!cell) return '<td></td>';
 
         let cls = 'available';
-        let label = '空き';
+        let label = '● 空き';
+        let titleAttr = '';
 
         if (cell.status === 'booked') {
           cls = 'booked';
           label = cell.customer_name || '予約済み';
-          if (cell.menu) label += ` (${cell.menu})`;
+          const menu = cell.menu || '';
+          const end  = cell.end_time || '';
+          titleAttr = menu ? ` title="${menu}  〜${end}"` : '';
+          if (menu) label += ` (${menu})`;
         } else if (cell.status === 'booked_continuation') {
           cls = 'booked-continuation';
           label = '';
         } else if (cell.status === 'lunch') {
           cls = 'lunch';
-          label = '昼休み';
+          label = '─ 休憩 ─';
         }
 
         const onclick = cell.status === 'available'
           ? `onclick="slotClicked('${s.name}', '${slot}')"`
           : '';
 
-        return `<td><span class="slot ${cls}" ${onclick} title="${cell.menu || ''}">${label}</span></td>`;
+        return `<td><span class="slot-cell ${cls}" ${onclick}${titleAttr}>${label}</span></td>`;
       }).join('');
 
-      return `<tr><td class="time-cell">${slot}</td>${cells}</tr>`;
+      return `<tr><td class="time-label">${slot}</td>${cells}</tr>`;
     }).join('');
   }
 
   function slotClicked(staffName, time) {
-    const msg = `${staffName}さんの${time}に予約したい`;
+    const msg = `${staffName}さんの${time}に予約したいです`;
     document.getElementById('chatInput').value = msg;
     sendMessage();
   }
 
   // --- Chat ---
-  function addMessage(role, text, slots, confirmed) {
-    const messages = document.getElementById('chatMessages');
+  function escapeHtml(str) {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
 
+  function addMessage(role, text, slots, confirmed) {
+    const container = document.getElementById('chatMessages');
     const div = document.createElement('div');
     div.className = `message ${role}`;
 
     if (role === 'bot') {
       div.innerHTML = `
-        <div class="message-avatar">&#x1F916;</div>
-        <div>
+        <div class="msg-avatar">&#x1FA7A;</div>
+        <div class="msg-body">
           <div class="message-bubble">${escapeHtml(text)}</div>
-          ${confirmed ? '<div class="confirmed-badge">&#x2713; 予約確定</div>' : ''}
+          ${confirmed ? '<div class="confirmed-badge">&#x2713;&nbsp;予約が確定しました</div>' : ''}
           ${slots && slots.length > 0 ? renderSlotChips(slots) : ''}
         </div>
       `;
     } else {
       div.innerHTML = `
-        <div class="message-bubble">${escapeHtml(text)}</div>
+        <div class="msg-body">
+          <div class="message-bubble">${escapeHtml(text)}</div>
+        </div>
       `;
     }
 
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
   }
 
   function renderSlotChips(slots) {
-    // スタッフ別に最初の3枠だけ表示
     const byStaff = {};
     for (const s of slots) {
       if (!byStaff[s.staff_name]) byStaff[s.staff_name] = [];
       if (byStaff[s.staff_name].length < 3) byStaff[s.staff_name].push(s);
     }
-
     const chips = Object.values(byStaff).flat().slice(0, 9);
     if (chips.length === 0) return '';
 
@@ -993,20 +1248,22 @@ DEMO_HTML = """<!DOCTYPE html>
   }
 
   function showTyping() {
-    const messages = document.getElementById('chatMessages');
+    const container = document.getElementById('chatMessages');
     const div = document.createElement('div');
     div.className = 'message bot';
     div.id = 'typingIndicator';
     div.innerHTML = `
-      <div class="message-avatar">&#x1F916;</div>
-      <div class="typing-indicator">
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
-        <div class="typing-dot"></div>
+      <div class="msg-avatar">&#x1FA7A;</div>
+      <div class="msg-body">
+        <div class="typing-indicator">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
       </div>
     `;
-    messages.appendChild(div);
-    messages.scrollTop = messages.scrollHeight;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
   }
 
   function hideTyping() {
@@ -1021,12 +1278,10 @@ DEMO_HTML = """<!DOCTYPE html>
 
     input.value = '';
     addMessage('user', text);
-
     isTyping = true;
     showTyping();
 
-    // 500ms の疑似ディレイ（UXのため）
-    await new Promise(r => setTimeout(r, 500 + Math.random() * 400));
+    await new Promise(r => setTimeout(r, 500 + Math.random() * 350));
 
     try {
       const res = await fetch(`${API_BASE}/demo/chat`, {
@@ -1039,16 +1294,13 @@ DEMO_HTML = """<!DOCTYPE html>
         }),
       });
       const data = await res.json();
-
       hideTyping();
       addMessage('bot', data.reply, data.available_slots, data.booking_confirmed);
       sessionState = data.next_state || sessionState;
-
-      // 予約確定したらスケジュールを再読み込み
       if (data.booking_confirmed) {
-        setTimeout(() => loadSchedule(currentDate), 800);
+        setTimeout(() => loadSchedule(currentDate), 900);
       }
-    } catch (e) {
+    } catch (_) {
       hideTyping();
       addMessage('bot', '通信エラーが発生しました。もう一度お試しください。');
     } finally {
@@ -1061,19 +1313,14 @@ DEMO_HTML = """<!DOCTYPE html>
     sendMessage();
   }
 
-  function escapeHtml(str) {
-    return str
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;');
-  }
-
   // --- Init ---
   window.addEventListener('load', () => {
     loadSchedule(currentDate);
     addMessage('bot',
-      'こんにちは！予約AIアシスタントです。\\n\\nご希望の日時・スタッフをお気軽にお知らせください。\\n左のスケジュール表の「空き」をクリックしても予約できます。',
+      'こんにちは！〇〇歯科クリニックのAI受付です。\\n\\n' +
+      '診察のご予約を24時間365日承っております。\\n' +
+      'ご希望の日時・担当医師をお気軽にお知らせください。\\n\\n' +
+      '左のスケジュール表の「空き枠」をクリックしてもご予約いただけます。',
       null, false
     );
   });

@@ -220,14 +220,24 @@ async function executeCreateAppointment(
   }, context?.siteId);
 
   if (result.success) {
-    // LINE予約の場合、phone_numberをline_usersテーブルにupsert（リマインド用）
+    // LINE予約の場合、phone_numberをline_usersテーブルに保存（リマインド用）
     if (isLineSource && context?.lineUserId) {
       try {
-        // siteIdをspreadsheetIdから取得する代わりに、line_usersをline_user_idで検索してupsert
-        await supabaseClient
+        // site_idとline_user_idの両方で絞り込み（クロスサイトの誤更新防止）
+        // siteIdがない場合はline_user_idのみで更新（後方互換性のため）
+        let updateQuery = supabaseClient
           .from('line_users')
           .update({ phone_number: phoneDigits, updated_at: new Date().toISOString() })
           .eq('line_user_id', context.lineUserId);
+
+        if (context.siteId) {
+          updateQuery = updateQuery.eq('site_id', context.siteId);
+        }
+
+        const { error: updateErr } = await updateQuery;
+        if (updateErr) {
+          console.error('[Hybrid] Failed to update line_users phone_number:', updateErr);
+        }
       } catch (upsertErr) {
         console.error('[Hybrid] Failed to update line_users phone_number:', upsertErr);
       }

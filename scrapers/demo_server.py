@@ -30,9 +30,12 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
 from scrapers.demo_mock_data import (
+    add_demo_booking,
     build_schedule_grid,
+    clear_demo_bookings,
     generate_mock_reservations,
     get_available_slots,
+    get_demo_bookings_count,
     get_menu_list,
     get_staff_list,
 )
@@ -283,14 +286,36 @@ def _chatbot_reply(message: str, state: dict) -> tuple[str, dict, list[dict] | N
     # ---- ステップ: 確認待ち ----
     if step == "confirm":
         if re.search(r"はい|yes|お願い|確定|いいです|大丈夫", message, re.IGNORECASE):
-            date_display = datetime.strptime(target_date, "%Y-%m-%d").strftime("%-m月%-d日")
-            reply = (
-                f"予約が完了しました！\n\n"
-                f"日時: {date_display} {selected_time}〜\n"
-                f"担当: {selected_staff}\n\n"
-                "ご来院をお待ちしております。\n"
-                "変更・キャンセルは診療時間内にお電話にてご連絡ください。"
+            # 実際にインメモリストアに予約を書き込む
+            booking = add_demo_booking(
+                date=target_date,
+                staff_name=selected_staff,
+                start_time=selected_time,
+                customer_name="WEB予約（AI受付）",
+                menu="初診・検診",
+                duration_min=30,
             )
+
+            date_display = datetime.strptime(target_date, "%Y-%m-%d").strftime("%-m月%-d日")
+
+            if booking:
+                reply = (
+                    f"ご予約が確定しました！\n\n"
+                    f"📅 日時: {date_display} {selected_time}〜{booking['end_time']}\n"
+                    f"👨‍⚕️ 担当: {selected_staff}\n"
+                    f"📋 内容: 初診・検診\n\n"
+                    "左のスケジュール表にも反映されましたのでご確認ください。\n"
+                    "ご来院をお待ちしております。"
+                )
+            else:
+                reply = (
+                    f"申し訳ありません。{date_display} {selected_time}〜の{selected_staff}の枠は"
+                    "ちょうど埋まってしまったようです。\n\n"
+                    "別の時間帯をお選びいただけますか？"
+                )
+                new_state = {"step": "show_slots", "date": target_date}
+                return reply, new_state, get_available_slots(target_date)[:20], False
+
             new_state = {"step": "done"}
             return reply, new_state, None, True
 
@@ -400,9 +425,46 @@ async def chat(req: ChatRequest):
     )
 
 
+class BookingRequest(BaseModel):
+    date: str
+    staff_name: str
+    start_time: str
+    customer_name: str = "WEB予約"
+    menu: str = "初診・検診"
+    duration_min: int = 30
+
+
+@app.post("/demo/book")
+async def book_slot(req: BookingRequest):
+    """デモ予約を直接作成（グリッドの空き枠クリック用）"""
+    booking = add_demo_booking(
+        date=_validate_date(req.date),
+        staff_name=req.staff_name,
+        start_time=req.start_time,
+        customer_name=req.customer_name,
+        menu=req.menu,
+        duration_min=req.duration_min,
+    )
+    if booking is None:
+        raise HTTPException(status_code=409, detail="この枠は既に予約済みです")
+    return {"success": True, "booking": booking}
+
+
+@app.post("/demo/reset")
+async def reset_demo():
+    """デモ予約をリセット（プレゼンやり直し用）"""
+    clear_demo_bookings()
+    return {"success": True, "message": "デモ予約をリセットしました"}
+
+
 @app.get("/health")
 async def health():
-    return {"status": "ok", "mode": "demo", "timestamp": datetime.now(JST).isoformat()}
+    return {
+        "status": "ok",
+        "mode": "demo",
+        "demo_bookings": get_demo_bookings_count(),
+        "timestamp": datetime.now(JST).isoformat(),
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -712,6 +774,19 @@ DEMO_HTML = """<!DOCTYPE html>
       cursor: default;
     }
 
+    .slot-cell.new-booking {
+      background: linear-gradient(135deg, #d4f5e9, #b0eed6);
+      color: #0a6847;
+      border: 2px solid #2ec486;
+      font-weight: 700;
+      animation: pulseNew 2s ease-in-out 3;
+    }
+
+    @keyframes pulseNew {
+      0%, 100% { box-shadow: none; }
+      50% { box-shadow: inset 0 0 8px rgba(46,196,134,.35), 0 0 12px rgba(46,196,134,.25); }
+    }
+
     .slot-cell.booked-continuation {
       background: var(--booked-bg);
       opacity: .45;
@@ -1014,7 +1089,7 @@ DEMO_HTML = """<!DOCTYPE html>
       <span class="status-dot"></span>
       <span>24時間対応中</span>
     </div>
-    <span class="demo-badge">DEMO</span>
+    <span class="demo-badge" onclick="resetDemo()" style="cursor:pointer;" title="デモ予約をリセット">&#x21BB; RESET</span>
   </div>
 </header>
 
@@ -1043,6 +1118,10 @@ DEMO_HTML = """<!DOCTYPE html>
       <div class="legend-item">
         <div class="legend-swatch" style="background:var(--booked-bg);border:1px solid var(--booked-bd);"></div>
         <span>予約済み</span>
+      </div>
+      <div class="legend-item">
+        <div class="legend-swatch" style="background:linear-gradient(135deg,#d4f5e9,#b0eed6);border:2px solid #2ec486;"></div>
+        <span>今回の予約（AI受付）</span>
       </div>
       <div class="legend-item">
         <div class="legend-swatch" style="background:var(--lunch-bg);border:1px solid var(--lunch-bd);"></div>
@@ -1158,12 +1237,16 @@ DEMO_HTML = """<!DOCTYPE html>
         let titleAttr = '';
 
         if (cell.status === 'booked') {
-          cls = 'booked';
+          cls = cell.is_new_booking ? 'new-booking' : 'booked';
           label = cell.customer_name || '予約済み';
           const menu = cell.menu || '';
           const end  = cell.end_time || '';
           titleAttr = menu ? ` title="${menu}  〜${end}"` : '';
-          if (menu) label += ` (${menu})`;
+          if (cell.is_new_booking) {
+            label = '★ ' + label;
+          } else if (menu) {
+            label += ` (${menu})`;
+          }
         } else if (cell.status === 'booked_continuation') {
           cls = 'booked-continuation';
           label = '';
@@ -1311,6 +1394,21 @@ DEMO_HTML = """<!DOCTYPE html>
   function sendQuick(text) {
     document.getElementById('chatInput').value = text;
     sendMessage();
+  }
+
+  // --- Reset demo bookings ---
+  async function resetDemo() {
+    if (!confirm('デモ予約をリセットしますか？')) return;
+    try {
+      await fetch(`${API_BASE}/demo/reset`, { method: 'POST' });
+      sessionState = { step: 'greeting' };
+      document.getElementById('chatMessages').innerHTML = '';
+      addMessage('bot',
+        'デモ予約をリセットしました。\\n新しいご予約をお試しください。',
+        null, false
+      );
+      loadSchedule(currentDate);
+    } catch(_) {}
   }
 
   // --- Init ---

@@ -1,10 +1,15 @@
 """
 デモ用モック予約データ
 サロンボード実アカウント不要でデモフロー全体を見せるためのモックデータ
+
+インメモリ予約ストア:
+  チャットから予約確定→グリッドに即反映するための仕組み。
+  add_demo_booking() で追加、build_schedule_grid() で自動的にマージされる。
 """
 
 from datetime import datetime, timedelta
 import random
+from threading import Lock
 
 # スタッフ定義
 STAFF_LIST = [
@@ -161,7 +166,7 @@ def get_available_slots(target_date: str) -> list[dict]:
     Returns:
         空き枠データのリスト（スタッフ・時間帯ごと）
     """
-    reservations = generate_mock_reservations(target_date)
+    reservations = generate_mock_reservations(target_date) + _get_demo_bookings(target_date)
     available_slots = []
 
     for staff in STAFF_LIST:
@@ -200,6 +205,77 @@ def get_menu_list() -> list[dict]:
     ]
 
 
+# ---------------------------------------------------------------------------
+# インメモリ予約ストア（デモ用）
+# ---------------------------------------------------------------------------
+
+_demo_bookings: list[dict] = []
+_demo_lock = Lock()
+
+
+def add_demo_booking(
+    date: str,
+    staff_name: str,
+    start_time: str,
+    customer_name: str = "WEB予約",
+    menu: str = "初診・検診",
+    duration_min: int = 30,
+) -> dict | None:
+    """
+    デモ予約を追加。成功すれば予約dictを返す。
+    スタッフ名が見つからない or 枠が埋まっていたら None。
+    """
+    staff = next((s for s in STAFF_LIST if s["name"] == staff_name), None)
+    if staff is None:
+        return None
+
+    start_dt = datetime.strptime(f"{date} {start_time}", "%Y-%m-%d %H:%M")
+    end_dt = start_dt + timedelta(minutes=duration_min)
+    end_time = end_dt.strftime("%H:%M")
+
+    # 既存予約＋モック予約と衝突チェック
+    all_reservations = generate_mock_reservations(date) + _get_demo_bookings(date)
+    if _is_slot_occupied(all_reservations, staff["id"], start_time):
+        return None
+
+    booking = {
+        "date": date,
+        "staff_id": staff["id"],
+        "staff_name": staff_name,
+        "start_time": start_time,
+        "end_time": end_time,
+        "customer_name": customer_name,
+        "menu": menu,
+        "price": 0,
+        "duration_min": duration_min,
+        "status": "confirmed",
+        "source": "demo_web_booking",
+    }
+
+    with _demo_lock:
+        _demo_bookings.append(booking)
+
+    return booking
+
+
+def _get_demo_bookings(date: str) -> list[dict]:
+    """指定日のデモ予約を返す"""
+    with _demo_lock:
+        return [b for b in _demo_bookings if b["date"] == date]
+
+
+def get_demo_bookings_count() -> int:
+    """デモ予約の総数"""
+    with _demo_lock:
+        return len(_demo_bookings)
+
+
+def clear_demo_bookings() -> None:
+    """デモ予約を全クリア"""
+    with _demo_lock:
+        _demo_bookings.clear()
+
+
 def build_schedule_grid(target_date: str) -> dict:
     """
     フロントエンド表示用のスケジュールグリッドデータを構築
@@ -212,7 +288,7 @@ def build_schedule_grid(target_date: str) -> dict:
           "grid": { "staff_id": { "HH:MM": cell_data } }
         }
     """
-    reservations = generate_mock_reservations(target_date)
+    reservations = generate_mock_reservations(target_date) + _get_demo_bookings(target_date)
     grid: dict[str, dict[str, dict]] = {}
 
     for staff in STAFF_LIST:
@@ -239,6 +315,7 @@ def build_schedule_grid(target_date: str) -> dict:
                     "is_start": False,
                 }
             elif res_here:
+                is_new = res_here.get("source") == "demo_web_booking"
                 grid[staff["id"]][slot_time] = {
                     "status": "booked",
                     "label": res_here["customer_name"],
@@ -248,6 +325,7 @@ def build_schedule_grid(target_date: str) -> dict:
                     "end_time": res_here["end_time"],
                     "duration_min": res_here["duration_min"],
                     "is_start": True,
+                    "is_new_booking": is_new,
                 }
             elif is_occupied:
                 grid[staff["id"]][slot_time] = {

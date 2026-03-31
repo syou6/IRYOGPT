@@ -49,3 +49,6 @@ public/index.html
 salonboard/cookies.json
 salonboard/screenshots/
 salonboard/__pycache__/
+
+# Windsurf IDE
+.windsurf/

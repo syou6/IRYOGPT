@@ -1,808 +1,448 @@
-# Anti-Bot Evasion Techniques 2025-2026: Gap Analysis vs Current Implementation
-
-> Research date: 2026-03-30
-> Codebase: `/Users/sho/yoyakuraku/IRYOGPT/scrapers/`
-> Key files: `stealth.py`, `base_scraper.py`
+# Anti-Bot Evasion Research: Comprehensive 2025-2026 Report
+## Research date: 2026-03-31
+## Focus: Akamai Bot Manager, browser frameworks, TLS evasion, proxies, CDP bypass
 
 ---
 
 ## Executive Summary
 
-The current scraper stack is well-built for Akamai Bot Manager evasion: puppeteer-extra-plugin-stealth full 17-module coverage, WindMouse, Bezier fallback, CDP injection timing, and Xvfb+headless=False are all best practices. However, six significant gaps exist that could cause detection on hardened targets in 2026: AudioContext fingerprinting, WebRTC IP leak, Runtime.enable CDP leak (rebrowser-patches pattern), HTTP/2 fingerprint mismatch from proxy chains, screen.devicePixelRatio/colorDepth fixup on Xvfb, and IP-layer datacenter flagging (ConoHa VPS). Two medium-priority gaps (scroll physics, Poisson-distributed timing) would improve behavioral plausibility. One low-priority gap (font enumeration defense) is a theoretical concern for most targets.
+Akamai Bot Manager in 2026 is a multi-layered trust scoring system that cannot be bypassed by any single technique alone. The effective approach requires combining: (1) a source IP with legitimate residential or mobile ASN reputation, (2) authentic TLS fingerprints matching a real browser, (3) a stealthy browser automation layer that hides CDP signals, and (4) human-like behavioral patterns. From a datacenter VPS like ConoHa, direct requests achieve under 12% success against Akamai-protected sites. With residential/mobile proxies routed through the VPS, success rates rise to 70-96% depending on proxy type and browser tool. Commercial scraping APIs (Scrapfly, ZenRows) claim 97-99% success and abstract all complexity at a cost of roughly $0.03-0.30 per heavy request.
 
 ---
 
-## Area 1: TLS / Network Layer
+## 1. How Akamai Bot Manager Actually Detects Bots
 
-### 1.1 JA3/JA4 TLS Fingerprint
+Akamai's detection runs across five layers simultaneously:
 
-**What it is:** JA3 hashes the ClientHello fields (cipher suites, extensions, elliptic curves) into a 32-char MD5. JA4 improves on it by sorting extensions alphabetically before hashing, making it stable against Chrome's TLS ClientHello permutation feature (Chrome since v117 shuffles extension order on every connection, breaking JA3 consistency). Akamai, Cloudflare, and DataDome all ingest JA3/JA4 as a detection signal.
+**Layer 1 - TLS Fingerprinting (Connection-time)**
+Each TLS library produces a unique ClientHello handshake. Akamai captures JA3 and JA4 hashes. JA4 (2023-present) sorts cipher suites and extensions into canonical order before hashing, making JA3-era randomization useless. A Python `requests` library connecting from a VPS produces a JA3/JA4 instantly recognizable as automation.
 
-**Do we handle it?** YES — implicitly. Because zendriver controls a real Chrome binary, the TLS handshake is produced by Chrome's BoringSSL stack, not by a Python `ssl` module or `requests` library. Chrome's JA3/JA4 profile matches a genuine browser by definition. No custom action required.
+**Layer 2 - IP Reputation**
+IP addresses are classified by ASN (Autonomous System Number). Datacenter ASNs (AWS, GCP, ConoHa, etc.) receive immediate negative trust scores. Akamai enforces 3 requests before challenge on datacenter ASNs. Residential ISP IPs (NTT, KDDI, SoftBank) receive positive trust signals. Mobile carrier IPs (NTT Docomo, SoftBank, au) receive the highest trust.
 
-**Caveat:** If you ever route requests through a Python `requests`/`httpx` proxy layer (e.g., for API calls or sidecar requests), those calls will emit a Python TLS fingerprint, not Chrome's. Keep all traffic inside the browser or through curl_cffi with `impersonate="chrome131"`.
+**Layer 3 - HTTP Characteristics**
+Header order, presence of `Origin`/`Referer`, HTTP version (1.1 vs 2/3), and header value patterns. `requests` and similar libraries default to HTTP/1.1 and produce non-browser header ordering.
 
-**Priority:** MEDIUM (no action needed for current zendriver-only approach; becomes CRITICAL if any Python HTTP client is added)
-**Difficulty:** N/A for current stack; LOW for curl_cffi addition if needed
+**Layer 4 - JavaScript Fingerprinting**
+Akamai injects JavaScript that collects: JS engine details, hardware capabilities, GPU info (WebGL), OS details, browser plugins, canvas fingerprint, audio fingerprint, screen properties, and timezone. This data becomes the `sensor_data` payload POSTed to `/akamai/bm/gather-data-from-client`.
 
----
+**Layer 5 - Cookie Chain + Behavioral Analysis**
+The `_abck` cookie is issued after successful sensor_data validation. It has a TTL and must be refreshed. Subsequent requests are validated against this cookie. Behavioral patterns (mouse movements, scroll timing, click patterns) accumulate trust or suspicion over the session.
 
-### 1.2 HTTP/2 Fingerprint (SETTINGS, WINDOW_UPDATE, Pseudo-Header Order)
-
-**What it is:** HTTP/2 connections start with a SETTINGS frame that includes 6 parameters: HEADER_TABLE_SIZE, ENABLE_PUSH, MAX_CONCURRENT_STREAMS, INITIAL_WINDOW_SIZE, MAX_FRAME_SIZE, MAX_HEADER_LIST_SIZE. Each HTTP client library has hardcoded defaults that differ from Chrome. Additionally, Chrome sends pseudo-headers in a fixed order: `:method`, `:authority`, `:scheme`, `:path`. Python's `httpx`/`aiohttp`/`requests` all send different SETTINGS values and header orderings that are trivially fingerprinted.
-
-Chrome's canonical HTTP/2 SETTINGS (as of Chrome 120+):
-```
-HEADER_TABLE_SIZE: 65536
-ENABLE_PUSH: 1
-MAX_CONCURRENT_STREAMS: 1000
-INITIAL_WINDOW_SIZE: 6291456
-MAX_FRAME_SIZE: 16384
-MAX_HEADER_LIST_SIZE: 262144
-WINDOW_UPDATE: 15663105
-```
-
-**Do we handle it?** YES — implicitly, same reason as JA3: zendriver drives real Chrome which produces real HTTP/2 frames. The risk is the same as above: any sidecar Python HTTP calls will expose a non-Chrome H2 fingerprint.
-
-**Priority:** MEDIUM (same caveat as JA3)
-**Difficulty:** LOW if using curl_cffi; HIGH if implementing natively
+**Key Akamai cookies:**
+- `_abck` - Primary validation cookie, ~10 min TTL
+- `ak_bmsc` - Bot manager session cookie
+- `bm_sv` - Session validation
+- `bm_mi` - Machine identification
 
 ---
 
-### 1.3 TCP Fingerprint (JA4T / TCP Window Size / TTL)
+## 2. Browser Automation Framework Rankings
 
-**What it is:** JA4T fingerprints the TCP SYN packet: window size, MSS, options order (timestamp, SACK, NOP, window scaling), and TTL. A Linux VPS produces TTL=64, window_size=65535 by default. A Windows desktop produces TTL=128, window_size=65535 but with different TCP option ordering. Akamai uses JA4T as an additional signal but it is a network-layer fingerprint, not browser-layer.
+### Benchmark Data (techinz/browsers-benchmark, January 2026)
+18 tools tested across 5 anti-bot systems (Cloudflare, DataDome, Amazon, Google, Ticketmaster/Imperva):
 
-**Do we handle it?** NO. The VPS (ConoHa, Linux) sends Linux TCP SYN packets regardless of what Chrome does.
+| Tool | Overall Bypass Rate | RAM Usage | Notes |
+|------|---------------------|-----------|-------|
+| camoufox_headless | 83.3% | 1037 MB | Firefox, C++ patched |
+| nodriver-chrome | 83.3% | ~400 MB | Direct CDP |
+| playwright-firefox | 83.3% | ~600 MB | Firefox engine |
+| zendriver | 75% | ~400 MB | Best vs Akamai specifically |
+| playwright-stealth | 66.7% | ~350 MB | Varies by config |
+| patchright_headless | 16.7% | ~350 MB | Poor headless |
+| playwright-chrome | 16.7% | 212 MB | Heavily detected headless |
 
-**Priority:** LOW — Akamai weights browser-layer signals far more heavily than TCP-layer for standard bot detection. TCP fingerprinting is used more by enterprise DPI appliances. The ConoHa IP reputation problem (see 5.2) is a larger concern.
-**Difficulty:** VERY HIGH — requires kernel-level modification (`tc qdisc`, `iptables NFQUEUE`, or `nfqueue-bindings`). Not practical for this use case.
+**Note**: These tests used "clean" home proxies. Datacenter IPs would reduce all scores by 30-50 percentage points.
 
----
+### Tool Deep-Dives
 
-## Area 2: Browser Fingerprint Gaps
+**Camoufox (daijro/camoufox)**
+- Firefox modified at the C++ level before JavaScript can inspect it
+- BrowserForge integration for statistically accurate fingerprint generation
+- Achieves 0% headless detection on major fingerprint test suites
+- Best against DataDome and fingerprint-heavy systems
+- IMPORTANT: Original maintainer inactive since March 2025. Community forks active but check status.
+- Memory intensive: ~1GB per instance
+- Python async API
 
-### 2.1 AudioContext Fingerprinting
+**Zendriver (ultrafunkamsterdam/zendriver)**
+- Active fork of NoDriver with faster development pace
+- Bypasses WebDriver protocol entirely - no `navigator.webdriver` exposure
+- Direct Chrome DevTools Protocol without Puppeteer overhead
+- Async-first Python
+- Confirmed working against Akamai, Cloudflare, CloudFront in 2025 testing
+- 75% baseline success rate (clean proxy, no residential required for some sites)
 
-**What it is:** Websites create an `OfflineAudioContext`, instantiate an `OscillatorNode` and `DynamicsCompressorNode`, render the audio buffer, then hash the resulting float32 array. The output varies by CPU, GPU, OS audio stack, and sample rate. On a VPS with no physical audio hardware, Chrome uses a software renderer (typically PulseAudio/ALSA stub or the internal Chrome audio renderer) which produces a different fingerprint hash than consumer laptops. Brave defends against this with "farbling" — deterministic per-domain randomization with 0.00000014% to 0.00000214% signal noise.
+**Patchright (Kaliiiiiiiiii-Vinyzu/patchright)**
+- Playwright binary-level patch
+- Sets `navigator.webdriver` = false, patches HeadlessChrome UA
+- Protocol-level CDP stealth (better than JS patching)
+- Works well against basic/medium anti-bot
+- Against enterprise Akamai headless: needs residential proxy support
+- Active maintenance, tracks Playwright versions
 
-**Current state in `stealth.py`:** NOT PRESENT. The 22 existing patches do not include AudioContext.
+**Rebrowser-patches (rebrowser/rebrowser-patches)**
+- Collection of patches for Puppeteer and Playwright
+- Primary fix: `Runtime.Enable` CDP leak (this single signal detected by ALL major anti-bots)
+- Three modes:
+  - `addBinding` (default): Creates bindings in main world, avoids Runtime.Enable
+  - `alwaysIsolated`: Uses `Page.createIsolatedWorld`
+  - `enableDisable`: Runtime.Enable then immediate Runtime.Disable
+- Also patches `sourceURL` from `pptr:...` to generic names
+- Tested vs Cloudflare and DataDome (not specifically tested vs Akamai)
+- Latest: Playwright 1.52.0 (April 2025), Puppeteer 24.8.1 (May 2025)
 
-**Do we handle it?** NO.
+**Playwright-stealth / puppeteer-extra-plugin-stealth**
+- Legacy approach: JS API patching via Proxy objects
+- Spoofs `navigator.webdriver`, `navigator.languages`, `screen.colorDepth`
+- Problem: patches introduce their own detectable artifacts
+- Still useful for basic/medium protection but considered inferior to CDP-level approaches
+- Not recommended for Akamai
 
-**Priority:** HIGH — Akamai Bot Manager's sensor data JS explicitly collects audio fingerprint data as part of its telemetry payload. Mismatches between claimed OS (Windows, via userAgentData) and VPS audio stack are detectable.
+**Botright**
+- Playwright-based with built-in CAPTCHA solving
+- Less maintained, not recommended for production
 
-**Implementation:**
-```javascript
-// Inject via add_script_to_evaluate_on_new_document
-const audioCtxProto = window.AudioContext || window.webkitAudioContext;
-const origCreateOscillator = audioCtxProto.prototype.createOscillator;
-const origCreateDynamicsCompressor = audioCtxProto.prototype.createDynamicsCompressor;
+### Practical Success Rates Against Akamai (Combined Tool + Proxy)
 
-// Offline context: spoof getChannelData output
-const OrigOfflineCtx = window.OfflineAudioContext;
-window.OfflineAudioContext = class extends OrigOfflineCtx {
-    startRendering() {
-        return super.startRendering().then(buffer => {
-            // Apply deterministic per-session noise (same seed as canvas noise)
-            const data = buffer.getChannelData(0);
-            const noise = 0.0000001; // Brave-level farbling
-            for (let i = 0; i < data.length; i++) {
-                data[i] += (Math.random() * 2 - 1) * noise;
-            }
-            return buffer;
-        });
-    }
-};
-makeNative(window.OfflineAudioContext, 'OfflineAudioContext');
-```
-
-**Difficulty:** LOW (15 lines of JS to add to `build_stealth_js`)
-
----
-
-### 2.2 WebGL2 Advanced (Shader Precision, Extensions List)
-
-**What it is:** Current `stealth.py` patches `WebGLRenderingContext.getParameter` for params `0x9245` (VENDOR) and `0x9246` (RENDERER) only. Advanced detection checks:
-- `getSupportedExtensions()` — headless Chrome on a VPS may have fewer extensions than desktop Chrome with NVIDIA GPU
-- `getShaderPrecisionFormat()` — returns precision for FRAGMENT_SHADER/VERTEX_SHADER; differs between real NVIDIA and SwiftShader
-- `MAX_TEXTURE_SIZE`, `MAX_VIEWPORT_DIMS`, `ALIASED_LINE_WIDTH_RANGE` — cross-check with reported GPU
-- `getExtension('WEBGL_debug_renderer_info')` — some sites specifically call this to get the unmasked renderer
-
-**Do we handle it?** PARTIAL — vendor/renderer strings are spoofed, but precision formats and extensions list are not.
-
-**Priority:** MEDIUM — Akamai's current sensor collects WebGL parameters but the vendor/renderer spoof is the primary signal. Shader precision is a secondary signal used by more sophisticated checks (Cloudflare Turnstile, DataDome).
-
-**Implementation:**
-```javascript
-// Add to WebGL getParameter patch block
-if (param === 0x8B4D) return { rangeMin: 127, rangeMax: 127, precision: 23 }; // HIGH_FLOAT
-if (param === 0x8B4E) return { rangeMin: 127, rangeMax: 127, precision: 23 }; // HIGH_INT
-if (param === 0x8B50) return 16384; // MAX_TEXTURE_SIZE (NVIDIA GTX 1650)
-if (param === 0x9240) return 'Google Inc. (NVIDIA)'; // UNMASKED_VENDOR_WEBGL
-if (param === 0x9241) return 'ANGLE (NVIDIA, NVIDIA GeForce GTX 1650 Direct3D11 vs_5_0 ps_5_0, D3D11)';
-
-// getSupportedExtensions spoof
-const origGetSupportedExtensions = WebGLRenderingContext.prototype.getSupportedExtensions;
-WebGLRenderingContext.prototype.getSupportedExtensions = function() {
-    return [
-        'ANGLE_instanced_arrays', 'EXT_blend_minmax', 'EXT_color_buffer_half_float',
-        'EXT_disjoint_timer_query', 'EXT_float_blend', 'EXT_frag_depth',
-        'EXT_shader_texture_lod', 'EXT_texture_compression_bptc',
-        'EXT_texture_compression_rgtc', 'EXT_texture_filter_anisotropic',
-        'EXT_sRGB', 'KHR_parallel_shader_compile', 'OES_element_index_uint',
-        'OES_fbo_render_mipmap', 'OES_standard_derivatives', 'OES_texture_float',
-        'OES_texture_float_linear', 'OES_texture_half_float',
-        'OES_texture_half_float_linear', 'OES_vertex_array_object',
-        'WEBGL_color_buffer_float', 'WEBGL_compressed_texture_s3tc',
-        'WEBGL_compressed_texture_s3tc_srgb', 'WEBGL_debug_renderer_info',
-        'WEBGL_debug_shaders', 'WEBGL_depth_texture', 'WEBGL_draw_buffers',
-        'WEBGL_lose_context', 'WEBGL_multi_draw',
-    ];
-};
-```
-
-**Difficulty:** LOW-MEDIUM (30-50 lines of JS additions)
+| Proxy Type | Tool Alone | + Residential Proxy | + Mobile Proxy |
+|-----------|-----------|---------------------|----------------|
+| Enterprise Akamai | 5-15% | 40-70% | 75-96% |
+| Medium protection | 40-60% | 80-90% | 90%+ |
 
 ---
 
-### 2.3 Font Enumeration
+## 3. TLS Fingerprint Evasion
 
-**What it is:** Sites measure the rendered pixel width of text in a set of hundreds of font families against a baseline (e.g., `monospace`). Installed fonts differ: a Linux VPS with Japanese locale will have `Noto CJK`, `IPAGothic`, etc., but will lack Windows-only fonts like `MS Mincho`, `Meiryo`, `Yu Gothic` that real Windows Chrome users have.
+### The JA3/JA4 Problem
 
-**Do we handle it?** NO.
+**JA3** (2017-2021): Hash of TLS cipher suites + extensions + elliptic curves. Defeatable by randomization.
 
-**Priority:** MEDIUM — This fingerprint is used by fingerprint.js Pro and FingerprintJS Enterprise to compute a stable user ID. Akamai Bot Manager itself may use it as a supplementary signal. The VPS + Japanese locale + claimed "Windows" UA creates an inconsistency.
+**JA4** (2023-present): Sorts cipher suites and extensions canonically before hashing, ignores GREASE values. Randomization does NOT defeat JA4. A Python `requests` session always produces a non-browser JA4 fingerprint.
 
-**Implementation approach:** There is no clean JS injection fix. Options:
-1. Install Windows-compatible Japanese fonts on the VPS: `sudo apt-get install -y fonts-ipafont fonts-ipaexfont` (covers IPA but not MS-proprietary fonts). Wine can install MS fonts: `apt-get install ttf-mscorefonts-installer`.
-2. Override `document.fonts` API to return a controlled font list (complex; breaks legitimate font loading).
-3. Accept the inconsistency since Akamai weighs this less than behavioral signals.
+### Tools That Work
 
-**Difficulty:** MEDIUM (system-level font installation, one-time VPS setup)
-
----
-
-### 2.4 Screen: devicePixelRatio and colorDepth on Xvfb
-
-**What it is:** Xvfb default color depth is 24-bit and devicePixelRatio is 1.0. Real modern monitors are 96+ DPI with devicePixelRatio typically 1.0-2.0 (Retina/HiDPI). The colorDepth issue: `screen.colorDepth` should be 24 (which Xvfb does provide), but `window.devicePixelRatio` being exactly 1.0 combined with certain screen resolutions (1920x1080) that should logically be DPR=1.5 on modern monitors is mildly suspicious.
-
-**Do we handle it?** PARTIAL — `stealth.py` patches outerWidth/outerHeight/innerWidth/innerHeight/screen.width/screen.height/screen.availWidth/screen.availHeight. It does NOT patch `screen.colorDepth`, `screen.pixelDepth`, or `window.devicePixelRatio`.
-
-**Priority:** LOW-MEDIUM — colorDepth=24 is the correct value for Xvfb's default. The gap is `devicePixelRatio`.
-
-**Implementation:**
-```javascript
-// Add to stealth.py
-Object.defineProperty(window, 'devicePixelRatio', {
-    get: () => 1.0,  // or 1.25 for higher-DPI common laptops
-    configurable: true,
-});
-Object.defineProperty(screen, 'colorDepth', {
-    get: () => 24, configurable: true,
-});
-Object.defineProperty(screen, 'pixelDepth', {
-    get: () => 24, configurable: true,
-});
-```
-
-**Difficulty:** VERY LOW (3 lines)
-
----
-
-### 2.5 WebRTC Local IP Leak
-
-**What it is:** WebRTC's ICE (Interactive Connectivity Establishment) process enumerates all local network interfaces and sends them to the STUN server. Even with a proxy configured in Chrome, WebRTC uses UDP which bypasses SOCKS/HTTP proxy settings. A VPS's real IP (133.88.120.151 or similar ConoHa range) leaks through WebRTC even if the user-facing IP appears different.
-
-**Do we handle it?** NO — no WebRTC mitigation in `stealth.py` or `base_scraper.py`.
-
-**Priority:** HIGH — Akamai Bot Manager collects WebRTC ICE candidates as part of sensor telemetry. A datacenter IP leaking through WebRTC while the connection IP is also datacenter is a strong bot signal. More critically, the VPS IP range (GMO/ConoHa: AS7506) is a known datacenter ASN — WebRTC leaking this confirms datacenter origin.
-
-**Implementation (two approaches):**
-
-Option A — Chrome launch flag (preferred):
+**curl_cffi (lexiforest/curl_cffi) - Recommended for Python**
 ```python
-browser_args=[
-    # ...existing args...
-    "--enforce-webrtc-ip-handling-policy=disable_non_proxied_udp",
-    # Alternatively: default_public_interface_only (less aggressive)
-]
+from curl_cffi import requests as cffi_requests
+
+# Impersonate Chrome 124
+session = cffi_requests.Session(impersonate="chrome124")
+response = session.get("https://target.com")
+
+# Custom JA3/JA4
+session = cffi_requests.Session(ja3="...", akamai="...")
 ```
+- Python bindings for curl-impersonate via CFFI
+- Supported profiles: Chrome (110-124+), Firefox, Safari, Edge
+- Also supports HTTP/2 fingerprint (SETTINGS, WINDOW_UPDATE frames)
+- Real-world: ~92% success vs 12% for `requests` library (tested Q1 2025, 50+ sites)
+- Works against Akamai when TLS is the primary detection vector
+- Maintained actively (lexiforest fork, more active than original lwthiker)
 
-Option B — JS injection (fallback, intercepts RTCPeerConnection):
-```javascript
-// Add to stealth.py
-const origRTCPeerConnection = window.RTCPeerConnection;
-window.RTCPeerConnection = function(config, constraints) {
-    if (config && config.iceServers) {
-        config.iceServers = [];  // Block STUN/TURN servers
-    }
-    const pc = new origRTCPeerConnection(config, constraints);
-    const origAddIceCandidate = pc.addIceCandidate.bind(pc);
-    // Block local IP candidates
-    pc.addIceCandidate = function(candidate) {
-        if (candidate && candidate.candidate &&
-            /192\.168\.|10\.|172\.(1[6-9]|2[0-9]|3[01])\./.test(candidate.candidate)) {
-            return Promise.resolve();
-        }
-        return origAddIceCandidate(candidate);
-    };
-    return pc;
-};
-makeNative(window.RTCPeerConnection, 'RTCPeerConnection');
-```
+**scrapy-impersonate / scrapy-curl-cffi**
+- Scrapy middleware using curl_cffi
+- Author of The Web Scraping Club confirmed: "I've used it in several cases when it comes to handling Akamai bot protection"
+- For Akamai sites where JS execution is not required
 
-**Difficulty:** LOW (Chrome flag: 1 line; JS injection: 20 lines)
+**tls-client (Go)**
+- Go library using uTLS for per-browser TLS fingerprints
+- Good for high-throughput Go scrapers
+- Less Python-friendly
 
----
+**uTLS (Go)**
+- Underlying library for TLS fingerprint mimicking
+- Less effective against JA4 due to normalization but useful for JA3 targets
 
-### 2.6 SpeechSynthesis API Fingerprint
-
-**What it is:** `window.speechSynthesis.getVoices()` returns a list of available TTS voices. On a Linux VPS with no audio system, this returns an empty array. A Windows Chrome user would have Japanese Microsoft voices (`Microsoft Haruka`, `Microsoft Ichiro`, etc.) plus Google voices. Discrepancy between `navigator.languages = ['ja-JP', 'ja']` and empty voice list is detectable.
-
-**Do we handle it?** NO.
-
-**Priority:** LOW — Akamai does check for this inconsistency but it is a weak signal. However, combined with other signals it adds to a bot score.
-
-**Implementation:**
-```javascript
-// Add to stealth.py
-if (window.speechSynthesis) {
-    const origGetVoices = window.speechSynthesis.getVoices.bind(window.speechSynthesis);
-    window.speechSynthesis.getVoices = function() {
-        const voices = origGetVoices();
-        if (voices.length === 0) {
-            // Return minimal spoofed voice list consistent with Japanese Windows
-            return [
-                { voiceURI: 'Microsoft Haruka Desktop - Japanese', name: 'Microsoft Haruka Desktop - Japanese',
-                  lang: 'ja-JP', localService: true, default: true },
-                { voiceURI: 'Google 日本語', name: 'Google 日本語',
-                  lang: 'ja-JP', localService: false, default: false },
-            ];
-        }
-        return voices;
-    };
-}
-```
-
-**Difficulty:** VERY LOW (15 lines)
+### What No Longer Works
+- Simple cipher suite randomization (JA4 sorts before hashing)
+- Only changing User-Agent (TLS fingerprint remains unchanged)
+- HTTP/1.1 requests claiming to be Chrome (HTTP/2 required)
 
 ---
 
-### 2.7 Performance.now() Timing Precision
+## 4. Residential Proxy Providers - Japan Focus
 
-**What it is:** Chrome reduces `performance.now()` precision to 100 microseconds (0.1ms) by default for security (Spectre mitigation). Brave reduces it further to 1ms. When running on a VPS with a high-resolution Linux clock, `performance.now()` may return sub-100µs precision if Chrome's internal jitter mechanism is not working correctly in certain Xvfb configurations.
+### Success Rate Data (proxies.sx, January 2026 benchmark)
+Methodology: 30 sites per anti-bot vendor, same stealth browser config (Camoufox + behavioral sim), proxy variable isolated
 
-**Do we handle it?** NO — not patched in `stealth.py`.
+| Metric | Mobile 4G/5G | Residential | Datacenter (ConoHa) |
+|--------|-------------|-------------|---------------------|
+| Akamai success rate | 91-96% | 35-55% | 5-12% |
+| DataDome success rate | 89-95% | 30-50% | <10% |
+| PerimeterX success rate | 90-94% | 25-45% | 8-15% |
+| Akamai JA4 pass rate | 97% | 55% | 8% |
+| IP ban rate /1000 req | 0.5% | 5.8% | 52% |
+| Time to first block | 4.2 hours | 18 min | 45 sec |
+| Cost /1000 successful req | $2.80 | $4.50 | $22+ |
 
-**Priority:** LOW — Chrome in headless=False mode should already apply the 100µs reduction natively. This is primarily a concern for `headless=new` mode.
+**ConoHa VPS**: 45 seconds before first block, 52% ban rate per 1000 requests, 5-12% Akamai success rate.
 
-**Implementation (only needed if issues arise):**
-```javascript
-const origPerfNow = performance.now.bind(performance);
-performance.now = function() {
-    return Math.floor(origPerfNow() * 10) / 10; // Force 100µs precision
-};
-```
+### Provider Comparison for Japan
 
----
+**BrightData**
+- Residential pool: 195 countries, significant Japan
+- ISP proxies: NTT, KDDI, SoftBank ASNs available
+- Mobile proxies: NTT Docomo, SoftBank, au (KDDI)
+- Residential: $8-15/GB
+- ISP/static residential: ~$2-3/IP/month
+- Strengths: Web Scraper IDE, custom rules, proxy manager, best ecosystem
+- Best for: Enterprise-grade, needs specific Japan ISP targeting
 
-## Area 3: CDP / Automation Detection
+**Oxylabs**
+- Pool: 175M+ residential IPs, 195 countries
+- Success rate: 99.95% in independent testing (fastest: 0.6s avg response)
+- Japan: residential and ISP proxies available
+- Residential: comparable or slightly higher than BrightData
+- Best for: Highest reliability, performance-critical scraping
 
-### 3.1 Runtime.enable CDP Detection (rebrowser-patches gap)
+**IPRoyal**
+- Japan ISP proxies confirmed: NTT, SoftBank, au (KDDI)
+- Static residential ISP: from $2.70/IP/month
+- Speed: up to 10 Gbps, 99.9% uptime, unlimited bandwidth
+- Budget-friendly vs BrightData/Oxylabs
+- Best for: Cost-sensitive, Japan ISP IPs, static sessions
 
-**What it is:** When Puppeteer, Playwright, or any CDP-based tool calls `Runtime.enable`, it registers event listeners for `executionContextCreated` and `executionContextDestroyed`. Anti-bot JavaScript can detect this by calling a method that internally triggers a check for whether the `Runtime.enable` command was ever issued. The check works via a specific side effect: scripts injected into the page via `Runtime.evaluate` or `Page.addScriptToEvaluateOnNewDocument` leave traces in the runtime context chain.
+**Smartproxy (now Decodo)**
+- Japan residential available
+- Mid-tier pricing
+- Best for: Mid-budget operations
 
-rebrowser-patches fixes this with three modes:
-1. `addBinding` — creates a DOM binding instead of calling Runtime.enable
-2. `alwaysIsolated` — runs all scripts in isolated worlds via `Page.createIsolatedWorld`
-3. `enableDisable` — calls Runtime.enable then immediately Runtime.disable
-
-**Do we handle it?** PARTIAL. zendriver uses CDP directly, not Puppeteer. The key question is whether zendriver calls `Runtime.enable` internally. Since zendriver is a fork of nodriver which deliberately avoids WebDriver protocol, it likely avoids some of these leaks, but the source should be checked.
-
-**Priority:** HIGH — This is one of the primary detection mechanisms used by Cloudflare and DataDome in 2025. Less certain for Akamai, but worth auditing.
-
-**Action:** Audit zendriver's CDP command sequence on startup using `--remote-debugging-port` and Chrome DevTools to check if `Runtime.enable` is called.
-
-**Difficulty:** MEDIUM (requires zendriver internals audit; if present, requires either patching zendriver or using `Page.createIsolatedWorld` pattern)
-
----
-
-### 3.2 sourceURL Leak (`pptr:` / `__puppeteer_utility_world__`)
-
-**What it is:** Puppeteer appends `//# sourceURL=pptr:evaluateHandle` to `eval()`'d scripts. Pages can detect this by checking `Error().stack` or by hooking `eval`. zendriver likely has its own source annotation pattern.
-
-**Do we handle it?** UNKNOWN — zendriver may or may not annotate its injected scripts. The `__stealth_injected__` guard in `stealth.py` is visible to page JS.
-
-**Priority:** MEDIUM
-
-**Action:** Check what sourceURL zendriver injects. If it contains identifiable strings (e.g., `zendriver`, `nodriver`, `cdp`), rename them to something generic like `app.js`.
-
-**Difficulty:** LOW once identified
-
----
-
-### 3.3 Error.stack CDP Differences
-
-**What it is:** Chrome DevTools Protocol modifies how `Error().stack` is generated when evaluation happens in an isolated context vs. the main world. Scripts evaluated via `Runtime.evaluate` show a different stack frame pattern than scripts evaluated in the main JS thread.
-
-**Do we handle it?** PARTIALLY — because `add_script_to_evaluate_on_new_document` runs in the main world before page scripts, this is less of a concern for our stealth injections. However, any `page.evaluate()` calls made during scraping (to extract data, check states) may show CDP-sourced stack frames.
-
-**Priority:** LOW — Page JS rarely hooks `Error.stack` except on highly sophisticated anti-bot deployments. Not a current Akamai concern.
+**For Akamai bypass in Japan:**
+Priority order: Mobile carrier IPs (NTT Docomo/SoftBank/au) > Japan ISP static (NTT/KDDI) > Japan residential rotating > datacenter
 
 ---
 
-### 3.4 Anti-Detect Browsers (Multilogin / GoLogin) — What They Do Differently
+## 5. Commercial Anti-Detect Browsers
 
-**What it is:** Commercial anti-detect browsers (Multilogin, GoLogin, Kameleo, Incogniton) patch Chrome at the binary level rather than via JS injection. This means:
-- `navigator.userAgent` is patched at the C++ level (not detectable via `toString()` native check)
-- `WebGL.getParameter()` returns values patched in GPU code (not JS override)
-- Keyboard/mouse events are synthesized at OS level, not CDP-level
-- They maintain profile consistency across sessions (same fingerprint for same profile)
+All major anti-detect browsers expose automation APIs:
 
-**Do we handle it?** Our JS-level patching is detectable in theory by checking if `getParameter.toString()` returns `[native code]` while simultaneously the function has been replaced. Our `makeNative()` proxy addresses this for functions we've explicitly wrapped, but not for every patched method.
+| Browser | API Type | Headless | Price | Anti-Akamai |
+|---------|----------|----------|-------|-------------|
+| Multilogin | Selenium, Puppeteer | Yes | $29-159/mo | Medium-High (includes built-in residential proxies) |
+| Kameleo | REST API, Puppeteer, Selenium | Yes | €59/mo | High (best developer API) |
+| AdsPower | Local API, Selenium | Yes | $5.40+/mo | Medium |
+| GoLogin | Playwright, Puppeteer | Partial | $49/mo (100 profiles) | Medium |
+| Nstbrowser | Playwright, Puppeteer, Selenium | Yes | Free tier available | Medium (built-in CAPTCHA) |
 
-**Priority:** MEDIUM — the `makeNative()` wrapper in `stealth.py` covers `permissions.query` and `getBattery` but NOT `WebGLRenderingContext.getParameter`, `HTMLMediaElement.canPlayType`, `HTMLCanvasElement.toDataURL`. These patched functions will fail a `toString()` native check.
-
-**Implementation:** Extend `makeNative()` to all overridden native methods:
+**How to use programmatically:**
+All expose a local WebSocket endpoint or REST API. Example Kameleo + Playwright:
 ```python
-# In build_stealth_js, after all patches:
-"""
-makeNative(WebGLRenderingContext.prototype.getParameter, 'getParameter');
-makeNative(HTMLMediaElement.prototype.canPlayType, 'canPlayType');
-makeNative(HTMLCanvasElement.prototype.toDataURL, 'toDataURL');
-makeNative(HTMLCanvasElement.prototype.toBlob, 'toBlob');
-makeNative(window.RTCPeerConnection, 'RTCPeerConnection');
-"""
+# Connect to Kameleo's local port
+playwright.chromium.connect_over_cdp(f"ws://localhost:{KAMELEO_PORT}")
 ```
 
-**Difficulty:** VERY LOW (5 lines)
+**Key consideration**: Designed primarily for multi-account management, not high-volume scraping. Per-session overhead is significant. For volume scraping, open-source tools (Zendriver, Camoufox) are more appropriate.
+
+**Multilogin advantage**: Only commercial anti-detect browser with built-in residential proxies (no separate proxy subscription needed).
 
 ---
 
-## Area 4: Behavioral Analysis
+## 6. Session Cookie Harvesting / Replay
 
-### 4.1 Fitts's Law Compliance in Mouse Movement
+### The Hybrid Approach
 
-**What it is:** Fitts's Law predicts movement time based on target distance and size: `MT = a + b * log2(2D/W)`. Human cursor movement shows a characteristic velocity bell curve: slow start, rapid acceleration through the middle 60% of the path, gradual deceleration and micro-correction as the cursor approaches the target. Bots that move at constant speed or use pure bezier curves with constant t-step progression fail this check.
+The most cost-effective pattern for Akamai-protected sites:
 
-**Do we handle it?** PARTIAL. WindMouse simulates gravity+wind physics which produces natural acceleration/deceleration. However, the step interval in the path traversal code uses fixed `random.uniform(0.008, 0.025)` delays regardless of position in the path. For true Fitts compliance, delays should be shorter in the middle of the path (high velocity phase) and longer at start/end (low velocity phase).
+1. **Session establishment** (expensive but infrequent):
+   - Use Zendriver or Camoufox + residential/mobile proxy
+   - Complete full page load including JS execution
+   - Extract: `_abck`, `ak_bmsc`, `bm_sv`, `bm_mi` cookies
+   - Extract any `akamai-bm-telemetry` headers
 
-**Priority:** MEDIUM — Akamai's behavior analysis uses velocity profiling as one of its ML features.
+2. **Data extraction** (cheap and fast):
+   - Use `curl_cffi` with extracted cookies
+   - Same session headers/fingerprint
+   - Much faster than full browser per request
 
-**Implementation:**
-```python
-# In human_click(), replace uniform delay with velocity-scaled delay:
-total_points = len(path)
-for i in range(0, len(path), step):
-    px, py = path[i]
-    # Position in path (0=start, 1=end)
-    t = i / total_points
-    # Bell curve: slower at start/end, faster in middle
-    # Using 1 - 4*(t-0.5)^2 bell shape
-    velocity_factor = 1 - 4 * (t - 0.5) ** 2
-    # velocity_factor ~0 at edges, ~1 in middle
-    delay = 0.025 - (velocity_factor * 0.017)  # range: 0.008 to 0.025
-    await self._page.mouse_move(px, py, steps=1)
-    await asyncio.sleep(delay)
+3. **Session refresh**:
+   - When `_abck` expires (~10 min) or 403 received
+   - Return to step 1
+
+### Direct Sensor Data Generation (Advanced)
+
+For sites where cookie replay alone is insufficient:
+
+**GitHub resources (reverse-engineered):**
+- `xiaoweigege/akamai2.0-sensor_data`: Akamai v2 sensor_data + _abck bypass
+- `cirleamihai/akamai-1.7-cookie-generator`: v1.7 cookie generator
+- `i7solar/Akamai`: v1.75 _abck and ak_bmsc generator
+- `JokerPeter/akamai-sensor-data-bypass`: Sensor data bypass
+
+**WARNING**: Akamai v3 (current, 2024-present) uses:
+- Dynamic JavaScript with complex function concatenation
+- Encrypted sensor data
+- Hash-seeded by dynamically downloaded script IDs
+- Significantly harder to reverse engineer than v2
+
+Commercial sensor_data generation APIs exist (found on BHW forums) but are expensive and fragile.
+
+**Practical recommendation**: Use browser-based session establishment unless you have dedicated reverse engineering resources.
+
+---
+
+## 7. CDP Detection Bypass - Technical Details
+
+### Detection Vectors (ranked by how widely they're checked)
+
+1. **`Runtime.Enable` CDP command** - Detected by ALL major anti-bots (Akamai, Cloudflare, DataDome)
+2. **`navigator.webdriver` = true** - Basic check, most tools fix this
+3. **HeadlessChrome in User Agent** - Fixed by most stealth tools
+4. **`window.cdc_*` / `$cdc_*` variables** - Chrome DevTools markers
+5. **`pptr:...` source URLs** in JS stack traces
+6. **CDP-specific JS execution timing patterns**
+7. **Utility world naming** (Playwright's internal world names)
+
+### The Runtime.Enable Problem (Critical)
+
+Standard Playwright and Puppeteer use `Runtime.Enable` to receive CDP events. This single CDP command is detectable by all major anti-bot vendors. The pattern appears in JS stack traces and timing.
+
+**Solutions:**
+- **rebrowser-patches**: Replaces Runtime.Enable with binding-based context tracking
+- **NoDriver/ZenDriver**: Never calls Runtime.Enable in the first place
+- **Patchright**: Binary-level fix to Playwright's CDP communication
+
+### Current Best Practice
+
+```
+ZenDriver > Patchright + rebrowser-patches > Camoufox > Playwright-stealth
+(for CDP detection evasion, from best to worst)
 ```
 
-**Difficulty:** LOW (modify 3 lines in `human_click`)
+### Chrome Headless v2 (2022 unification)
 
----
+Google unified headful/headless Chrome codebases in late 2022. Traditional fingerprint-based detection (API discrepancies, rendering differences) was largely eliminated. Detection shifted to behavioral analysis and CDP protocol signals.
 
-### 4.2 Keystroke Dynamics (Digraph Timing)
-
-**What it is:** Humans type character pairs (digraphs) with characteristic inter-key intervals. Research shows these follow a log-logistic distribution (not uniform random). For Japanese input, common digraphs like `の` → `no`, `は` → `ha` on romaji input have specific timing profiles. Detection systems that analyze `keydown`/`keyup` event timing can identify bot typing.
-
-**Do we handle it?** PARTIAL. `human_type()` uses `random.uniform(0.04, 0.12)` per character + occasional pauses. This is random uniform, not log-logistic. The current pauses at punctuation boundaries are good. However, there is no variation based on character pair (e.g., same-finger digraphs are slower than alternating-hand digraphs for touch typists).
-
-**Priority:** MEDIUM — Akamai collects keystroke timing in sensor data. For login forms (username/password), digraph consistency matters. However, for typical login with short alphanumeric credentials, current implementation is likely sufficient.
-
-**Implementation improvement:**
-```python
-async def human_type(self, element, text: str) -> None:
-    await element.click()
-    await self.human_delay(0.2, 0.5)
-    await element.clear_input()
-
-    prev_char = None
-    for char in text:
-        await element.send_keys(char)
-
-        # Log-logistic distribution approximation via weibull
-        # mu=0.07 (70ms mean), sigma=0.35
-        mu, sigma = 0.07, 0.35
-        u = random.random()
-        delay = mu * (u / (1 - u)) ** sigma  # log-logistic quantile
-        delay = max(0.03, min(delay, 0.4))  # clamp to sane range
-
-        # Same-finger penalty (simplistic: consecutive same key)
-        if prev_char and prev_char.lower() == char.lower():
-            delay += random.uniform(0.02, 0.06)
-
-        # Punctuation/space boundary
-        if char in (" ", "-", "@", ".", "_"):
-            delay += random.uniform(0.05, 0.15)
-
-        # Occasional "think" pause
-        if random.random() < 0.05:
-            delay += random.uniform(0.3, 0.8)
-
-        await asyncio.sleep(delay)
-        prev_char = char
+### Remaining Flags That Help (Necessary but Not Sufficient)
+```
+--disable-blink-features=AutomationControlled
+--disable-web-security
+--no-first-run
+--no-service-autorun
+--password-store=basic
 ```
 
-**Difficulty:** LOW
+---
+
+## 8. Cloud Browser / Scraping API Services
+
+### For Akamai Bypass - Service Comparison
+
+| Service | Claimed Akamai Success | Independent Benchmark | Cost | Datacenter-friendly |
+|---------|----------------------|----------------------|------|---------------------|
+| Scrapfly | 97-99% | 99% overall (Scrapeway) | Credits: ~$0.03-0.30/heavy req | Yes |
+| ZenRows | 98% | 54% (Scrapeway) | $69/mo base, ~$4.60/1K avg | Yes |
+| ScraperAPI | "Bypass Akamai" | 64% overall | Per-successful-request | Yes |
+| ScrapingBee | Not specified | 31% (Scrapeway) | Per-request | Yes |
+| Browserless.io | None (browser only) | N/A | ~$250/mo | Yes |
+| Browserbase | None (browser only) | N/A | ~$100/mo | Yes |
+
+**Warning about benchmarks**: Scrapeway and other third-party benchmarks may use specific test sites that favor particular services. Claims should be independently verified on target sites.
+
+**Working from ConoHa VPS**: All these services handle proxy routing server-side. Your VPS is just making API calls. Source IP does not matter for these services.
+
+**Scrapfly technical approach:**
+- Real browser fingerprints
+- Automatic challenge solving
+- Country-specific routing
+- Anti-scraping protection (ASP) bypass parameter
+- Supports Playwright/Puppeteer/Selenium via their API
+
+**ZenRows technical approach:**
+- AI-powered detection bypass
+- Premium residential proxies included
+- JavaScript rendering with stealth
+- `?apikey=X&url=Y&js_render=true&premium_proxy=true`
 
 ---
 
-### 4.3 Japanese IME Input Simulation
-
-**What it is:** Japanese web forms expect romaji-to-kana conversion events. When a Japanese user types `yamada` to enter `山田`, the browser fires:
-1. `compositionstart`
-2. Multiple `compositionupdate` (keyCode=229 for each IME character)
-3. `compositionend`
-4. `input` event with the final kana/kanji
-
-Current `element.send_keys(char)` sends direct ASCII keypresses without composition events. For sites with strict keyboard event validation (rare but possible), this pattern is detectable.
-
-**Do we handle it?** NO — `human_type()` sends chars directly without IME simulation.
-
-**Priority:** LOW — Akamai's current detection does not specifically check for IME composition events. Most Japanese forms accept direct romaji input. Only login forms on highly regulated Japanese sites (banking, government) might validate IME patterns.
-
-**Difficulty:** HIGH — requires CDP `Input.dispatchKeyEvent` with `keyIdentifier=U+0000` (IME composition key code 229) followed by `Input.insertText` for the composed character. Non-trivial to implement correctly.
-
----
-
-### 4.4 Scroll Physics (Momentum / Deceleration)
-
-**What it is:** Human scroll behavior has:
-- Variable scroll delta (not fixed pixel amounts per event)
-- Momentum: continued scrolling after finger release (especially trackpad)
-- Natural pauses mid-page (reading behavior)
-- Occasional scroll-up corrections (user reads back)
-- Delta variance > 5px between events (bots typically send uniform scroll amounts)
-
-**Do we handle it?** PARTIAL. `random_scroll()` in `base_scraper.py` uses chunked scroll with variable `random.randint(30, 120)` chunks and `random.uniform(0.02, 0.08)` delays. This is reasonable but lacks:
-- Momentum deceleration (decreasing scroll speed over time)
-- Occasional reverse scroll (scroll up 10-30px)
-- Natural micro-pause on interesting elements
-
-**Priority:** MEDIUM — Google SearchGuard (deployed January 2025) specifically uses Welford's algorithm to compute scroll delta variance in real-time. Low variance = bot flag.
-
-**Implementation:**
-```python
-async def random_scroll(self) -> None:
-    """自然なスクロール（モメンタム + 逆スクロール再現）"""
-    total_scroll = random.randint(200, 600)
-    scrolled = 0
-    # Initial velocity
-    velocity = random.randint(40, 80)  # pixels per frame
-
-    while scrolled < total_scroll:
-        # Momentum decay
-        velocity = max(15, int(velocity * random.uniform(0.85, 0.98)))
-        chunk = int(velocity * random.uniform(0.8, 1.2))
-        chunk = min(chunk, total_scroll - scrolled)
-
-        await self._page.evaluate(f"window.scrollBy(0, {chunk})")
-        scrolled += chunk
-
-        # Occasional micro-reverse (human re-reads)
-        if random.random() < 0.08:
-            reverse = random.randint(10, 40)
-            await self._page.evaluate(f"window.scrollBy(0, -{reverse})")
-            scrolled -= reverse  # allows more total scroll
-
-        delay = random.uniform(0.015, 0.06)
-        # Natural reading pause (3% chance)
-        if random.random() < 0.03:
-            delay += random.uniform(0.4, 1.2)
-        await asyncio.sleep(delay)
-
-    await self.human_delay(0.2, 0.6)
-```
-
-**Difficulty:** LOW
-
----
-
-### 4.5 Poisson Distribution for Inter-Action Intervals
-
-**What it is:** Human action timing (clicks, page loads, form interactions) follows a Poisson process where events arrive at a mean rate. The inter-arrival times follow an exponential distribution with occasional bursts. Current `human_delay()` uses `random.uniform()` which is flat — not exponentially distributed.
-
-**Do we handle it?** PARTIAL — pauses exist but use uniform distribution.
-
-**Priority:** LOW — The difference between uniform and exponential inter-action timing is subtle and unlikely to be the primary detection trigger for Akamai. More relevant for long-session behavioral consistency.
-
-**Implementation:**
-```python
-async def human_delay(self, min_sec: float = 0.5, max_sec: float = 2.0) -> None:
-    # Exponential distribution clipped to [min_sec, max_sec]
-    mean = (min_sec + max_sec) / 2
-    delay = random.expovariate(1.0 / mean)
-    delay = max(min_sec, min(delay, max_sec * 1.5))
-    await asyncio.sleep(delay)
-```
-
-**Difficulty:** VERY LOW (2 lines)
-
----
-
-### 4.6 Session-Level Behavioral Consistency
-
-**What it is:** Anti-bot ML models analyze session-level patterns: does the mouse move before every click? Does scroll always happen between navigations? Is the timing distribution consistent across the session? A scraper that always does click→type→click→next in exactly the same sequence with the same timing variance will be detected by LSTM models trained on session trajectories.
-
-**Do we handle it?** PARTIAL — `random_idle()` (15% chance, 1-3s) provides some variance. The natural navigation flow (top→menu→target) adds behavioral plausibility. However, the scraping pattern is highly repetitive: fetch reservation page, click dates, extract data, repeat. This session-level regularity is detectable.
-
-**Priority:** MEDIUM — Akamai Bot Manager uses ML scoring that accumulates trust across requests in a session. Highly repetitive patterns lower the trust score over time.
-
-**Implementation suggestions:**
-1. Add occasional "distraction" behavior: random hover over non-target elements (15% of navigations)
-2. Vary the sequence: sometimes scroll before clicking, sometimes not
-3. Add a 5-15% chance of going to an "irrelevant" page (e.g., clinic top page) and spending 10-30s before the target
-4. Vary session start: don't always start from the login page directly; sometimes browse the top page first
-
----
-
-## Area 5: Proxy / IP Layer
-
-### 5.1 Residential Proxy for Japan
-
-**What it is:** Residential proxies use IP addresses from ISP-assigned consumer internet connections (NTT Flets, SoftBank, au, etc.) rather than datacenter IP ranges. Akamai and other bot managers classify IPs by ASN (Autonomous System Number) and categorize them as "residential", "mobile", "datacenter", or "hosting".
-
-**Current state:** Running directly on ConoHa VPS (GMO Internet, AS7506) — a datacenter ASN.
-
-**Do we handle it?** NO.
-
-**Priority:** HIGH — The single most impactful evasion improvement available. Akamai's ML assigns significantly lower trust scores to requests from datacenter ASNs. A residential Japan IP immediately improves the trust score baseline.
-
-**Options:**
-- **BrightData Residential (Japan):** 150M+ IPs, 99% success rate, ~$15/GB. Sticky sessions up to 30 min. Best-in-class for Akamai bypass. Integration: set proxy in Chrome launch args.
-- **Oxylabs Residential (Japan):** 175M+ IPs, 99.95% success rate, ~$15/GB. Slightly faster response times.
-- **IPRoyal / Proxy-Cheap:** Lower cost (~$3-8/GB) but smaller Japan pool and lower reliability.
-
-**Integration:**
-```python
-browser_args=[
-    # ...existing args...
-    f"--proxy-server=http://user:pass@jp.residential.brightdata.com:22225",
-]
-```
-
-**Note:** Using a residential proxy will also fix the TLS/HTTP2 fingerprint concern (section 1.1/1.2) for the proxied connections, since the proxy routes traffic through a real residential browser.
-
-**Difficulty:** LOW (1 line in browser_args; cost is the main consideration: ~$15-30/month for typical scraping volume)
-
----
-
-### 5.2 ConoHa VPS IP Reputation
-
-**What it is:** ConoHa VPS is operated by GMO Internet (AS7506). This ASN is in all major IP reputation databases as a "Japan datacenter/hosting" range. Akamai's IP intelligence module flags AS7506 IPs as medium-risk bot traffic by default. The IP 133.88.120.151 (referenced in project memory) is in the 133.88.0.0/16 CIDR block which is ConoHa's range.
-
-**Do we handle it?** NO (the VPS IP is used directly for all scraping traffic).
-
-**Priority:** HIGH — Even with perfect browser fingerprint spoofing, the IP-layer classification as "datacenter" is a persistent negative signal.
-
-**Mitigation options:**
-1. Use residential proxy (5.1) — routes scraping traffic through residential IPs
-2. Add a Japan mobile proxy as alternative for high-security targets
-3. Check if Salon Board / Minimo specifically blocks AS7506 (test with `curl -x "" https://target.com` from VPS vs from local residential IP)
-
----
-
-### 5.3 Sticky Session Strategy
-
-**What it is:** Anti-bot systems track IP consistency across a session. If the source IP changes mid-session (IP rotation between requests), it's an immediate detection signal. Residential proxy providers offer "sticky sessions" where the same exit IP is maintained for a configurable duration.
-
-**Do we handle it?** N/A (currently no proxy at all).
-
-**Priority:** HIGH (when residential proxy is added).
-
-**Recommendation:** Use sticky sessions for the full session duration (minimum 10-20 minutes for a login→scrape cycle). BrightData and Oxylabs both support sticky sessions up to 30 minutes.
-
----
-
-## Area 6: Akamai-Specific Analysis
-
-### 6.1 Sensor JS Telemetry — What Akamai Actually Collects
-
-Based on research into Akamai's sensor data structure (the `sensor_data` POST parameter, which is a 58-element encoded array), the key telemetry fields are:
-
-**Device/Environment signals:**
-- Screen resolution, colorDepth, pixelDepth
-- `window.outerWidth/outerHeight` vs `window.innerWidth/innerHeight` ratio
-- `navigator.hardwareConcurrency`
-- `navigator.deviceMemory`
-- `navigator.connection.rtt`, `downlink`, `effectiveType`
-- Battery API availability and state
-- `navigator.userAgentData` high-entropy values
-
-**Browser fingerprint signals:**
-- Canvas fingerprint hash
-- WebGL vendor/renderer string
-- AudioContext hash
-- Font metric fingerprint
-- Installed plugins/MIME types
-
-**Behavioral signals (collected over first 3-5 seconds):**
-- Mouse movement coordinates and timing (velocity/acceleration vectors)
-- Scroll events (delta values and timing)
-- Keyboard events on interactive elements
-- Time between page load and first user interaction
-- Touch event presence (distinguishes mobile from desktop)
-
-**Network signals:**
-- IP classification (residential/datacenter/mobile)
-- HTTP header order and values
-- `_abck` cookie validation chain
-
-**Current coverage:**
-- Screen/viewport: COVERED (outerWidth/Height, innerWidth/Height, screen.width/height)
-- hardwareConcurrency: COVERED (returns 8)
-- deviceMemory: COVERED (returns 8)
-- connection.rtt/downlink: COVERED
-- Battery API: COVERED
-- Canvas: COVERED (noise injection)
-- WebGL vendor/renderer: COVERED
-- userAgentData: COVERED
-- Plugins/MIME: COVERED
-- **AudioContext: MISSING**
-- **WebRTC/IP: MISSING**
-- **Font metrics: PARTIALLY MISSING** (system fonts don't match claimed Windows OS)
-- Behavioral (mouse, scroll, keyboard): MOSTLY COVERED but improvements possible
-
----
-
-### 6.2 What Triggers Pixel Challenge vs. Block
-
-Based on research (Akamai's response taxonomy):
-
-| Akamai Response | HTTP Status | Trigger Conditions |
-|----------------|-------------|-------------------|
-| **Pass** | 200 (normal) | Trust score > 0.7, all signals clean |
-| **Monitor** | 200 (normal) | Trust score 0.4-0.7, session tracked |
-| **Pixel Challenge** | 200 (challenge page) | Trust score 0.2-0.4, one major signal off |
-| **Bot Score Block** | 403 "Pardon Our Interruption" | Trust score < 0.2, multiple bad signals |
-| **IP Block** | 403 or 429 | IP reputation blacklisted |
-
-**Primary triggers for pixel challenge (image puzzle):**
-1. Datacenter IP (AS detection)
-2. `navigator.webdriver = true` detected
-3. `outerWidth/innerHeight = 0` (unpatched headless)
-4. AudioContext fingerprint mismatch (server-grade audio stack)
-5. No mouse movement before form interaction
-6. Cookie validation chain broken (_abck sensor failure)
-
-**Our current status:**
-- navigator.webdriver: FIXED
-- outerWidth/Height: FIXED
-- Mouse movement: FIXED (WindMouse)
-- Cookie validation: FIXED (wait for _abck)
-- Datacenter IP: NOT FIXED
-- AudioContext: NOT FIXED
-
----
-
-### 6.3 Known Working Bypasses in 2026
-
-**Approaches confirmed working (from research as of March 2026):**
-
-1. **Real browser + residential proxy + complete stealth patch** — the approach we already use, minus the residential proxy and AudioContext fix.
-
-2. **curl_cffi with `impersonate="chrome131"`** — bypasses TLS/JA3/JA4/HTTP2 for pure HTTP requests. Not applicable to our interactive browser scraping use case.
-
-3. **Sensor data regeneration services** (commercial) — services like Hyper-Solutions SDK generate valid `sensor_data` without a browser. Not recommended: creates hard dependency on external service, legally grey.
-
-4. **BrightData Scraping Browser** — a managed browser with built-in residential proxy rotation and stealth patches. Cost: ~$0.001/request. Alternative to DIY if cost is acceptable.
-
-**Approaches that no longer work (2025-2026):**
-
-1. `headless=True` with basic stealth — detected by Akamai headless signals
-2. Python `requests` + fake UA — TLS fingerprint immediately flagged
-3. seleniumwire / mitmproxy for header injection — creates H2 fingerprint mismatch
-4. IP rotation without sticky sessions — mid-session IP change = instant block
-5. Random delays with uniform distribution only — behavioral ML detects non-human distributions
-
----
-
-## Summary: Gap Priority Matrix
-
-| # | Gap | Currently Handled | Priority | Difficulty | Estimated Impact |
-|---|-----|------------------|----------|------------|-----------------|
-| 1 | AudioContext fingerprint | NO | HIGH | LOW | Fixes Akamai audio telemetry mismatch |
-| 2 | WebRTC IP leak | NO | HIGH | LOW | Prevents datacenter IP leak via WebRTC |
-| 3 | Residential proxy (Japan) | NO | HIGH | LOW* | Fundamental IP reputation improvement |
-| 4 | makeNative() on all patched fns | PARTIAL | MEDIUM | VERY LOW | Prevents toString() native check failure |
-| 5 | Runtime.enable CDP audit (zendriver) | UNKNOWN | HIGH | MEDIUM | May be critical if zendriver leaks this |
-| 6 | Scroll physics (momentum/reverse) | PARTIAL | MEDIUM | LOW | Improves behavioral ML score |
-| 7 | screen.devicePixelRatio, colorDepth | PARTIAL | LOW-MED | VERY LOW | Removes 3 detectable gaps |
-| 8 | Fitts's law velocity in mouse path | PARTIAL | MEDIUM | LOW | More natural velocity profile |
-| 9 | WebGL2 extensions + precision | PARTIAL | MEDIUM | LOW | Closes secondary WebGL fingerprint |
-| 10 | Keystroke log-logistic distribution | PARTIAL | MEDIUM | LOW | More human-like typing timing |
-| 11 | SpeechSynthesis voice list spoof | NO | LOW | VERY LOW | Removes minor inconsistency |
-| 12 | Font enumeration (system fonts) | NO | MEDIUM | MEDIUM | Install MS-compatible fonts on VPS |
-| 13 | Session behavioral consistency | PARTIAL | MEDIUM | MEDIUM | Reduces session-level ML pattern score |
-| 14 | Poisson/exponential inter-action timing | PARTIAL | LOW | VERY LOW | Minor behavioral improvement |
-| 15 | Performance.now() precision | LIKELY OK | LOW | VERY LOW | Only needed if timing issues arise |
-| 16 | TCP fingerprint (JA4T) | NO | LOW | VERY HIGH | Not practical to fix; low Akamai weight |
-| 17 | sourceURL leak (zendriver) | UNKNOWN | MEDIUM | LOW | Audit required |
-
-*Low difficulty to add the proxy arg; cost is the main consideration
-
----
-
-## Recommended Implementation Order
-
-### Phase 1: High-Impact, Low-Effort (1-2 hours)
-1. Add **AudioContext farbling** to `stealth.py` (~20 lines)
-2. Add **WebRTC blocking** Chrome flag `--enforce-webrtc-ip-handling-policy=disable_non_proxied_udp`
-3. Add **`makeNative()` to all patched functions** (~5 lines)
-4. Add **screen.devicePixelRatio, colorDepth, pixelDepth** patches (~6 lines)
-5. Add **SpeechSynthesis voice list** spoof (~15 lines)
-6. Switch `human_delay()` to **exponential distribution** (~2 lines)
-
-### Phase 2: Medium-Effort Improvements (2-4 hours)
-7. **Fitts's law velocity** in mouse path traversal (~5 lines)
-8. **Scroll momentum/deceleration** with occasional reverse-scroll (~20 lines)
-9. **Log-logistic keystroke timing** in `human_type()` (~10 lines)
-10. **WebGL2 extensions list and shader precision** extensions (~40 lines)
-11. **Audit zendriver for Runtime.enable** CDP leak
-
-### Phase 3: Infrastructure (Ongoing / Budget Consideration)
-12. **Residential proxy** (BrightData or Oxylabs Japan residential, ~$15-30/month)
-13. **Font installation** on VPS: `apt-get install fonts-ipafont fonts-ipaexfont` + MS Core Fonts via ttf-mscorefonts-installer
-14. **Session behavioral randomization**: add distraction behaviors, vary navigation sequences
-
----
-
-## Sources
-
-1. [Rebrowser Patches README](https://github.com/rebrowser/rebrowser-patches/blob/main/README.md) — Detailed CDP leak analysis: Runtime.enable, sourceURL, utility world naming
-2. [Rebrowser: Sensitive CDP Methods](https://rebrowser.net/docs/sensitive-cdp-methods) — Runtime.enable, Page.setBypassCSP, Emulation.* detection
-3. [Rebrowser: Runtime.enable Fix](https://rebrowser.net/blog/how-to-fix-runtime-enable-cdp-detection-of-puppeteer-playwright-and-other-automation-libraries) — Fix modes: addBinding, alwaysIsolated, enableDisable
-4. [Browserless: TLS Fingerprinting](https://www.browserless.io/blog/tls-fingerprinting-explanation-detection-and-bypassing-it-in-playwright-and-puppeteer) — Chrome via CDP passes JA3/JA4 natively; H2 coherence requirement
-5. [Trickster Dev: HTTP/2 Fingerprinting](https://www.trickster.dev/post/understanding-http2-fingerprinting/) — Chrome SETTINGS frame values, pseudo-header order
-6. [Scrapfly: Akamai Bypass](https://scrapfly.io/blog/posts/how-to-bypass-akamai-anti-scraping) — Akamai telemetry layers, trust score model, working bypasses
-7. [ScrapingAnt: Headless vs Headful 2025](https://scrapingant.com/blog/headless-vs-headful-browsers-in-2025-detection-tradeoffs) — Detection methods for headless Chrome in 2025
-8. [DataDome: AudioContext Fingerprinting](https://datadome.co/anti-detect-tools/audio-fingerprint/) — OfflineAudioContext fingerprinting technique
-9. [Fingerprint.com: Audio Fingerprinting](https://fingerprint.com/blog/audio-fingerprinting/) — 99.6% uniqueness of audio fingerprints
-10. [Oxylabs: Japan Residential Proxies](https://oxylabs.io/location-proxy/japan) — Japan residential proxy specs
-11. [BrightData vs Oxylabs 2026](https://brightdata.com/blog/comparison/bright-data-vs-oxylabs) — Proxy provider comparison
-12. [Scrapeless: Time Fingerprinting](https://www.scrapeless.com/en/blog/time-fingerprinting) — Performance.now() precision and randomization
-13. [Multilogin: WebRTC Leak Prevention](https://multilogin.com/blog/how-to-prevent-webrtc-leak/) — WebRTC IP leak prevention strategies
-14. [Chrome Enterprise: WebRtcIPHandling](https://chromeenterprise.google/policies/web-rtc-ip-handling/) — Chrome policy flags for WebRTC control
-15. [GitHub: akamai-bmp-generator](https://github.com/xvertile/akamai-bmp-generator) — Akamai sensor data structure research
-16. [DEV: HTTP/2 Header Consistency](https://dev.to/deepak_mishra_35863517037/http2-and-header-consistency-the-holy-grail-of-stealth-3ej5) — H2 SETTINGS and header order for stealth
-17. [SpringerLink: Keystroke Dynamics Bot Detection](https://link.springer.com/chapter/10.1007/978-3-031-65175-5_30) — Digraph timing analysis for bot detection
-18. [arxiv: Timing-Forgery Attacks on Keystroke Detection](https://arxiv.org/html/2601.17280v1) — Log-logistic distribution for keystroke evasion (2025)
-19. [ScraperAPI: SearchGuard Analysis](https://searchengineland.com/inside-google-searchguard-467676) — Welford algorithm for scroll variance detection
+## 9. Recommended Architecture by Use Case
+
+### Use Case A: From ConoHa VPS, occasional Akamai bypass (< 1000 req/day)
+
+**Stack**: ZenRows or Scrapfly API
+- No proxy management needed
+- No browser automation needed
+- Simple HTTP calls from VPS
+- Cost: ~$49-70/month for moderate volume
+- Success rate: 70-99% (site-dependent)
+
+### Use Case B: High-volume Japan-specific Akamai bypass (> 10,000 req/day)
+
+**Stack**:
+1. Zendriver (Python) for browser automation
+2. BrightData or Oxylabs Japan mobile/ISP proxies
+3. curl_cffi for non-JS requests after session establishment
+4. Session cookie harvesting + replay pattern
+
+**Cost estimate**: ~$200-500/month (proxies dominate)
+**Success rate**: 80-95% against Akamai
+**From ConoHa VPS**: Yes, VPS routes through residential proxies
+
+### Use Case C: Maximum stealth, enterprise Akamai (custom built)
+
+**Stack**:
+1. Camoufox (or maintained fork) for fingerprint perfection
+2. Japan mobile carrier proxies (NTT Docomo/SoftBank 4G/5G)
+3. Behavioral simulation (realistic mouse/scroll/timing patterns)
+4. Session management with periodic refresh
+5. curl_cffi with TLS matching for bulk data extraction
+
+**Success rate**: 91-96% with mobile proxies
+**Cost**: High (mobile proxies most expensive at $4-6/GB)
+
+### What Does NOT Work from Datacenter IPs (ConoHa Direct)
+
+- Direct HTTP requests with `requests` library: ~2% success
+- curl_cffi TLS spoofing without proxy: ~15% success (TLS fixed but IP reputation fails)
+- Stealth browser from datacenter: ~10-20% (IP reputation dominates)
+- The only exception: Akamai sites where JS/TLS is the ONLY check (rare in 2026)
 
 ---
 
 ## Confidence Assessment
 
-**High confidence** (multiple authoritative sources):
-- JA3/JA4 is handled natively by real Chrome via CDP
-- AudioContext fingerprinting is a real Akamai sensor signal and we don't handle it
-- WebRTC leaks real IPs and Chrome has no built-in disable; CDP flag is the fix
-- Residential proxy is the highest-impact single improvement for IP reputation
-- Runtime.enable is a critical CDP detection vector in 2025
+**High confidence** (multiple consistent sources):
+- Datacenter IPs alone get <12% success against Akamai
+- Mobile proxies achieve 91-96% Akamai success
+- Runtime.Enable CDP command is the primary detection vector for browser automation
+- JA4 normalization defeats simple TLS randomization
+- Camoufox and Zendriver are the leading open-source stealth tools in 2026
+- curl_cffi is the standard Python library for TLS fingerprint spoofing
 
-**Medium confidence** (1-2 sources or inferred):
-- Specific Akamai trust score thresholds for pixel challenge vs. block
-- Exact weight Akamai assigns to each fingerprint signal
-- Whether zendriver specifically triggers Runtime.enable leak
+**Medium confidence** (fewer sources, possible bias):
+- Scrapfly's 97-99% Akamai claim (vendor-stated)
+- Specific proxy pricing figures (change frequently)
+- 83.3% benchmark figures for camoufox (specific test sites, may not generalize)
 
-**Low confidence / unverified**:
-- Whether Akamai specifically uses SpeechSynthesis voice list cross-validation
-- Whether JA4T TCP fingerprinting is actively used by Akamai for standard bot scoring (vs. DPI-level analysis)
-- Exact AudioContext output values that would be produced by a Linux VPS Chrome instance
+**Low confidence / Unverified**:
+- Akamai v3 sensor_data reverse engineering difficulty level
+- Specific Japan ISP proxy coverage by provider
+- Exact cookie TTL values for _abck in all configurations
+
+---
 
 ## Information Gaps
 
-- Akamai sensor data complete field list (the 58-element array is obfuscated; only partial field mapping is publicly known)
-- Whether zendriver calls Runtime.enable internally (requires source code audit or CDP traffic capture)
-- Current Akamai ML model weights for each fingerprint signal (proprietary, changes continuously)
-- Whether SalonBoard / Minimo specifically uses AS7506 (ConoHa) IP blocklist
+- No independent benchmark specifically against Akamai (most tests use Cloudflare as proxy)
+- Japan mobile proxy quality and actual ASN coverage per provider not publicly documented
+- Akamai v3 sensor_data encryption scheme not publicly reversed (only v1.7/2.0 documented on GitHub)
+- Real-world persistent session longevity data for mobile proxies against Akamai
+- Whether rebrowser-patches specifically bypasses Akamai (only Cloudflare/DataDome tested)
+
+---
+
+## Sources
+
+1. [Scrapfly: How to Bypass Akamai Anti-Scraping 2026](https://scrapfly.io/blog/posts/how-to-bypass-akamai-anti-scraping)
+2. [DataDome & Akamai Bypass Guide 2026 - PROXIES.SX](https://www.proxies.sx/blog/datadome-akamai-bypass-mobile-proxies)
+3. [GitHub: techinz/browsers-benchmark](https://github.com/techinz/browsers-benchmark)
+4. [GitHub: pim97/anti-detect-browser-tools-tech-comparison](https://github.com/pim97/anti-detect-browser-tools-tech-comparison)
+5. [GitHub: rebrowser/rebrowser-patches](https://github.com/rebrowser/rebrowser-patches)
+6. [TLS Fingerprint Bypass Techniques 2026 - ScrapeHero](https://www.scrapehero.com/tls-fingerprint-bypass-techniques/)
+7. [From Puppeteer-stealth to Nodriver - Security Boulevard](https://securityboulevard.com/2025/06/from-puppeteer-stealth-to-nodriver-how-anti-detect-frameworks-evolved-to-evade-bot-detection/)
+8. [The 2025 Web Scraping Tech Stack - Substack](https://substack.thewebscraping.club/p/the-2025-web-scraping-tech-stack)
+9. [Best Antidetect Browsers 2026 - Proxyway](https://proxyway.com/best/antidetect-browsers)
+10. [GitHub: lexiforest/curl_cffi](https://github.com/lexiforest/curl_cffi)
+11. [Bypassing Akamai for Free - The Web Scraping Club](https://substack.thewebscraping.club/p/bypassing-akamai-for-free)
+12. [GitHub: daijro/camoufox](https://github.com/daijro/camoufox)

@@ -3,10 +3,18 @@
 
 全ての環境変数をここで一元管理する。
 各モジュールは config からインポートして使う。
+
+マルチテナント:
+  StoreConfig でストアごとの資格情報を保持。
+  環境変数は単一ストア用のデフォルト値として残す（後方互換）。
 """
 
+import json
 import os
+from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Optional
+
 from dotenv import load_dotenv
 
 # .env を明示的にこのファイルと同じディレクトリから読む
@@ -56,6 +64,56 @@ SCRAPER_API_SECRET = os.getenv("SCRAPER_API_SECRET", "")
 # --- スケジューラー ---
 SYNC_INTERVAL_MIN = int(os.getenv("SYNC_INTERVAL_MIN", "150"))  # 秒（2.5分）
 SYNC_INTERVAL_MAX = int(os.getenv("SYNC_INTERVAL_MAX", "240"))  # 秒（4分）
+
+# --- レート制限クリーンアップ間隔 ---
+RATE_LIMIT_CLEANUP_INTERVAL = 300  # 秒
+
+
+# --- ストア設定（マルチテナント）---
+@dataclass(frozen=True)
+class StoreConfig:
+    """1店舗分の資格情報・設定を保持"""
+    store_id: str
+    site_id: str
+    salonboard_id: str = ""
+    salonboard_password: str = ""
+    salonboard_type: str = "klp"
+    minimo_id: str = ""
+    minimo_password: str = ""
+    business_hours_start: int = 9
+    business_hours_end: int = 20
+    label: str = ""
+
+
+def load_store_configs(config_path: Optional[str] = None) -> list[StoreConfig]:
+    """
+    ストア設定をロード。
+
+    1) config_path が指定されていればJSONから読み込み
+    2) なければ環境変数から単一ストアとして生成（後方互換）
+    """
+    path = config_path or os.getenv("STORES_CONFIG_PATH", "")
+    if path and Path(path).exists():
+        with open(path, encoding="utf-8") as f:
+            raw = json.load(f)
+        return [StoreConfig(**entry) for entry in raw]
+
+    # 後方互換: 環境変数から単一ストアを生成
+    if SITE_ID:
+        return [
+            StoreConfig(
+                store_id="default",
+                site_id=SITE_ID,
+                salonboard_id=SALONBOARD_ID,
+                salonboard_password=SALONBOARD_PASSWORD,
+                salonboard_type=SALONBOARD_TYPE,
+                minimo_id=MINIMO_ID,
+                minimo_password=MINIMO_PASSWORD,
+                label="default (env)",
+            )
+        ]
+    return []
+
 
 # --- User-Agent（2026年3月時点のChrome最新版に合わせる）---
 USER_AGENTS = [

@@ -6,7 +6,7 @@
 # ブラウザ自動化: zendriver + Xvfb（headless=False）
 #
 # 使い方:
-#   ssh root@133.88.120.151
+#   ssh root@YOUR_VPS_IP
 #   cd /home/IRYOGPT && bash scrapers/setup-vps.sh
 #
 # ============================================================

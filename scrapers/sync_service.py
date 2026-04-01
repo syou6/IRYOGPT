@@ -26,6 +26,7 @@ import asyncio
 import hashlib
 import json
 import logging
+import re
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
@@ -37,18 +38,23 @@ logger = logging.getLogger(__name__)
 
 JST = timezone(timedelta(hours=9))
 
+# PostgREST in.() フィルタに安全でない文字
+_POSTGREST_UNSAFE_RE = re.compile(r'[(),"]')
+
 # httpx 接続プール設定
 _http_client: Optional[httpx.AsyncClient] = None
+_http_lock = asyncio.Lock()
 
 
 async def get_http_client() -> httpx.AsyncClient:
-    """共有HTTPクライアントを取得（接続プールの再利用）"""
+    """共有HTTPクライアントを取得（接続プールの再利用、ロック付き）"""
     global _http_client
-    if _http_client is None or _http_client.is_closed:
-        _http_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(10.0, connect=5.0),
-            limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
-        )
+    async with _http_lock:
+        if _http_client is None or _http_client.is_closed:
+            _http_client = httpx.AsyncClient(
+                timeout=httpx.Timeout(10.0, connect=5.0),
+                limits=httpx.Limits(max_connections=10, max_keepalive_connections=5),
+            )
     return _http_client
 
 
@@ -223,7 +229,19 @@ class SyncService:
             return 0
 
         now = datetime.now(JST).isoformat()
-        ids_csv = ",".join(external_ids)
+        # PostgREST in.() injection 防止: 安全でない文字を含むIDは除外
+        safe_ids = {
+            eid for eid in external_ids
+            if eid and not _POSTGREST_UNSAFE_RE.search(eid)
+        }
+        if len(safe_ids) != len(external_ids):
+            skipped = external_ids - safe_ids
+            logger.warning(f"[{source}] 不正な文字を含むexternal_idをスキップ: {skipped}")
+        if not safe_ids:
+            return 0
+
+        # PostgREST の in.() 内では各値をダブルクォートで囲む
+        ids_csv = ",".join(f'"{eid}"' for eid in safe_ids)
 
         try:
             resp = await self._request_with_retry(

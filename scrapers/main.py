@@ -31,7 +31,7 @@ import logging.handlers
 import sys
 from datetime import datetime
 
-from scrapers.config import LOGS_DIR
+from scrapers.config import LOGS_DIR, load_store_configs
 from scrapers.minimo_scraper import MinimoScraper
 from scrapers.salonboard_scraper import SalonBoardScraper
 from scrapers.scheduler import ReservationScheduler
@@ -61,7 +61,9 @@ def setup_logging() -> None:
 
 async def run_scheduler(site_id: str) -> None:
     """定期同期を開始"""
-    scheduler = ReservationScheduler(site_id)
+    stores = load_store_configs()
+    store = next((s for s in stores if s.site_id == site_id), None)
+    scheduler = ReservationScheduler(site_id, store_config=store)
     await scheduler.start()
 
 

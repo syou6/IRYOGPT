@@ -22,11 +22,13 @@ from datetime import datetime
 
 from scrapers.base_scraper import BaseScraper
 from scrapers.config import (
+    COOKIES_DIR,
     MINIMO_COOKIES_PATH,
     MINIMO_ID,
     MINIMO_LOGIN_URL,
     MINIMO_PASSWORD,
     MINIMO_TOP_URL,
+    StoreConfig,
 )
 
 logger = logging.getLogger(__name__)
@@ -36,16 +38,37 @@ MINIMO_SCHEDULE_HASH = "#/schedule"
 
 
 class MinimoScraper(BaseScraper):
-    def __init__(self):
-        super().__init__(name="minimo", cookies_path=MINIMO_COOKIES_PATH)
+    def __init__(
+        self,
+        minimo_id: str = "",
+        minimo_password: str = "",
+        store_id: str = "",
+    ):
+        self._minimo_id = minimo_id or MINIMO_ID
+        self._minimo_password = minimo_password or MINIMO_PASSWORD
+
+        if store_id:
+            cookies_path = COOKIES_DIR / f"minimo_{store_id}_cookies.dat"
+        else:
+            cookies_path = MINIMO_COOKIES_PATH
+
+        super().__init__(name=f"minimo:{store_id or 'default'}", cookies_path=cookies_path)
+
+    @classmethod
+    def from_store_config(cls, config: StoreConfig) -> "MinimoScraper":
+        return cls(
+            minimo_id=config.minimo_id,
+            minimo_password=config.minimo_password,
+            store_id=config.store_id,
+        )
 
     # ------------------------------------------------------------------
     # ログイン
     # ------------------------------------------------------------------
 
     async def login(self) -> bool:
-        if not MINIMO_ID or not MINIMO_PASSWORD:
-            logger.error("[minimo] MINIMO_ID/PASSWORD が未設定")
+        if not self._minimo_id or not self._minimo_password:
+            logger.error(f"[{self.name}] MINIMO_ID/PASSWORD が未設定")
             return False
 
         try:
@@ -82,7 +105,7 @@ class MinimoScraper(BaseScraper):
                 await self.screenshot("login_no_id_field")
                 return False
 
-            await self.human_type(id_input, MINIMO_ID)
+            await self.human_type(id_input, self._minimo_id)
             await self.human_delay(0.3, 0.8)
 
             # PW入力
@@ -93,11 +116,11 @@ class MinimoScraper(BaseScraper):
                     break
 
             if not pw_input:
-                logger.error("[minimo] パスワードフィールドが見つからない")
+                logger.error(f"[{self.name}] パスワードフィールドが見つからない")
                 await self.screenshot("login_no_pw_field")
                 return False
 
-            await self.human_type(pw_input, MINIMO_PASSWORD)
+            await self.human_type(pw_input, self._minimo_password)
             await self.human_delay(0.5, 1.0)
 
             # ログインボタン

@@ -31,10 +31,13 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Header, Query, Request, Response
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+import re
 
+from fastapi import Depends, FastAPI, HTTPException, Header, Query, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel, field_validator
+
+from scrapers.config import load_store_configs
 from scrapers.scheduler import ReservationScheduler
 from scrapers.sync_service import SyncService
 
@@ -44,15 +47,30 @@ JST = timezone(timedelta(hours=9))
 
 # --- 設定 ---
 API_SECRET = os.getenv("SCRAPER_API_SECRET", "")
-ALLOWED_ORIGINS = os.getenv(
+if not API_SECRET:
+    logging.getLogger(__name__).critical(
+        "SCRAPER_API_SECRET が未設定です。全エンドポイントが無認証で公開されます。"
+        "本番環境では必ず設定してください。"
+    )
+
+# CORS: allow_origin_regex を使うためここでは文字列で保持
+CORS_ORIGINS_RAW = os.getenv(
     "CORS_ORIGINS",
-    "https://yoyakuraku.com,https://*.vercel.app",
-).split(",")
+    "https://yoyakuraku.com",
+)
+# 固定オリジンリスト（ワイルドカードは allow_origin_regex で処理）
+ALLOWED_ORIGINS = [o.strip() for o in CORS_ORIGINS_RAW.split(",") if "*" not in o]
+ALLOWED_ORIGIN_REGEX = os.getenv(
+    "CORS_ORIGIN_REGEX",
+    r"https://yoyakuraku-[a-z0-9\-]+\.vercel\.app",
+)
 
 # --- レート制限 ---
 RATE_LIMIT_WINDOW = 60  # 秒
 RATE_LIMIT_MAX = 30     # 1分あたりの最大リクエスト数
+RATE_LIMIT_MAX_KEYS = 10000  # 追跡するIPの上限
 _rate_limit_store: dict[str, list[float]] = defaultdict(list)
+_rate_limit_last_cleanup = 0.0
 
 # --- グローバル変数 ---
 scheduler: Optional[ReservationScheduler] = None
@@ -66,12 +84,16 @@ async def lifespan(app: FastAPI):
     global scheduler, scheduler_task, _start_time
 
     _start_time = time.time()
-    site_id = os.getenv("SITE_ID", "")
 
-    if not site_id:
-        logger.error("SITE_ID 環境変数が未設定")
+    # マルチテナント: StoreConfig から読み込み（後方互換あり）
+    stores = load_store_configs()
+    if not stores:
+        logger.error("ストア設定が見つかりません（SITE_ID または STORES_CONFIG_PATH を設定）")
     else:
-        scheduler = ReservationScheduler(site_id)
+        # Phase 1: 最初のストアのみ起動（将来は複数ストア並列対応）
+        store = stores[0]
+        logger.info(f"ストア設定ロード: {store.label or store.store_id} (site_id={store.site_id})")
+        scheduler = ReservationScheduler(store.site_id, store_config=store)
         scheduler_task = asyncio.create_task(scheduler.start())
         logger.info("スケジューラー開始（バックグラウンド）")
 
@@ -101,8 +123,9 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=ALLOWED_ORIGIN_REGEX,
     allow_credentials=False,
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PATCH"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
@@ -117,6 +140,18 @@ async def request_middleware(request: Request, call_next):
     if request.url.path != "/health":
         now = time.time()
         window_start = now - RATE_LIMIT_WINDOW
+
+        # 定期的にstaleキーをクリーンアップ（メモリリーク防止）
+        global _rate_limit_last_cleanup
+        if now - _rate_limit_last_cleanup > 300:
+            stale_keys = [
+                ip for ip, ts in _rate_limit_store.items()
+                if not ts or ts[-1] < window_start
+            ]
+            for ip in stale_keys:
+                del _rate_limit_store[ip]
+            _rate_limit_last_cleanup = now
+
         requests = _rate_limit_store[client_ip]
         # 古いエントリを除去
         _rate_limit_store[client_ip] = [t for t in requests if t > window_start]
@@ -143,23 +178,51 @@ async def request_middleware(request: Request, call_next):
     return response
 
 
-# --- 認証ヘルパー ---
+# --- 認証ヘルパー（FastAPI Depends で使用）---
 def verify_api_key(authorization: str = Header(default="")):
     if not API_SECRET:
-        return
+        raise HTTPException(
+            status_code=503,
+            detail="SCRAPER_API_SECRET が未設定のため利用不可",
+        )
     if authorization != f"Bearer {API_SECRET}":
         raise HTTPException(status_code=401, detail="Unauthorized")
 
 
 # --- リクエスト/レスポンスモデル ---
+_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+_TIME_RE = re.compile(r"^\d{2}:\d{2}$")
+
+
 class SyncRequest(BaseModel):
     date: Optional[str] = None
+
+    @field_validator("date")
+    @classmethod
+    def validate_date(cls, v: Optional[str]) -> Optional[str]:
+        if v is not None and not _DATE_RE.match(v):
+            raise ValueError("date は YYYY-MM-DD 形式で指定してください")
+        return v
 
 
 class RealtimeCheckRequest(BaseModel):
     date: str
     staff_name: str
     start_time: str
+
+    @field_validator("date")
+    @classmethod
+    def validate_date(cls, v: str) -> str:
+        if not _DATE_RE.match(v):
+            raise ValueError("date は YYYY-MM-DD 形式で指定してください")
+        return v
+
+    @field_validator("start_time")
+    @classmethod
+    def validate_time(cls, v: str) -> str:
+        if not _TIME_RE.match(v):
+            raise ValueError("start_time は HH:MM 形式で指定してください")
+        return v
 
 
 class RealtimeCheckResponse(BaseModel):
@@ -206,16 +269,14 @@ async def health():
 
 
 @app.get("/status")
-async def status(authorization: str = Header(default="")):
-    verify_api_key(authorization)
+async def status(_=Depends(verify_api_key)):
     if not scheduler:
         raise HTTPException(status_code=503, detail="スケジューラー未起動")
     return scheduler.get_status()
 
 
 @app.post("/sync")
-async def sync(req: SyncRequest, authorization: str = Header(default="")):
-    verify_api_key(authorization)
+async def sync(req: SyncRequest, _=Depends(verify_api_key)):
     if not scheduler:
         raise HTTPException(status_code=503, detail="スケジューラー未起動")
 
@@ -226,9 +287,8 @@ async def sync(req: SyncRequest, authorization: str = Header(default="")):
 @app.post("/realtime-check", response_model=RealtimeCheckResponse)
 async def realtime_check(
     req: RealtimeCheckRequest,
-    authorization: str = Header(default=""),
+    _=Depends(verify_api_key),
 ):
-    verify_api_key(authorization)
     if not scheduler:
         raise HTTPException(status_code=503, detail="スケジューラー未起動")
 
@@ -239,8 +299,7 @@ async def realtime_check(
 
 
 @app.post("/resume/{source}")
-async def resume(source: str, authorization: str = Header(default="")):
-    verify_api_key(authorization)
+async def resume(source: str, _=Depends(verify_api_key)):
     if not scheduler:
         raise HTTPException(status_code=503, detail="スケジューラー未起動")
 
@@ -255,9 +314,9 @@ async def resume(source: str, authorization: str = Header(default="")):
 
 @app.get("/reservations")
 async def get_reservations(
-    date: str = Query(..., description="対象日 (YYYY-MM-DD)"),
+    date: str = Query(..., description="対象日 (YYYY-MM-DD)", pattern=r"^\d{4}-\d{2}-\d{2}$"),
     source: Optional[str] = Query(None, description="salonboard or minimo"),
-    authorization: str = Header(default=""),
+    _=Depends(verify_api_key),
 ):
     """
     指定日の外部予約一覧を返す。
@@ -265,7 +324,6 @@ async def get_reservations(
     Vercel側からリアルタイムに予約済みスロットを参照するためのエンドポイント。
     スクレイパーが最後にSupabaseに書き込んだデータをそのまま返す。
     """
-    verify_api_key(authorization)
 
     site_id = os.getenv("SITE_ID", "")
     if not site_id:
@@ -289,9 +347,7 @@ async def get_reservations(
 
 
 @app.post("/cleanup-screenshots")
-async def cleanup_screenshots(authorization: str = Header(default="")):
-    """古いスクリーンショットを手動削除"""
-    verify_api_key(authorization)
+async def cleanup_screenshots(_=Depends(verify_api_key)):
 
     from scrapers.config import SCREENSHOTS_DIR
     from scrapers.disk_manager import cleanup_screenshots as do_cleanup

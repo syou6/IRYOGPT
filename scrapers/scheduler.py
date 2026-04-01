@@ -24,6 +24,7 @@ from scrapers.config import (
     SCREENSHOTS_DIR,
     SYNC_INTERVAL_MAX,
     SYNC_INTERVAL_MIN,
+    StoreConfig,
 )
 from scrapers.disk_manager import backup_cookies, check_disk_space, cleanup_screenshots
 from scrapers.minimo_scraper import MinimoScraper
@@ -40,18 +41,26 @@ BUSINESS_HOURS_START = 8   # 8:00
 BUSINESS_HOURS_END = 22    # 22:00
 
 
+CAPTCHA_AUTO_RESUME_SECONDS = 30 * 60  # 30分後に自動再開
+
+
 class ReservationScheduler:
     """ランダム間隔でスクレイピングを実行するスケジューラー"""
 
-    def __init__(self, site_id: str):
+    def __init__(self, site_id: str, store_config: StoreConfig | None = None):
         self.site_id = site_id
-        self.salonboard = SalonBoardScraper()
-        self.minimo = MinimoScraper()
+        if store_config:
+            self.salonboard = SalonBoardScraper.from_store_config(store_config)
+            self.minimo = MinimoScraper.from_store_config(store_config)
+        else:
+            self.salonboard = SalonBoardScraper()
+            self.minimo = MinimoScraper()
         self.sync_service = SyncService(site_id)
         self._running = False
         self._consecutive_errors = {"salonboard": 0, "minimo": 0}
         self._max_consecutive_errors = 5
         self._paused = {"salonboard": False, "minimo": False}
+        self._paused_at: dict[str, datetime | None] = {"salonboard": None, "minimo": None}
         self._cycle_count = 0
         self._last_cleanup: datetime | None = None
         self._started_at: datetime | None = None
@@ -74,6 +83,7 @@ class ReservationScheduler:
         try:
             while self._running:
                 self._cycle_count += 1
+                await self._maybe_auto_resume()
                 await self._run_cycle()
 
                 await self._maybe_cleanup()
@@ -111,18 +121,26 @@ class ReservationScheduler:
 
         results = {}
 
+        # 並列実行: 独立したスクレイプタスクを同時に走らせる
+        tasks = []
+        task_keys = []
+
         for date in dates:
             if not self._paused["salonboard"]:
-                sb_result = await self._scrape_safe(
-                    self.salonboard, "salonboard", date
-                )
-                results[f"salonboard_{date}"] = sb_result
-
+                tasks.append(self._scrape_safe(self.salonboard, "salonboard", date))
+                task_keys.append(f"salonboard_{date}")
             if not self._paused["minimo"]:
-                minimo_result = await self._scrape_safe(
-                    self.minimo, "minimo", date
-                )
-                results[f"minimo_{date}"] = minimo_result
+                tasks.append(self._scrape_safe(self.minimo, "minimo", date))
+                task_keys.append(f"minimo_{date}")
+
+        if tasks:
+            task_results = await asyncio.gather(*tasks, return_exceptions=True)
+            for key, result in zip(task_keys, task_results):
+                if isinstance(result, Exception):
+                    logger.error(f"[{key}] 並列実行エラー: {result}")
+                    results[key] = {"synced": 0, "errors": 1}
+                else:
+                    results[key] = result
 
         self._last_sync_at = datetime.now(JST)
         await notify_sync_result(results)
@@ -136,9 +154,13 @@ class ReservationScheduler:
 
             if scraper.captcha_detected:
                 self._paused[source] = True
+                self._paused_at[source] = datetime.now(JST)
                 self._consecutive_errors[source] = 0
                 await notify_captcha(source)
-                logger.warning(f"[{source}] CAPTCHA検知 → 一時停止")
+                logger.warning(
+                    f"[{source}] CAPTCHA検知 → 一時停止"
+                    f"（{CAPTCHA_AUTO_RESUME_SECONDS // 60}分後に自動再開）"
+                )
                 return {"synced": 0, "errors": 0, "captcha": True}
 
             # --- 消えた予約の検知 ---
@@ -220,6 +242,31 @@ class ReservationScheduler:
             logger.info("日次クリーンアップ完了")
         except Exception as e:
             logger.error(f"クリーンアップエラー: {e}")
+
+    async def _maybe_auto_resume(self) -> None:
+        """CAPTCHA一時停止後、一定時間経過で自動再開を試みる"""
+        now = datetime.now(JST)
+        for source in ("salonboard", "minimo"):
+            if not self._paused[source]:
+                continue
+            paused_at = self._paused_at.get(source)
+            if paused_at is None:
+                continue
+            elapsed = (now - paused_at).total_seconds()
+            if elapsed < CAPTCHA_AUTO_RESUME_SECONDS:
+                continue
+
+            logger.info(
+                f"[{source}] CAPTCHA一時停止から"
+                f"{elapsed / 60:.0f}分経過 → 自動再開を試行"
+            )
+            success = await self.resume(source)
+            if success:
+                logger.info(f"[{source}] 自動再開成功")
+            else:
+                # 再開失敗 → タイマーリセットして次回また試行
+                self._paused_at[source] = now
+                logger.warning(f"[{source}] 自動再開失敗 → 次回再試行")
 
     async def resume(self, source: str) -> bool:
         if source not in self._paused:

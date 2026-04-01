@@ -22,7 +22,9 @@ StartLimitBurst=5
 
 [Service]
 Type=simple
-User=root
+# セキュリティ: 専用ユーザーで実行（root禁止）
+# sudo useradd -r -m -s /bin/bash scraper && sudo usermod -aG sudo scraper
+User=scraper
 WorkingDirectory=/home/IRYOGPT
 EnvironmentFile=/home/IRYOGPT/scrapers/.env
 Environment=PYTHONUNBUFFERED=1
@@ -46,6 +48,8 @@ LimitNPROC=4096
 # --- セキュリティ ---
 NoNewPrivileges=yes
 PrivateTmp=yes
+ProtectSystem=strict
+ReadWritePaths=/home/IRYOGPT/scrapers/cookies /home/IRYOGPT/scrapers/screenshots /home/IRYOGPT/scrapers/logs
 
 # --- ログ ---
 StandardOutput=journal

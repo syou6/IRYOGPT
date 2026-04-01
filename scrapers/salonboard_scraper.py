@@ -23,6 +23,7 @@ from datetime import datetime
 
 from scrapers.base_scraper import BaseScraper
 from scrapers.config import (
+    COOKIES_DIR,
     SALONBOARD_COOKIES_PATH,
     SALONBOARD_ID,
     SALONBOARD_LOGIN_URL,
@@ -31,18 +32,45 @@ from scrapers.config import (
     SALONBOARD_SCHEDULE_URL_KLS,
     SALONBOARD_TOP_URL,
     SALONBOARD_TYPE,
+    StoreConfig,
 )
 
 logger = logging.getLogger(__name__)
 
 
 class SalonBoardScraper(BaseScraper):
-    def __init__(self):
-        super().__init__(name="salonboard", cookies_path=SALONBOARD_COOKIES_PATH)
+    def __init__(
+        self,
+        sb_id: str = "",
+        sb_password: str = "",
+        sb_type: str = "",
+        store_id: str = "",
+    ):
+        # マルチテナント: 引数優先、なければ環境変数フォールバック
+        self._sb_id = sb_id or SALONBOARD_ID
+        self._sb_password = sb_password or SALONBOARD_PASSWORD
+        self._sb_type = (sb_type or SALONBOARD_TYPE).lower()
+
+        # ストアごとにcookieファイルを分離
+        if store_id:
+            cookies_path = COOKIES_DIR / f"salonboard_{store_id}_cookies.dat"
+        else:
+            cookies_path = SALONBOARD_COOKIES_PATH
+
+        super().__init__(name=f"salonboard:{store_id or 'default'}", cookies_path=cookies_path)
+
+    @classmethod
+    def from_store_config(cls, config: StoreConfig) -> "SalonBoardScraper":
+        return cls(
+            sb_id=config.salonboard_id,
+            sb_password=config.salonboard_password,
+            sb_type=config.salonboard_type,
+            store_id=config.store_id,
+        )
 
     @property
     def schedule_url(self) -> str:
-        if SALONBOARD_TYPE == "kls":
+        if self._sb_type == "kls":
             return SALONBOARD_SCHEDULE_URL_KLS
         return SALONBOARD_SCHEDULE_URL
 
@@ -51,8 +79,8 @@ class SalonBoardScraper(BaseScraper):
     # ------------------------------------------------------------------
 
     async def login(self) -> bool:
-        if not SALONBOARD_ID or not SALONBOARD_PASSWORD:
-            logger.error("[salonboard] SALONBOARD_ID/PASSWORD が未設定")
+        if not self._sb_id or not self._sb_password:
+            logger.error(f"[{self.name}] SALONBOARD_ID/PASSWORD が未設定")
             return False
 
         try:
@@ -62,16 +90,16 @@ class SalonBoardScraper(BaseScraper):
             await self.human_delay(1.0, 2.0)
 
             if await self.detect_captcha():
-                logger.error("[salonboard] ログインページでCAPTCHA検知")
+                logger.error(f"[{self.name}] ログインページでCAPTCHA検知")
                 return False
 
             # ID 入力
             id_input = await self.find('input[name="userId"]')
             if not id_input:
-                logger.error("[salonboard] ユーザーIDフィールドが見つからない")
+                logger.error(f"[{self.name}] ユーザーIDフィールドが見つからない")
                 await self.screenshot("login_no_id")
                 return False
-            await self.human_type(id_input, SALONBOARD_ID)
+            await self.human_type(id_input, self._sb_id)
             await self.human_delay(0.3, 0.8)
 
             # PW 入力
@@ -85,7 +113,7 @@ class SalonBoardScraper(BaseScraper):
                 logger.error("[salonboard] パスワードフィールドが見つからない")
                 await self.screenshot("login_no_pw")
                 return False
-            await self.human_type(pw_input, SALONBOARD_PASSWORD)
+            await self.human_type(pw_input, self._sb_password)
             await self.human_delay(0.5, 1.0)
 
             # ログインボタン

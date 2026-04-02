@@ -85,7 +85,7 @@ async def run_tests():
         page = await browser.get("about:blank")
 
         # ステルスJS注入
-        stealth_js = build_stealth_js(ua, w, h)
+        stealth_js = build_stealth_js((w, h), ua)
         import zendriver.cdp as cdp
         await page.send(
             cdp.page.add_script_to_evaluate_on_new_document(stealth_js)
@@ -204,7 +204,7 @@ async def run_tests():
         logger.info(f"{'='*60}")
 
     finally:
-        browser.stop()
+        await browser.stop()
 
 
 if __name__ == "__main__":

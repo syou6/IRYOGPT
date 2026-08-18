@@ -11,9 +11,9 @@ const BeforeAfterSection = () => {
           className="text-center mb-14 lg:mb-20"
         >
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight">
-            予約対応の悩みを
+            電話対応に追われる毎日を
             <br />
-            <span className="text-emerald-500">AIがまるっと解決</span>
+            <span className="text-emerald-500">AIが変える</span>
           </h2>
         </motion.div>
 

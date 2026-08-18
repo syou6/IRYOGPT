@@ -51,11 +51,31 @@ const PricingSection = () => {
                   ¥300,000<span className="text-base lg:text-lg font-normal opacity-80">（税別）</span>
                 </div>
               </div>
-              <div className="mb-8">
+              <div className="mb-6">
                 <div className="text-sm opacity-80 mb-2">月額費用</div>
                 <div className="text-4xl lg:text-5xl font-bold leading-none tracking-tight">
                   ¥100,000<span className="text-base lg:text-lg font-normal opacity-80">/月</span>
                 </div>
+              </div>
+
+              {/* ROI計算 */}
+              <div className="bg-white/10 rounded-xl p-4 mb-8 border border-white/20">
+                <div className="text-sm font-bold mb-3 opacity-90">経営効果シミュレーション</div>
+                <div className="space-y-1.5 text-sm">
+                  <div className="flex justify-between">
+                    <span className="opacity-80">受付スタッフ年間人件費</span>
+                    <span className="font-bold">¥4,000,000</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="opacity-80">よやくらく年間費用</span>
+                    <span className="font-bold">- ¥1,500,000</span>
+                  </div>
+                  <div className="border-t border-white/30 pt-1.5 flex justify-between">
+                    <span className="font-bold">年間削減額</span>
+                    <span className="text-lg font-bold text-yellow-300">¥2,500,000</span>
+                  </div>
+                </div>
+                <p className="text-xs opacity-70 mt-2">※ 初期費用は約2ヶ月で回収可能</p>
               </div>
 
               {/* 安心保証バッジ */}

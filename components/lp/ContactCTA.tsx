@@ -16,14 +16,14 @@ const ContactCTA = ({ variant = "default" }: ContactCTAProps) => {
             viewport={{ once: true }}
           >
             <p className="text-[18px] lg:text-[24px] text-white/95 mb-6 tracking-wide font-medium">
-              予約対応でお困りの方、お気軽にご相談ください
+              年間250万円の削減効果。まずは無料で診断してみませんか？
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 href="/contact"
                 className="px-10 py-4 bg-white text-emerald-600 rounded-full font-bold text-[16px] lg:text-[17px] hover:shadow-lg transition-shadow tracking-wide"
               >
-                無料で相談する
+                削減額を無料診断する
               </Link>
               <a
                 href="tel:090-3639-9477"
@@ -51,12 +51,12 @@ const ContactCTA = ({ variant = "default" }: ContactCTAProps) => {
           className="rounded-3xl bg-gradient-to-r from-emerald-500 to-emerald-600 p-10 lg:p-20 text-center text-white"
         >
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold mb-8">
-            まずは無料相談から
+            年間250万円の削減を実現
           </h2>
           <p className="text-xl lg:text-2xl opacity-90 mb-12 max-w-3xl mx-auto leading-relaxed">
-            導入についてのご質問、お見積もりなど、お気軽にご相談ください。
+            貴院の診療フローを診断し、最適な導入プランと削減シミュレーションをご提案。
             <br className="hidden lg:block" />
-            専門スタッフが丁寧にご説明いたします。
+            5分のヒアリングで、削減可能額がわかります。
           </p>
 
           <div className="flex flex-col sm:flex-row gap-6 justify-center mb-12">
@@ -64,7 +64,7 @@ const ContactCTA = ({ variant = "default" }: ContactCTAProps) => {
               href="/contact"
               className="px-12 py-6 bg-white text-emerald-600 rounded-full font-bold text-xl lg:text-2xl hover:shadow-xl transition-shadow flex items-center justify-center gap-3"
             >
-              無料で相談する
+              今すぐ無料診断を予約
               <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
               </svg>

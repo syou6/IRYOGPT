@@ -34,16 +34,18 @@ const HeroSection = () => {
               医療・美容業界特化
             </motion.p>
 
-            <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-[5.5rem] xl:text-[6.5rem] font-bold leading-[1.1] mt-8 mb-6 lg:mb-8">
-              <span className="whitespace-nowrap">もう予約電話に</span>
+            <h1 className="text-4xl sm:text-5xl md:text-6xl lg:text-[5rem] xl:text-[5.5rem] font-bold leading-[1.1] mt-8 mb-6 lg:mb-8">
+              <span className="whitespace-nowrap">本業に集中できる</span>
               <br />
-              <span className="whitespace-nowrap text-emerald-400">振り回されない</span>
+              <span className="whitespace-nowrap text-emerald-400">医院へ。</span>
             </h1>
 
-            <p className="text-2xl sm:text-3xl opacity-80 mb-8 lg:mb-10 leading-relaxed">
-              24時間365日、AIが予約を自動受付。
+            <p className="text-xl sm:text-2xl lg:text-3xl opacity-90 mb-8 lg:mb-10 leading-relaxed">
+              AIが予約電話を24時間自動対応。
               <br />
-              スタッフは本業に集中できます。
+              スタッフの電話対応を<span className="text-emerald-400 font-bold">80%削減</span>し、
+              <br className="hidden sm:block" />
+              診療に専念できる環境を実現します。
             </p>
 
             <div className="flex flex-col sm:flex-row gap-3">
@@ -51,7 +53,7 @@ const HeroSection = () => {
                 href="/contact"
                 className="px-6 lg:px-8 py-3.5 lg:py-4 bg-white text-emerald-600 rounded-full font-medium text-[14px] lg:text-[15px] flex items-center justify-center gap-3 hover:shadow-lg transition-shadow"
               >
-                <span>無料で相談する</span>
+                <span>削減額を無料診断する</span>
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M14 5l7 7m0 0l-7 7m7-7H3" />
                 </svg>
@@ -73,14 +75,26 @@ const HeroSection = () => {
             >
               <div className="flex items-center gap-4">
                 <Image
-                  src="https://img.icons8.com/3d-fluency/94/hospital.png"
-                  alt="医療"
+                  src="https://img.icons8.com/3d-fluency/94/phone.png"
+                  alt="電話削減"
                   width={56}
                   height={56}
                 />
                 <div>
-                  <p className="text-xl lg:text-2xl font-bold text-white">医療・美容特化</p>
-                  <p className="text-lg text-white/60">業界専門AI</p>
+                  <p className="text-xl lg:text-2xl font-bold text-white">電話80%削減</p>
+                  <p className="text-lg text-white/60">業務効率化</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-4">
+                <Image
+                  src="https://img.icons8.com/3d-fluency/94/hospital.png"
+                  alt="コスト削減"
+                  width={56}
+                  height={56}
+                />
+                <div>
+                  <p className="text-xl lg:text-2xl font-bold text-white">年間250万円削減</p>
+                  <p className="text-lg text-white/60">人件費の大幅カット</p>
                 </div>
               </div>
               <div className="flex items-center gap-4">
@@ -91,20 +105,8 @@ const HeroSection = () => {
                   height={56}
                 />
                 <div>
-                  <p className="text-xl lg:text-2xl font-bold text-white">24時間対応</p>
-                  <p className="text-lg text-white/60">夜間・休日も</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <Image
-                  src="https://img.icons8.com/3d-fluency/94/phone.png"
-                  alt="電話削減"
-                  width={56}
-                  height={56}
-                />
-                <div>
-                  <p className="text-xl lg:text-2xl font-bold text-white">電話80%削減</p>
-                  <p className="text-lg text-white/60">業務効率化</p>
+                  <p className="text-xl lg:text-2xl font-bold text-white">24時間365日</p>
+                  <p className="text-lg text-white/60">夜間・休日も自動対応</p>
                 </div>
               </div>
             </motion.div>
@@ -127,7 +129,7 @@ const HeroSection = () => {
                 <div className="rounded-t-3xl bg-gray-800 p-4 shadow-2xl">
                   <div className="absolute left-1/2 top-3 h-3 w-3 -translate-x-1/2 rounded-full bg-gray-600" />
                   <div className="overflow-hidden rounded-xl bg-white">
-                    <video autoPlay muted loop playsInline className="h-auto w-[480px] xl:w-[540px] 2xl:w-[600px]">
+                    <video autoPlay muted loop playsInline preload="none" className="h-auto w-[480px] xl:w-[540px] 2xl:w-[600px]">
                       <source src="/videos/demo.mp4" type="video/mp4" />
                     </video>
                   </div>

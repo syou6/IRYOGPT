@@ -4,21 +4,21 @@ import Image from "next/image";
 const reasons = [
   {
     number: "01",
-    image: "https://images.unsplash.com/photo-1512486130939-2c4f79935e4f?w=600&h=400&fit=crop",
-    title: "AI×スプレッドシートで誰でも簡単運用",
-    description: "特別なシステムは不要。使い慣れたGoogleスプレッドシートで予約を一元管理。AIが自動で予約を受け付け、スタッフの電話予約も同じシートに追加するだけ。",
+    image: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=600&h=400&fit=crop",
+    title: "年間250万円の人件費削減を実現",
+    description: "受付スタッフ1人の年間給与400万円が、よやくらくなら年間150万円で実現。初期費用は約2ヶ月で回収でき、以降は毎年250万円の経営効率化に直結します。",
   },
   {
     number: "02",
-    image: "https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=600&h=400&fit=crop",
-    title: "圧倒的なコストパフォーマンス",
-    description: "受付スタッフを1人雇用すると年間400万円以上。よやくらくなら年間150万円で24時間365日の予約対応を実現。年間250万円以上のコスト削減。",
+    image: "https://images.unsplash.com/photo-1512486130939-2c4f79935e4f?w=600&h=400&fit=crop",
+    title: "導入3日で運用開始。システム導入の手間なし",
+    description: "Googleスプレッドシート連携で、新しいシステム導入は不要。初期設定は当社が代行するため、スタッフの負担はゼロ。ITリテラシーを問わず、すぐに運用を開始できます。",
   },
   {
     number: "03",
     image: "https://images.unsplash.com/photo-1584982751601-97dcc096659c?w=600&h=400&fit=crop",
-    title: "医療・美容業界に特化したAI",
-    description: "医療アドバイスは一切行わず、予約と案内に特化。業界特有のニーズを理解し、担当医指名や診察券番号の確認にも対応します。",
+    title: "予約と案内に専門化した安全なAI",
+    description: "医療判断は一切行わず、予約と案内業務に特化。担当医指名や診察券番号の確認にも対応し、医院の実務フローに最適化された安全設計です。",
   },
 ];
 
